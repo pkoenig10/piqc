@@ -1,0 +1,6 @@
+[package]
+name = "piqc"
+version = "0.0.0"
+authors = ["Patrick Koenig <pkoenig10@gmail.com>"]
+
+[dependencies]
