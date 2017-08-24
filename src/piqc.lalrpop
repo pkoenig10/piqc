@@ -1,0 +1,91 @@
+use ast::*;
+
+grammar;
+
+IntLiteral : IntLiteral = {
+    r"\d+" => IntLiteral::new(<>.parse().unwrap()),
+};
+
+FloatLiteral : FloatLiteral = {
+    r"\d*\.\d*" => FloatLiteral::new(<>.parse().unwrap()),
+};
+
+BoolLiteral : BoolLiteral = {
+    "true" => BoolLiteral::new(true),
+    "false" => BoolLiteral::new(false),
+};
+
+Identifier : Identifier = {
+    r"[A-Za-z_][0-9A-Za-z_]*" => Identifier::new(<>),
+};
+
+PrimaryExpr : Expr = {
+    IntLiteral => Expr::IntLiteral(<>),
+    FloatLiteral => Expr::FloatLiteral(<>),
+    BoolLiteral => Expr::BoolLiteral(<>),
+    Identifier => Expr::Identifier(<>),
+    "(" <Expr> ")" => <>,
+};
+
+UnaryExpr : Expr = {
+    PrimaryExpr => <>,
+    "-" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::Negate, <>)),
+    "~" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::BitNot, <>)),
+    "!" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::LogicalNot, <>)),
+};
+
+MultiplicativeExpr : Expr = {
+    UnaryExpr => <>,
+    <MultiplicativeExpr> "*" <UnaryExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Mul, <>)),
+};
+
+AdditiveExpr : Expr = {
+    MultiplicativeExpr => <>,
+    <AdditiveExpr> "+" <MultiplicativeExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Add, <>)),
+    <AdditiveExpr> "-" <MultiplicativeExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Sub, <>)),
+};
+
+ShiftExpr : Expr = {
+    AdditiveExpr => <>,
+    <ShiftExpr> "<<" <AdditiveExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Shl, <>)),
+    <ShiftExpr> ">>" <AdditiveExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Shr, <>)),
+};
+
+BitAndExpr : Expr = {
+    ShiftExpr => <>,
+    <BitAndExpr> "&" <ShiftExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitAnd, <>)),
+};
+
+BitXorExpr : Expr = {
+    BitAndExpr => <>,
+    <BitXorExpr> "^" <BitAndExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitXor, <>)),
+};
+
+BitOrExpr : Expr = {
+    BitXorExpr => <>,
+    <BitOrExpr> "|" <BitXorExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitOr, <>)),
+};
+
+ComparisonExpr : Expr = {
+    BitOrExpr => <>,
+    <ComparisonExpr> "==" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Eq, <>)),
+    <ComparisonExpr> "!=" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Ne, <>)),
+    <ComparisonExpr> "<" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Lt, <>)),
+    <ComparisonExpr> ">" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Gt, <>)),
+    <ComparisonExpr> "<=" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Le, <>)),
+    <ComparisonExpr> ">=" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Ge, <>)),
+};
+
+LogicalAndExpr : Expr = {
+    ComparisonExpr => <>,
+    <LogicalAndExpr> "&&" <ComparisonExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::LogicalAnd, <>)),
+};
+
+LogicalOrExpr : Expr = {
+    LogicalAndExpr => <>,
+    <LogicalOrExpr> "||" <LogicalAndExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::LogicalOr, <>)),
+};
+
+pub Expr : Expr = {
+    LogicalOrExpr => <>,
+};
