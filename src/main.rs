@@ -1,6 +1,5 @@
-mod ast;
-mod piqc;
+extern crate piqc;
 
 fn main() {
-    println!("{:#?}", piqc::parse_Expr("42").unwrap());
+    piqc::parse("42");
 }
