@@ -1,5 +1,12 @@
 extern crate piqc;
 
 fn main() {
-    piqc::parse("42");
+    piqc::parse(
+        "
+{
+    int foo = 42;
+    bool bar = true;
+}
+",
+    );
 }
