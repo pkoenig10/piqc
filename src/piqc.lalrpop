@@ -1,4 +1,6 @@
 use ast::expr::*;
+use ast::func::*;
+use ast::prog::*;
 use ast::stmt::*;
 use ast::type_::*;
 
@@ -36,46 +38,46 @@ PrimaryExpr: Expr = {
 };
 
 UnaryExpr: Expr = {
-    PrimaryExpr => <>,
+    PrimaryExpr,
     "-" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::Negate, <>)),
     "~" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::BitNot, <>)),
     "!" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::LogicalNot, <>)),
 };
 
 MultiplicativeExpr: Expr = {
-    UnaryExpr => <>,
+    UnaryExpr,
     <MultiplicativeExpr> "*" <UnaryExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Mul, <>)),
 };
 
 AdditiveExpr: Expr = {
-    MultiplicativeExpr => <>,
+    MultiplicativeExpr,
     <AdditiveExpr> "+" <MultiplicativeExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Add, <>)),
     <AdditiveExpr> "-" <MultiplicativeExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Sub, <>)),
 };
 
 ShiftExpr: Expr = {
-    AdditiveExpr => <>,
+    AdditiveExpr,
     <ShiftExpr> "<<" <AdditiveExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Shl, <>)),
     <ShiftExpr> ">>" <AdditiveExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Shr, <>)),
 };
 
 BitAndExpr: Expr = {
-    ShiftExpr => <>,
+    ShiftExpr,
     <BitAndExpr> "&" <ShiftExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitAnd, <>)),
 };
 
 BitXorExpr : Expr = {
-    BitAndExpr => <>,
+    BitAndExpr,
     <BitXorExpr> "^" <BitAndExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitXor, <>)),
 };
 
 BitOrExpr: Expr = {
-    BitXorExpr => <>,
+    BitXorExpr,
     <BitOrExpr> "|" <BitXorExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitOr, <>)),
 };
 
 ComparisonExpr: Expr = {
-    BitOrExpr => <>,
+    BitOrExpr,
     <ComparisonExpr> "==" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Eq, <>)),
     <ComparisonExpr> "!=" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Ne, <>)),
     <ComparisonExpr> "<" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Lt, <>)),
@@ -85,38 +87,63 @@ ComparisonExpr: Expr = {
 };
 
 LogicalAndExpr: Expr = {
-    ComparisonExpr => <>,
+    ComparisonExpr,
     <LogicalAndExpr> "&&" <ComparisonExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::LogicalAnd, <>)),
 };
 
 LogicalOrExpr: Expr = {
-    LogicalAndExpr => <>,
+    LogicalAndExpr,
     <LogicalOrExpr> "||" <LogicalAndExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::LogicalOr, <>)),
 };
 
 Expr: Expr = {
-    LogicalOrExpr => <>,
+    LogicalOrExpr,
 };
 
-DeclStmt: Stmt = {
-    <Type> <Identifier> "=" <Expr> ";" => Stmt::DeclStmt(DeclStmt::new(<>)),
+DeclStmt: DeclStmt = {
+    <Type> <Identifier> "=" <Expr> ";" => DeclStmt::new(<>),
 };
 
-AssignStmt: Stmt = {
-    <Identifier> "=" <Expr> ";" => Stmt::AssignStmt(AssignStmt::new(<>)),
+AssignStmt: AssignStmt = {
+    <Identifier> "=" <Expr> ";" => AssignStmt::new(<>),
 };
 
-ReturnStmt: Stmt = {
-    "return" ";" => Stmt::ReturnStmt,
+ReturnStmt: ReturnStmt = {
+    "return" ";" => ReturnStmt::new(),
 };
 
-BlockStmt: Stmt = {
-    "{" <Stmt*> "}" => Stmt::BlockStmt(BlockStmt::new(<>)),
+BlockStmt: BlockStmt = {
+    "{" <Stmt*> "}" => BlockStmt::new(<>),
 };
 
-pub Stmt: Stmt = {
-    DeclStmt => <>,
-    AssignStmt => <>,
-    ReturnStmt => <>,
-    BlockStmt => <>,
+Stmt: Stmt = {
+    DeclStmt => Stmt::DeclStmt(<>),
+    AssignStmt => Stmt::AssignStmt(<>),
+    ReturnStmt => Stmt::ReturnStmt(<>),
+    BlockStmt => Stmt::BlockStmt(<>),
+};
+
+Param: Param = {
+    <Type> <Identifier> => Param::new(<>),
+};
+
+Params_: Vec<Param> = {
+    Param => vec![<>],
+    <params: Params_> "," <param: Param> => {
+        let mut params = params;
+        params.push(param);
+        params
+    },
+};
+
+Params: Params = {
+    <Params_?> => Params::new(<>.unwrap_or(vec![])),
+};
+
+Func: Func = {
+    "fn" <Identifier> "(" <Params> ")" <BlockStmt> => Func::new(<>),
+};
+
+pub Prog: Prog = {
+    <Func*> => Prog::new(<>),
 };

@@ -31,6 +31,15 @@ impl AssignStmt {
 }
 
 #[derive(Debug)]
+pub struct ReturnStmt {}
+
+impl ReturnStmt {
+    pub fn new() -> ReturnStmt {
+        ReturnStmt {}
+    }
+}
+
+#[derive(Debug)]
 pub struct BlockStmt {
     stmts: Vec<Stmt>,
 }
@@ -45,6 +54,6 @@ impl BlockStmt {
 pub enum Stmt {
     DeclStmt(DeclStmt),
     AssignStmt(AssignStmt),
-    ReturnStmt,
+    ReturnStmt(ReturnStmt),
     BlockStmt(BlockStmt),
 }
