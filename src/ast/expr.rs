@@ -57,11 +57,11 @@ pub struct UnaryExpr {
 }
 
 impl UnaryExpr {
-    pub fn new(op: UnaryOp, expr: Expr) -> UnaryExpr {
-        UnaryExpr {
+    pub fn new(op: UnaryOp, expr: Expr) -> Expr {
+        Expr::UnaryExpr(UnaryExpr {
             op,
             expr: Box::new(expr),
-        }
+        })
     }
 }
 
@@ -93,12 +93,12 @@ pub struct BinaryExpr {
 }
 
 impl BinaryExpr {
-    pub fn new(op: BinaryOp, left: Expr, right: Expr) -> BinaryExpr {
-        BinaryExpr {
+    pub fn new(left: Expr, op: BinaryOp, right: Expr) -> Expr {
+        Expr::BinaryExpr(BinaryExpr {
             op,
             left: Box::new(left),
             right: Box::new(right),
-        }
+        })
     }
 }
 

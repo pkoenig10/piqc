@@ -12,6 +12,11 @@ Type: Type = {
     "bool" => Type::Bool,
 };
 
+Bool: bool = {
+    "true" => true,
+    "false" => false,
+};
+
 Identifier: Identifier = {
     r"[A-Za-z_][0-9A-Za-z_]*" => Identifier::new(<>),
 };
@@ -25,8 +30,56 @@ FloatLiteral: FloatLiteral = {
 };
 
 BoolLiteral: BoolLiteral = {
-    "true" => BoolLiteral::new(true),
-    "false" => BoolLiteral::new(false),
+    Bool => BoolLiteral::new(<>),
+};
+
+UnaryOp: UnaryOp = {
+    "-" => UnaryOp::Negate,
+    "~" => UnaryOp::BitNot,
+    "!" => UnaryOp::LogicalNot,
+};
+
+MultiplicativeOp: BinaryOp = {
+    "*" => BinaryOp::Mul,
+};
+
+AdditiveOp: BinaryOp = {
+    "+" => BinaryOp::Add,
+    "-" => BinaryOp::Sub,
+};
+
+ShiftOp: BinaryOp = {
+    "<<" => BinaryOp::Shl,
+    ">>" => BinaryOp::Shr,
+};
+
+BitAndOp: BinaryOp = {
+    "&" => BinaryOp::BitAnd,
+};
+
+BitXorOp: BinaryOp = {
+    "^" => BinaryOp::BitXor,
+};
+
+BitOrOp: BinaryOp = {
+    "|" => BinaryOp::BitOr,
+};
+
+ComparisonOp: BinaryOp = {
+    "==" => BinaryOp::Eq,
+    "!=" => BinaryOp::Ne,
+    "<" => BinaryOp::Lt,
+    ">" => BinaryOp::Gt,
+    "<=" => BinaryOp::Le,
+    ">=" => BinaryOp::Ge,
+};
+
+LogicalAndOp: BinaryOp = {
+    "&&" => BinaryOp::LogicalAnd,
+};
+
+LogicalOrOp: BinaryOp = {
+    "||" => BinaryOp::LogicalOr,
 };
 
 PrimaryExpr: Expr = {
@@ -39,62 +92,31 @@ PrimaryExpr: Expr = {
 
 UnaryExpr: Expr = {
     PrimaryExpr,
-    "-" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::Negate, <>)),
-    "~" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::BitNot, <>)),
-    "!" <UnaryExpr> => Expr::UnaryExpr(UnaryExpr::new(UnaryOp::LogicalNot, <>)),
+    UnaryOp UnaryExpr => UnaryExpr::new(<>),
 };
 
-MultiplicativeExpr: Expr = {
-    UnaryExpr,
-    <MultiplicativeExpr> "*" <UnaryExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Mul, <>)),
+BinaryExpr<Op, Expr>: Expr = {
+    Expr,
+    BinaryExpr<Op, Expr> Op Expr => BinaryExpr::new(<>),
 };
 
-AdditiveExpr: Expr = {
-    MultiplicativeExpr,
-    <AdditiveExpr> "+" <MultiplicativeExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Add, <>)),
-    <AdditiveExpr> "-" <MultiplicativeExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Sub, <>)),
-};
+MultiplicativeExpr = BinaryExpr<MultiplicativeOp, UnaryExpr>;
 
-ShiftExpr: Expr = {
-    AdditiveExpr,
-    <ShiftExpr> "<<" <AdditiveExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Shl, <>)),
-    <ShiftExpr> ">>" <AdditiveExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Shr, <>)),
-};
+AdditiveExpr = BinaryExpr<AdditiveOp, MultiplicativeExpr>;
 
-BitAndExpr: Expr = {
-    ShiftExpr,
-    <BitAndExpr> "&" <ShiftExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitAnd, <>)),
-};
+ShiftExpr = BinaryExpr<ShiftOp, AdditiveExpr>;
 
-BitXorExpr : Expr = {
-    BitAndExpr,
-    <BitXorExpr> "^" <BitAndExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitXor, <>)),
-};
+BitAndExpr = BinaryExpr<BitAndOp, ShiftExpr>;
 
-BitOrExpr: Expr = {
-    BitXorExpr,
-    <BitOrExpr> "|" <BitXorExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::BitOr, <>)),
-};
+BitXorExpr = BinaryExpr<BitXorOp, BitAndExpr>;
 
-ComparisonExpr: Expr = {
-    BitOrExpr,
-    <ComparisonExpr> "==" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Eq, <>)),
-    <ComparisonExpr> "!=" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Ne, <>)),
-    <ComparisonExpr> "<" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Lt, <>)),
-    <ComparisonExpr> ">" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Gt, <>)),
-    <ComparisonExpr> "<=" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Le, <>)),
-    <ComparisonExpr> ">=" <BitOrExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::Ge, <>)),
-};
+BitOrExpr = BinaryExpr<BitOrOp, BitXorExpr>;
 
-LogicalAndExpr: Expr = {
-    ComparisonExpr,
-    <LogicalAndExpr> "&&" <ComparisonExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::LogicalAnd, <>)),
-};
+ComparisonExpr = BinaryExpr<ComparisonOp, BitOrExpr>;
 
-LogicalOrExpr: Expr = {
-    LogicalAndExpr,
-    <LogicalOrExpr> "||" <LogicalAndExpr> => Expr::BinaryExpr(BinaryExpr::new(BinaryOp::LogicalOr, <>)),
-};
+LogicalAndExpr = BinaryExpr<LogicalAndOp, ComparisonExpr>;
+
+LogicalOrExpr = BinaryExpr<LogicalOrOp, LogicalAndExpr>;
 
 Expr: Expr = {
     LogicalOrExpr,
