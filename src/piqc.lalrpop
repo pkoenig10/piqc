@@ -12,25 +12,17 @@ Type: Type = {
     "bool" => Type::Bool,
 };
 
+Int: i32 = {
+    r"\d+" => <>.parse().unwrap(),
+};
+
+Float: f32 = {
+    r"\d*\.\d*" => <>.parse().unwrap(),
+};
+
 Bool: bool = {
     "true" => true,
     "false" => false,
-};
-
-Identifier: Identifier = {
-    r"[A-Za-z_][0-9A-Za-z_]*" => Identifier::new(<>),
-};
-
-IntLiteral: IntLiteral = {
-    r"\d+" => IntLiteral::new(<>.parse().unwrap()),
-};
-
-FloatLiteral: FloatLiteral = {
-    r"\d*\.\d*" => FloatLiteral::new(<>.parse().unwrap()),
-};
-
-BoolLiteral: BoolLiteral = {
-    Bool => BoolLiteral::new(<>),
 };
 
 UnaryOp: UnaryOp = {
@@ -82,6 +74,22 @@ LogicalOrOp: BinaryOp = {
     "||" => BinaryOp::LogicalOr,
 };
 
+Identifier: Identifier = {
+    @L r"[A-Za-z_][0-9A-Za-z_]*" @R => Identifier::new(<>),
+};
+
+IntLiteral: IntLiteral = {
+    @L Int @R => IntLiteral::new(<>),
+};
+
+FloatLiteral: FloatLiteral = {
+    @L Float @R => FloatLiteral::new(<>),
+};
+
+BoolLiteral: BoolLiteral = {
+    @L Bool @R => BoolLiteral::new(<>),
+};
+
 PrimaryExpr: Expr = {
     IntLiteral => Expr::IntLiteral(<>),
     FloatLiteral => Expr::FloatLiteral(<>),
@@ -92,12 +100,12 @@ PrimaryExpr: Expr = {
 
 UnaryExpr: Expr = {
     PrimaryExpr,
-    UnaryOp UnaryExpr => UnaryExpr::new(<>),
+    @L UnaryOp UnaryExpr @R => UnaryExpr::new(<>),
 };
 
-BinaryExpr<Op, Expr>: Expr = {
-    Expr,
-    BinaryExpr<Op, Expr> Op Expr => BinaryExpr::new(<>),
+BinaryExpr<Op, PrevExpr>: Expr = {
+    PrevExpr,
+    @L BinaryExpr<Op, PrevExpr> Op PrevExpr @R => BinaryExpr::new(<>),
 };
 
 MultiplicativeExpr = BinaryExpr<MultiplicativeOp, UnaryExpr>;
@@ -123,19 +131,19 @@ Expr: Expr = {
 };
 
 DeclStmt: DeclStmt = {
-    <Type> <Identifier> "=" <Expr> ";" => DeclStmt::new(<>),
+    <@L> <Type> <Identifier> "=" <Expr> ";" <@R> => DeclStmt::new(<>),
 };
 
 AssignStmt: AssignStmt = {
-    <Identifier> "=" <Expr> ";" => AssignStmt::new(<>),
+    <@L> <Identifier> "=" <Expr> ";" <@R> => AssignStmt::new(<>),
 };
 
 ReturnStmt: ReturnStmt = {
-    "return" ";" => ReturnStmt::new(),
+    <@L> "return" ";" <@R> => ReturnStmt::new(<>),
 };
 
 BlockStmt: BlockStmt = {
-    "{" <Stmt*> "}" => BlockStmt::new(<>),
+    <@L> "{" <Stmt*> "}" <@R> => BlockStmt::new(<>),
 };
 
 Stmt: Stmt = {
@@ -146,7 +154,7 @@ Stmt: Stmt = {
 };
 
 Param: Param = {
-    <Type> <Identifier> => Param::new(<>),
+    @L Type Identifier @R => Param::new(<>),
 };
 
 Params_: Vec<Param> = {
@@ -159,11 +167,11 @@ Params_: Vec<Param> = {
 };
 
 Params: Params = {
-    <Params_?> => Params::new(<>.unwrap_or(vec![])),
+    @L Params_? @R => Params::new(<>),
 };
 
 Func: Func = {
-    "fn" <Identifier> "(" <Params> ")" <BlockStmt> => Func::new(<>),
+    <@L> "fn" <Identifier> "(" <Params> ")" <BlockStmt> <@R> => Func::new(<>),
 };
 
 pub Prog: Prog = {
