@@ -3,15 +3,21 @@ use ast::loc::*;
 use ast::type_::*;
 
 #[derive(Debug)]
-pub struct DeclStmt {
+pub struct DeclStmt<'input> {
     location: Location,
     type_: Type,
-    identifier: Identifier,
-    expr: Expr,
+    identifier: Identifier<'input>,
+    expr: Expr<'input>,
 }
 
-impl DeclStmt {
-    pub fn new(l: usize, type_: Type, identifier: Identifier, expr: Expr, r: usize) -> DeclStmt {
+impl<'input> DeclStmt<'input> {
+    pub fn new(
+        l: usize,
+        type_: Type,
+        identifier: Identifier<'input>,
+        expr: Expr<'input>,
+        r: usize,
+    ) -> DeclStmt<'input> {
         DeclStmt {
             location: Location::new(l, r),
             type_,
@@ -22,14 +28,19 @@ impl DeclStmt {
 }
 
 #[derive(Debug)]
-pub struct AssignStmt {
+pub struct AssignStmt<'input> {
     location: Location,
-    identifier: Identifier,
-    expr: Expr,
+    identifier: Identifier<'input>,
+    expr: Expr<'input>,
 }
 
-impl AssignStmt {
-    pub fn new(l: usize, identifier: Identifier, expr: Expr, r: usize) -> AssignStmt {
+impl<'input> AssignStmt<'input> {
+    pub fn new(
+        l: usize,
+        identifier: Identifier<'input>,
+        expr: Expr<'input>,
+        r: usize,
+    ) -> AssignStmt<'input> {
         AssignStmt {
             location: Location::new(l, r),
             identifier,
@@ -50,13 +61,13 @@ impl ReturnStmt {
 }
 
 #[derive(Debug)]
-pub struct BlockStmt {
+pub struct BlockStmt<'input> {
     location: Location,
-    stmts: Vec<Stmt>,
+    stmts: Vec<Stmt<'input>>,
 }
 
-impl BlockStmt {
-    pub fn new(l: usize, stmts: Vec<Stmt>, r: usize) -> BlockStmt {
+impl<'input> BlockStmt<'input> {
+    pub fn new(l: usize, stmts: Vec<Stmt<'input>>, r: usize) -> BlockStmt<'input> {
         BlockStmt {
             location: Location::new(l, r),
             stmts,
@@ -65,9 +76,9 @@ impl BlockStmt {
 }
 
 #[derive(Debug)]
-pub enum Stmt {
-    DeclStmt(DeclStmt),
-    AssignStmt(AssignStmt),
+pub enum Stmt<'input> {
+    DeclStmt(DeclStmt<'input>),
+    AssignStmt(AssignStmt<'input>),
     ReturnStmt(ReturnStmt),
-    BlockStmt(BlockStmt),
+    BlockStmt(BlockStmt<'input>),
 }

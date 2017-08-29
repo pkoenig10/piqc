@@ -1,12 +1,12 @@
 use ast::func::*;
 
 #[derive(Debug)]
-pub struct Prog {
-    funcs: Vec<Func>,
+pub struct Prog<'input> {
+    funcs: Vec<Func<'input>>,
 }
 
-impl Prog {
-    pub fn new(funcs: Vec<Func>) -> Prog {
+impl<'input> Prog<'input> {
+    pub fn new(funcs: Vec<Func<'input>>) -> Prog<'input> {
         Prog { funcs }
     }
 }

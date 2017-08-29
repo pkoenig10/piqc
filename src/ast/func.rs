@@ -4,14 +4,14 @@ use ast::stmt::*;
 use ast::type_::*;
 
 #[derive(Debug)]
-pub struct Param {
+pub struct Param<'input> {
     location: Location,
     type_: Type,
-    identifier: Identifier,
+    identifier: Identifier<'input>,
 }
 
-impl Param {
-    pub fn new(l: usize, type_: Type, identifier: Identifier, r: usize) -> Param {
+impl<'input> Param<'input> {
+    pub fn new(l: usize, type_: Type, identifier: Identifier<'input>, r: usize) -> Param<'input> {
         Param {
             location: Location::new(l, r),
             type_,
@@ -21,13 +21,13 @@ impl Param {
 }
 
 #[derive(Debug)]
-pub struct Params {
+pub struct Params<'input> {
     location: Location,
-    params: Vec<Param>,
+    params: Vec<Param<'input>>,
 }
 
-impl Params {
-    pub fn new(l: usize, params: Option<Vec<Param>>, r: usize) -> Params {
+impl<'input> Params<'input> {
+    pub fn new(l: usize, params: Option<Vec<Param<'input>>>, r: usize) -> Params<'input> {
         Params {
             location: Location::new(l, r),
             params: params.unwrap_or(vec![]),
@@ -36,21 +36,21 @@ impl Params {
 }
 
 #[derive(Debug)]
-pub struct Func {
+pub struct Func<'input> {
     location: Location,
-    identifier: Identifier,
-    params: Params,
-    stmt: BlockStmt,
+    identifier: Identifier<'input>,
+    params: Params<'input>,
+    stmt: BlockStmt<'input>,
 }
 
-impl Func {
+impl<'input> Func<'input> {
     pub fn new(
         l: usize,
-        identifier: Identifier,
-        params: Params,
-        stmt: BlockStmt,
+        identifier: Identifier<'input>,
+        params: Params<'input>,
+        stmt: BlockStmt<'input>,
         r: usize,
-    ) -> Func {
+    ) -> Func<'input> {
         Func {
             location: Location::new(l, r),
             identifier,

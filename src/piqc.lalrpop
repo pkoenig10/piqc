@@ -74,7 +74,7 @@ LogicalOrOp: BinaryOp = {
     "||" => BinaryOp::LogicalOr,
 };
 
-Identifier: Identifier = {
+Identifier: Identifier<'input> = {
     @L r"[A-Za-z_][0-9A-Za-z_]*" @R => Identifier::new(<>),
 };
 
@@ -90,7 +90,7 @@ BoolLiteral: BoolLiteral = {
     @L Bool @R => BoolLiteral::new(<>),
 };
 
-PrimaryExpr: Expr = {
+PrimaryExpr: Expr<'input> = {
     IntLiteral => Expr::IntLiteral(<>),
     FloatLiteral => Expr::FloatLiteral(<>),
     BoolLiteral => Expr::BoolLiteral(<>),
@@ -98,12 +98,12 @@ PrimaryExpr: Expr = {
     "(" <Expr> ")" => <>,
 };
 
-UnaryExpr: Expr = {
+UnaryExpr: Expr<'input> = {
     PrimaryExpr,
     @L UnaryOp UnaryExpr @R => UnaryExpr::new(<>),
 };
 
-BinaryExpr<Op, PrevExpr>: Expr = {
+BinaryExpr<Op, PrevExpr>: Expr<'input> = {
     PrevExpr,
     @L BinaryExpr<Op, PrevExpr> Op PrevExpr @R => BinaryExpr::new(<>),
 };
@@ -126,15 +126,15 @@ LogicalAndExpr = BinaryExpr<LogicalAndOp, ComparisonExpr>;
 
 LogicalOrExpr = BinaryExpr<LogicalOrOp, LogicalAndExpr>;
 
-Expr: Expr = {
+Expr: Expr<'input> = {
     LogicalOrExpr,
 };
 
-DeclStmt: DeclStmt = {
+DeclStmt: DeclStmt<'input> = {
     <@L> <Type> <Identifier> "=" <Expr> ";" <@R> => DeclStmt::new(<>),
 };
 
-AssignStmt: AssignStmt = {
+AssignStmt: AssignStmt<'input> = {
     <@L> <Identifier> "=" <Expr> ";" <@R> => AssignStmt::new(<>),
 };
 
@@ -142,22 +142,22 @@ ReturnStmt: ReturnStmt = {
     <@L> "return" ";" <@R> => ReturnStmt::new(<>),
 };
 
-BlockStmt: BlockStmt = {
+BlockStmt: BlockStmt<'input> = {
     <@L> "{" <Stmt*> "}" <@R> => BlockStmt::new(<>),
 };
 
-Stmt: Stmt = {
+Stmt: Stmt<'input> = {
     DeclStmt => Stmt::DeclStmt(<>),
     AssignStmt => Stmt::AssignStmt(<>),
     ReturnStmt => Stmt::ReturnStmt(<>),
     BlockStmt => Stmt::BlockStmt(<>),
 };
 
-Param: Param = {
+Param: Param<'input> = {
     @L Type Identifier @R => Param::new(<>),
 };
 
-Params_: Vec<Param> = {
+Params_: Vec<Param<'input>> = {
     Param => vec![<>],
     <params: Params_> "," <param: Param> => {
         let mut params = params;
@@ -166,14 +166,14 @@ Params_: Vec<Param> = {
     },
 };
 
-Params: Params = {
+Params: Params<'input> = {
     @L Params_? @R => Params::new(<>),
 };
 
-Func: Func = {
+Func: Func<'input> = {
     <@L> "fn" <Identifier> "(" <Params> ")" <BlockStmt> <@R> => Func::new(<>),
 };
 
-pub Prog: Prog = {
+pub Prog: Prog<'input> = {
     <Func*> => Prog::new(<>),
 };

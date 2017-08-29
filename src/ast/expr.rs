@@ -47,16 +47,16 @@ impl BoolLiteral {
 }
 
 #[derive(Debug)]
-pub struct Identifier {
+pub struct Identifier<'input> {
     location: Location,
-    name: String,
+    name: &'input str,
 }
 
-impl Identifier {
-    pub fn new(l: usize, name: &str, r: usize) -> Identifier {
+impl<'input> Identifier<'input> {
+    pub fn new(l: usize, name: &'input str, r: usize) -> Identifier<'input> {
         Identifier {
             location: Location::new(l, r),
-            name: name.to_string(),
+            name: name,
         }
     }
 }
@@ -69,14 +69,14 @@ pub enum UnaryOp {
 }
 
 #[derive(Debug)]
-pub struct UnaryExpr {
+pub struct UnaryExpr<'input> {
     location: Location,
     op: UnaryOp,
-    expr: Box<Expr>,
+    expr: Box<Expr<'input>>,
 }
 
-impl UnaryExpr {
-    pub fn new(l: usize, op: UnaryOp, expr: Expr, r: usize) -> Expr {
+impl<'input> UnaryExpr<'input> {
+    pub fn new(l: usize, op: UnaryOp, expr: Expr<'input>, r: usize) -> Expr<'input> {
         Expr::UnaryExpr(UnaryExpr {
             location: Location::new(l, r),
             op,
@@ -106,15 +106,21 @@ pub enum BinaryOp {
 }
 
 #[derive(Debug)]
-pub struct BinaryExpr {
+pub struct BinaryExpr<'input> {
     location: Location,
     op: BinaryOp,
-    left: Box<Expr>,
-    right: Box<Expr>,
+    left: Box<Expr<'input>>,
+    right: Box<Expr<'input>>,
 }
 
-impl BinaryExpr {
-    pub fn new(l: usize, left_expr: Expr, op: BinaryOp, right_expr: Expr, r: usize) -> Expr {
+impl<'input> BinaryExpr<'input> {
+    pub fn new(
+        l: usize,
+        left_expr: Expr<'input>,
+        op: BinaryOp,
+        right_expr: Expr<'input>,
+        r: usize,
+    ) -> Expr<'input> {
         Expr::BinaryExpr(BinaryExpr {
             location: Location::new(l, r),
             op,
@@ -125,11 +131,11 @@ impl BinaryExpr {
 }
 
 #[derive(Debug)]
-pub enum Expr {
+pub enum Expr<'input> {
     IntLiteral(IntLiteral),
     FloatLiteral(FloatLiteral),
     BoolLiteral(BoolLiteral),
-    Identifier(Identifier),
-    UnaryExpr(UnaryExpr),
-    BinaryExpr(BinaryExpr),
+    Identifier(Identifier<'input>),
+    UnaryExpr(UnaryExpr<'input>),
+    BinaryExpr(BinaryExpr<'input>),
 }
