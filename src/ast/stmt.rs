@@ -1,6 +1,6 @@
-use ast::expr::*;
-use ast::loc::*;
-use ast::type_::*;
+use super::expr::*;
+use super::loc::*;
+use super::type_::*;
 
 #[derive(Debug)]
 pub struct DeclStmt<'input> {

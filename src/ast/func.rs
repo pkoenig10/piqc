@@ -1,7 +1,7 @@
-use ast::expr::*;
-use ast::loc::*;
-use ast::stmt::*;
-use ast::type_::*;
+use super::expr::*;
+use super::loc::*;
+use super::stmt::*;
+use super::type_::*;
 
 #[derive(Debug)]
 pub struct Param<'input> {

@@ -1,4 +1,4 @@
-use ast::func::*;
+use super::func::*;
 
 #[derive(Debug)]
 pub struct Prog<'input> {

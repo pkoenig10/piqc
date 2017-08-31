@@ -1,4 +1,4 @@
-use ast::loc::*;
+use super::loc::*;
 
 #[derive(Debug)]
 pub struct IntLiteral {
