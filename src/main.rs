@@ -5,8 +5,8 @@ fn main() {
         "
 fn main(int i, float f) {
     int foo = 42;
-    int bar = 2 + 2 * 2;
-    bool baz = true;
+    int bar = 2 + 2;
+    bool baz = !true;
 }
 ",
     );

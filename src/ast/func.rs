@@ -40,7 +40,7 @@ pub struct Func<'input> {
     location: Location,
     identifier: Identifier<'input>,
     params: Params<'input>,
-    stmt: BlockStmt<'input>,
+    stmt: Stmt<'input>,
 }
 
 impl<'input> Func<'input> {
@@ -55,7 +55,11 @@ impl<'input> Func<'input> {
             location: Location::new(l, r),
             identifier,
             params,
-            stmt,
+            stmt: Stmt::BlockStmt(stmt),
         }
+    }
+
+    pub fn stmt(&mut self) -> &mut Stmt<'input> {
+        &mut self.stmt
     }
 }

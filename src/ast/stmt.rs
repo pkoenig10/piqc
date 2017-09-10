@@ -25,6 +25,18 @@ impl<'input> DeclStmt<'input> {
             expr,
         }
     }
+
+    pub fn type_(&self) -> Type {
+        self.type_
+    }
+
+    pub fn identifier(&self) -> &Identifier<'input> {
+        &self.identifier
+    }
+
+    pub fn expr(&mut self) -> &mut Expr<'input> {
+        &mut self.expr
+    }
 }
 
 #[derive(Debug)]
@@ -46,6 +58,14 @@ impl<'input> AssignStmt<'input> {
             identifier,
             expr,
         }
+    }
+
+    pub fn identifier(&self) -> &Identifier<'input> {
+        &self.identifier
+    }
+
+    pub fn expr(&mut self) -> &mut Expr<'input> {
+        &mut self.expr
     }
 }
 
@@ -72,6 +92,10 @@ impl<'input> BlockStmt<'input> {
             location: Location::new(l, r),
             stmts,
         }
+    }
+
+    pub fn stmts(&mut self) -> &mut Vec<Stmt<'input>> {
+        &mut self.stmts
     }
 }
 
