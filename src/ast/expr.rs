@@ -16,6 +16,10 @@ impl IntLiteral {
             value,
         }
     }
+
+    pub fn value(&self) -> i32 {
+        self.value
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -32,6 +36,10 @@ impl FloatLiteral {
             value,
         }
     }
+
+    pub fn value(&self) -> f32 {
+        self.value
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -46,6 +54,10 @@ impl BoolLiteral {
             location: Location::new(l, r),
             value,
         }
+    }
+
+    pub fn value(&self) -> bool {
+        self.value
     }
 }
 

@@ -4,6 +4,7 @@ use ast::visitor::*;
 use ast::Type::*;
 use ast::UnaryOp::*;
 use ast::BinaryOp::*;
+use sym::*;
 
 pub fn type_check(prog: &mut Prog) {
     let mut type_checker = TypeChecker::new();
@@ -11,7 +12,7 @@ pub fn type_check(prog: &mut Prog) {
 }
 
 struct TypeChecker<'input> {
-    symbol_table: SymbolTable<'input>,
+    symbol_table: SymbolTable<'input, Symbol<'input>>,
 }
 
 impl<'input> TypeChecker<'input> {
@@ -33,7 +34,7 @@ impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
 
         for param in func.params() {
             let symbol = Symbol::new(*param.identifier(), param.type_());
-            self.symbol_table.insert_symbol(symbol);
+            self.symbol_table.insert(symbol.identifier().name(), symbol);
         }
 
         self.visit_stmt(func.stmt());
@@ -51,15 +52,13 @@ impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
         }
 
         let symbol = Symbol::new(*stmt.identifier(), type_);
-        self.symbol_table.insert_symbol(symbol);
+        self.symbol_table.insert(symbol.identifier().name(), symbol);
     }
 
     fn visit_assign_stmt(&mut self, stmt: &mut AssignStmt<'input>) {
         self.visit_expr(stmt.expr());
 
-        let symbol = self.symbol_table
-            .get_symbol(stmt.identifier().name())
-            .unwrap();
+        let symbol = self.symbol_table.get(stmt.identifier().name()).unwrap();
         let type_ = symbol.type_();
         let expr_type = stmt.expr().type_().unwrap();
         if type_ != expr_type {
@@ -86,7 +85,7 @@ impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
     fn visit_bool_literal(&mut self, bool_literal: &BoolLiteral) {}
 
     fn visit_identifier(&mut self, identifier: &mut Identifier) {
-        let symbol = self.symbol_table.get_symbol(identifier.name()).unwrap();
+        let symbol = self.symbol_table.get(identifier.name()).unwrap();
         identifier.set_type(symbol.type_());
     }
 
