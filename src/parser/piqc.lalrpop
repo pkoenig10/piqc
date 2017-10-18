@@ -3,9 +3,9 @@ use ast::*;
 grammar;
 
 Type: Type = {
-    "int" => Type::Int,
-    "float" => Type::Float,
-    "bool" => Type::Bool,
+    "int" => Int,
+    "float" => Float,
+    "bool" => Bool,
 };
 
 Int: i32 = {
@@ -22,52 +22,52 @@ Bool: bool = {
 };
 
 UnaryOp: UnaryOp = {
-    "-" => UnaryOp::Negate,
-    "~" => UnaryOp::BitNot,
-    "!" => UnaryOp::LogicalNot,
+    "-" => Negate,
+    "~" => BitNot,
+    "!" => LogicalNot,
 };
 
 MultiplicativeOp: BinaryOp = {
-    "*" => BinaryOp::Mul,
+    "*" => Mul,
 };
 
 AdditiveOp: BinaryOp = {
-    "+" => BinaryOp::Add,
-    "-" => BinaryOp::Sub,
+    "+" => Add,
+    "-" => Sub,
 };
 
 ShiftOp: BinaryOp = {
-    "<<" => BinaryOp::Shl,
-    ">>" => BinaryOp::Shr,
+    "<<" => Shl,
+    ">>" => Shr,
 };
 
 BitAndOp: BinaryOp = {
-    "&" => BinaryOp::BitAnd,
+    "&" => BitAnd,
 };
 
 BitXorOp: BinaryOp = {
-    "^" => BinaryOp::BitXor,
+    "^" => BitXor,
 };
 
 BitOrOp: BinaryOp = {
-    "|" => BinaryOp::BitOr,
+    "|" => BitOr,
 };
 
 ComparisonOp: BinaryOp = {
-    "==" => BinaryOp::Eq,
-    "!=" => BinaryOp::Ne,
-    "<" => BinaryOp::Lt,
-    ">" => BinaryOp::Gt,
-    "<=" => BinaryOp::Le,
-    ">=" => BinaryOp::Ge,
+    "==" => Eq,
+    "!=" => Ne,
+    "<" => Lt,
+    ">" => Gt,
+    "<=" => Le,
+    ">=" => Ge,
 };
 
 LogicalAndOp: BinaryOp = {
-    "&&" => BinaryOp::LogicalAnd,
+    "&&" => LogicalAnd,
 };
 
 LogicalOrOp: BinaryOp = {
-    "||" => BinaryOp::LogicalOr,
+    "||" => LogicalOr,
 };
 
 Identifier: Identifier<'input> = {

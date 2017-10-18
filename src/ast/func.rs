@@ -45,7 +45,7 @@ impl<'input> Func<'input> {
         Func {
             location: Location::new(l, r),
             identifier,
-            params: params.unwrap_or(vec![]),
+            params: params.unwrap_or(Vec::new()),
             stmt: Stmt::BlockStmt(stmt),
         }
     }
