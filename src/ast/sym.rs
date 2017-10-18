@@ -1,21 +1,20 @@
 use std::collections::HashMap;
 
-use ast::expr::*;
-use ast::type_::*;
+use ast::*;
 
 #[derive(Debug)]
-pub struct Symbol<'input: 'ast, 'ast> {
-    identifier: &'ast Identifier<'input>,
+pub struct Symbol<'input> {
+    identifier: Identifier<'input>,
     type_: Type,
 }
 
-impl<'input, 'ast> Symbol<'input, 'ast> {
-    pub fn new(identifier: &'ast Identifier<'input>, type_: Type) -> Symbol<'input, 'ast> {
+impl<'input> Symbol<'input> {
+    pub fn new(identifier: Identifier<'input>, type_: Type) -> Symbol<'input> {
         Symbol { identifier, type_ }
     }
 
-    pub fn identifier(&self) -> &'ast Identifier<'input> {
-        self.identifier
+    pub fn identifier(&self) -> &Identifier<'input> {
+        &self.identifier
     }
 
     pub fn type_(&self) -> Type {
@@ -24,12 +23,12 @@ impl<'input, 'ast> Symbol<'input, 'ast> {
 }
 
 #[derive(Debug)]
-struct ScopeSymbolTable<'input: 'ast, 'ast> {
-    symbols: HashMap<&'input str, Symbol<'input, 'ast>>,
+struct ScopeSymbolTable<'input> {
+    symbols: HashMap<&'input str, Symbol<'input>>,
 }
 
-impl<'input, 'ast> ScopeSymbolTable<'input, 'ast> {
-    pub fn new() -> ScopeSymbolTable<'input, 'ast> {
+impl<'input> ScopeSymbolTable<'input> {
+    pub fn new() -> ScopeSymbolTable<'input> {
         ScopeSymbolTable { symbols: HashMap::new() }
     }
 
@@ -37,18 +36,18 @@ impl<'input, 'ast> ScopeSymbolTable<'input, 'ast> {
         self.symbols.get(name)
     }
 
-    fn insert_symbol(&mut self, symbol: Symbol<'input, 'ast>) {
+    fn insert_symbol(&mut self, symbol: Symbol<'input>) {
         self.symbols.insert(symbol.identifier().name(), symbol);
     }
 }
 
 #[derive(Debug)]
-pub struct SymbolTable<'input: 'ast, 'ast> {
-    symbol_tables: Vec<ScopeSymbolTable<'input, 'ast>>,
+pub struct SymbolTable<'input> {
+    symbol_tables: Vec<ScopeSymbolTable<'input>>,
 }
 
-impl<'input, 'ast> SymbolTable<'input, 'ast> {
-    pub fn new() -> SymbolTable<'input, 'ast> {
+impl<'input> SymbolTable<'input> {
+    pub fn new() -> SymbolTable<'input> {
         SymbolTable { symbol_tables: Vec::new() }
     }
 
@@ -70,7 +69,7 @@ impl<'input, 'ast> SymbolTable<'input, 'ast> {
         return None;
     }
 
-    pub fn insert_symbol(&mut self, symbol: Symbol<'input, 'ast>) {
+    pub fn insert_symbol(&mut self, symbol: Symbol<'input>) {
         self.symbol_tables.last_mut().unwrap().insert_symbol(symbol);
     }
 }

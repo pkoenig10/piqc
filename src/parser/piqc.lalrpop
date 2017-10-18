@@ -1,8 +1,4 @@
-use ast::expr::*;
-use ast::func::*;
-use ast::prog::*;
-use ast::stmt::*;
-use ast::type_::*;
+use ast::*;
 
 grammar;
 
@@ -157,21 +153,17 @@ Param: Param<'input> = {
     @L Type Identifier @R => Param::new(<>),
 };
 
-Params_: Vec<Param<'input>> = {
+Params: Vec<Param<'input>> = {
     Param => vec![<>],
-    <params: Params_> "," <param: Param> => {
+    <params: Params> "," <param: Param> => {
         let mut params = params;
         params.push(param);
         params
     },
 };
 
-Params: Params<'input> = {
-    @L Params_? @R => Params::new(<>),
-};
-
 Func: Func<'input> = {
-    <@L> "fn" <Identifier> "(" <Params> ")" <BlockStmt> <@R> => Func::new(<>),
+    <@L> "fn" <Identifier> "(" <Params?> ")" <BlockStmt> <@R> => Func::new(<>),
 };
 
 pub Prog: Prog<'input> = {

@@ -1,7 +1,5 @@
-use super::expr::*;
-use super::loc::*;
-use super::stmt::*;
-use super::type_::*;
+use ast::*;
+use ast::loc::*;
 
 #[derive(Debug)]
 pub struct Param<'input> {
@@ -18,20 +16,13 @@ impl<'input> Param<'input> {
             identifier,
         }
     }
-}
 
-#[derive(Debug)]
-pub struct Params<'input> {
-    location: Location,
-    params: Vec<Param<'input>>,
-}
+    pub fn type_(&self) -> Type {
+        self.type_
+    }
 
-impl<'input> Params<'input> {
-    pub fn new(l: usize, params: Option<Vec<Param<'input>>>, r: usize) -> Params<'input> {
-        Params {
-            location: Location::new(l, r),
-            params: params.unwrap_or(vec![]),
-        }
+    pub fn identifier(&self) -> &Identifier<'input> {
+        &self.identifier
     }
 }
 
@@ -39,7 +30,7 @@ impl<'input> Params<'input> {
 pub struct Func<'input> {
     location: Location,
     identifier: Identifier<'input>,
-    params: Params<'input>,
+    params: Vec<Param<'input>>,
     stmt: Stmt<'input>,
 }
 
@@ -47,16 +38,20 @@ impl<'input> Func<'input> {
     pub fn new(
         l: usize,
         identifier: Identifier<'input>,
-        params: Params<'input>,
+        params: Option<Vec<Param<'input>>>,
         stmt: BlockStmt<'input>,
         r: usize,
     ) -> Func<'input> {
         Func {
             location: Location::new(l, r),
             identifier,
-            params,
+            params: params.unwrap_or(vec![]),
             stmt: Stmt::BlockStmt(stmt),
         }
+    }
+
+    pub fn params(&self) -> &Vec<Param<'input>> {
+        &self.params
     }
 
     pub fn stmt(&mut self) -> &mut Stmt<'input> {

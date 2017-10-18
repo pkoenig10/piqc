@@ -1,12 +1,9 @@
 use std::fmt;
 
-use super::loc::*;
-use super::type_::*;
+use ast::*;
+use ast::loc::*;
 
-use self::UnaryOp::*;
-use self::BinaryOp::*;
-
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct IntLiteral {
     location: Location,
     value: i32,
@@ -21,7 +18,7 @@ impl IntLiteral {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct FloatLiteral {
     location: Location,
     value: f32,
@@ -37,7 +34,7 @@ impl FloatLiteral {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct BoolLiteral {
     location: Location,
     value: bool,
@@ -52,7 +49,7 @@ impl BoolLiteral {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Identifier<'input> {
     location: Location,
     name: &'input str,
@@ -90,12 +87,12 @@ pub enum UnaryOp {
 
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let type_ = match *self {
+        let op = match *self {
             Negate => "-",
             BitNot => "~",
             LogicalNot => "!",
         };
-        write!(f, "{}", type_)
+        write!(f, "{}", op)
     }
 }
 
@@ -156,7 +153,7 @@ pub enum BinaryOp {
 
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let type_ = match *self {
+        let op = match *self {
             Mul => "*",
             Add => "+",
             Sub => "-",
@@ -174,7 +171,7 @@ impl fmt::Display for BinaryOp {
             LogicalAnd => "&&",
             LogicalOr => "||",
         };
-        write!(f, "{}", type_)
+        write!(f, "{}", op)
     }
 }
 
@@ -190,16 +187,16 @@ pub struct BinaryExpr<'input> {
 impl<'input> BinaryExpr<'input> {
     pub fn new(
         l: usize,
-        left_expr: Expr<'input>,
+        left: Expr<'input>,
         op: BinaryOp,
-        right_expr: Expr<'input>,
+        right: Expr<'input>,
         r: usize,
     ) -> Expr<'input> {
         Expr::BinaryExpr(BinaryExpr {
             location: Location::new(l, r),
             op,
-            left: Box::new(left_expr),
-            right: Box::new(right_expr),
+            left: Box::new(left),
+            right: Box::new(right),
             type_: None,
         })
     }

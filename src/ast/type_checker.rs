@@ -1,56 +1,60 @@
-use super::expr::*;
-use super::func::*;
-use super::prog::*;
-use super::stmt::*;
-use super::sym::*;
-use super::type_::*;
-use super::visitor::*;
-
-use self::Type::*;
-use self::UnaryOp::*;
-use self::BinaryOp::*;
+use ast::*;
+use ast::sym::*;
+use ast::visitor::*;
+use ast::Type::*;
+use ast::UnaryOp::*;
+use ast::BinaryOp::*;
 
 pub fn type_check(prog: &mut Prog) {
     let mut type_checker = TypeChecker::new();
     type_checker.visit_prog(prog);
 }
 
-struct TypeChecker<'input: 'ast, 'ast> {
-    symbol_table: SymbolTable<'input, 'ast>,
+struct TypeChecker<'input> {
+    symbol_table: SymbolTable<'input>,
 }
 
-impl<'input, 'ast> TypeChecker<'input, 'ast> {
-    pub fn new() -> TypeChecker<'input, 'ast> {
+impl<'input> TypeChecker<'input> {
+    pub fn new() -> TypeChecker<'input> {
         TypeChecker { symbol_table: SymbolTable::new() }
     }
 }
 
 #[allow(unused_variables)]
-impl<'input, 'ast> Visitor<'input, 'ast> for TypeChecker<'input, 'ast> {
-    fn visit_prog(&mut self, prog: &'ast mut Prog<'input>) {
+impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
+    fn visit_prog(&mut self, prog: &mut Prog<'input>) {
         for func in prog.funcs() {
             self.visit_func(func);
         }
     }
 
-    fn visit_func(&mut self, func: &'ast mut Func<'input>) {
+    fn visit_func(&mut self, func: &mut Func<'input>) {
+        self.symbol_table.push_scope();
+
+        for param in func.params() {
+            let symbol = Symbol::new(*param.identifier(), param.type_());
+            self.symbol_table.insert_symbol(symbol);
+        }
+
         self.visit_stmt(func.stmt());
+
+        self.symbol_table.pop_scope();
     }
 
-    fn visit_decl_stmt(&mut self, stmt: &'ast mut DeclStmt<'input>) {
+    fn visit_decl_stmt(&mut self, stmt: &mut DeclStmt<'input>) {
         self.visit_expr(stmt.expr());
 
         let type_ = stmt.type_();
         let expr_type = stmt.expr().type_().unwrap();
         if type_ != expr_type {
-            panic!("Mismatched types {} and {}", type_, expr_type);
+            panic!("Mismatched types '{}' and '{}'", type_, expr_type);
         }
 
-        let symbol = Symbol::new(stmt.identifier(), type_);
+        let symbol = Symbol::new(*stmt.identifier(), type_);
         self.symbol_table.insert_symbol(symbol);
     }
 
-    fn visit_assign_stmt(&mut self, stmt: &'ast mut AssignStmt<'input>) {
+    fn visit_assign_stmt(&mut self, stmt: &mut AssignStmt<'input>) {
         self.visit_expr(stmt.expr());
 
         let symbol = self.symbol_table
@@ -59,17 +63,19 @@ impl<'input, 'ast> Visitor<'input, 'ast> for TypeChecker<'input, 'ast> {
         let type_ = symbol.type_();
         let expr_type = stmt.expr().type_().unwrap();
         if type_ != expr_type {
-            panic!("Mismatched types {} and {}", type_, expr_type);
+            panic!("Mismatched types '{}' and '{}'", type_, expr_type);
         }
     }
 
     fn visit_return_stmt(&mut self, stmt: &ReturnStmt) {}
 
-    fn visit_block_stmt(&mut self, stmt: &'ast mut BlockStmt<'input>) {
+    fn visit_block_stmt(&mut self, stmt: &mut BlockStmt<'input>) {
         self.symbol_table.push_scope();
+
         for stmt in stmt.stmts() {
             self.visit_stmt(stmt);
         }
+
         self.symbol_table.pop_scope();
     }
 
@@ -125,15 +131,23 @@ impl<'input, 'ast> Visitor<'input, 'ast> for TypeChecker<'input, 'ast> {
             (Mul, Float, Float) |
             (Add, Float, Float) |
             (Sub, Float, Float) => Float,
+            (Eq, Int, Int) |
+            (Eq, Float, Float) |
             (Eq, Bool, Bool) |
+            (Ne, Int, Int) |
+            (Ne, Float, Float) |
             (Ne, Bool, Bool) |
-            (Lt, Bool, Bool) |
-            (Gt, Bool, Bool) |
-            (Le, Bool, Bool) |
-            (Ge, Bool, Bool) |
+            (Lt, Int, Int) |
+            (Lt, Float, Float) |
+            (Gt, Int, Int) |
+            (Gt, Float, Float) |
+            (Le, Int, Int) |
+            (Le, Float, Float) |
+            (Ge, Int, Int) |
+            (Ge, Float, Float) |
             (LogicalAnd, Bool, Bool) |
             (LogicalOr, Bool, Bool) => Bool,
-            (op, left_type, right_type) => {
+            _ => {
                 panic!(
                     "Cannot apply binary operator '{}' to types '{}' and '{}'",
                     op,
