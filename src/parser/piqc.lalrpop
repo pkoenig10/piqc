@@ -167,5 +167,5 @@ Func: Func<'input> = {
 };
 
 pub Prog: Prog<'input> = {
-    <Func*> => Prog::new(<>),
+    Func => Prog::new(<>),
 };

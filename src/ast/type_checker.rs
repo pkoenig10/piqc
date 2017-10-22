@@ -1,6 +1,5 @@
 use ast::*;
 use ast::sym::*;
-use ast::visitor::*;
 use ast::Type::*;
 use ast::UnaryOp::*;
 use ast::BinaryOp::*;
@@ -24,9 +23,7 @@ impl<'input> TypeChecker<'input> {
 #[allow(unused_variables)]
 impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
     fn visit_prog(&mut self, prog: &mut Prog<'input>) {
-        for func in prog.funcs() {
-            self.visit_func(func);
-        }
+        self.visit_func(prog.func());
     }
 
     fn visit_func(&mut self, func: &mut Func<'input>) {

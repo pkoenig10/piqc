@@ -2,11 +2,11 @@ use ir::*;
 
 #[derive(Debug)]
 pub struct Prog {
-    funcs: Vec<Func>,
+    func: Func,
 }
 
 impl Prog {
-    pub fn new(funcs: Vec<Func>) -> Prog {
-        Prog { funcs }
+    pub fn new(func: Func) -> Prog {
+        Prog { func }
     }
 }

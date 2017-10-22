@@ -46,13 +46,8 @@ impl<'input> IrGenerator<'input> {
 #[allow(unused_variables)]
 impl<'input> AstVisitor<'input, Operand, (), Func, Prog> for IrGenerator<'input> {
     fn visit_prog(&mut self, prog: &mut ast::Prog<'input>) -> Prog {
-        let mut funcs = Vec::new();
-        for func in prog.funcs() {
-            let func = self.visit_func(func);
-            funcs.push(func);
-        }
-
-        Prog::new(funcs)
+        let func = self.visit_func(prog.func());
+        Prog::new(func)
     }
 
     fn visit_func(&mut self, func: &mut ast::Func<'input>) -> Func {
@@ -133,7 +128,7 @@ impl<'input> AstVisitor<'input, Operand, (), Func, Prog> for IrGenerator<'input>
 
         let inst = match (op, type_) {
             (ast::Negate, Int) => binary_inst(Sub, IntConstant::new(0), src),
-            (ast::Negate, Float) => binary_inst(Fsub, IntConstant::new(0), src),
+            (ast::Negate, Float) => binary_inst(Fsub, FloatConstant::new(0.), src),
             (ast::BitNot, _) => binary_inst(Xor, src, IntConstant::new(-1)),
             (ast::LogicalNot, _) => binary_inst(Xor, src, IntConstant::new(1)),
             _ => {
