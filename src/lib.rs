@@ -3,7 +3,7 @@ mod ir;
 mod parser;
 mod sym;
 
-pub fn parse(s: &str) {
+pub fn compile(s: &str) {
     for (i, c) in s.char_indices() {
         println!("{}: {:?}", i, c);
     }
@@ -13,6 +13,6 @@ pub fn parse(s: &str) {
 
     ast::type_check(&mut prog);
 
-    let insts = ir::generate_ir(&mut prog);
-    println!("{:#?}", insts);
+    let prog = ir::generate_ir(&mut prog);
+    println!("{:#?}", prog);
 }

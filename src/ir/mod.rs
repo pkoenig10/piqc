@@ -1,9 +1,11 @@
+mod block;
 mod func;
 mod inst;
 mod ir_generator;
 mod operand;
 mod prog;
 
+pub use self::block::*;
 pub use self::func::*;
 pub use self::inst::*;
 pub use self::operand::*;

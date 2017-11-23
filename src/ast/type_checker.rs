@@ -20,7 +20,6 @@ impl<'input> TypeChecker<'input> {
     }
 }
 
-#[allow(unused_variables)]
 impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
     fn visit_prog(&mut self, prog: &mut Prog<'input>) {
         self.visit_func(prog.func());
@@ -63,7 +62,7 @@ impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
         }
     }
 
-    fn visit_return_stmt(&mut self, stmt: &ReturnStmt) {}
+    fn visit_return_stmt(&mut self, _stmt: &ReturnStmt) {}
 
     fn visit_block_stmt(&mut self, stmt: &mut BlockStmt<'input>) {
         self.symbol_table.push_scope();
@@ -75,11 +74,11 @@ impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
         self.symbol_table.pop_scope();
     }
 
-    fn visit_int_literal(&mut self, int_literal: &IntLiteral) {}
+    fn visit_int_literal(&mut self, _int_literal: &IntLiteral) {}
 
-    fn visit_float_literal(&mut self, float_literal: &FloatLiteral) {}
+    fn visit_float_literal(&mut self, _float_literal: &FloatLiteral) {}
 
-    fn visit_bool_literal(&mut self, bool_literal: &BoolLiteral) {}
+    fn visit_bool_literal(&mut self, _bool_literal: &BoolLiteral) {}
 
     fn visit_identifier(&mut self, identifier: &mut Identifier) {
         let symbol = self.symbol_table.get(identifier.name()).unwrap();
