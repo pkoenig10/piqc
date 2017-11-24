@@ -1,52 +1,45 @@
+use collections::*;
+
 #[derive(Debug, Clone, Copy)]
-pub struct IntConstant {
+pub struct IntImmediate {
     value: i32,
 }
 
-impl IntConstant {
-    pub fn new(value: i32) -> Operand {
-        Operand::IntConstant(IntConstant { value })
+impl IntImmediate {
+    pub fn new(value: i32) -> IntImmediate {
+        IntImmediate { value }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct FloatConstant {
+pub struct FloatImmediate {
     value: f32,
 }
 
 
-impl FloatConstant {
-    pub fn new(value: f32) -> Operand {
-        Operand::FloatConstant(FloatConstant { value })
+impl FloatImmediate {
+    pub fn new(value: f32) -> FloatImmediate {
+        FloatImmediate { value }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct BoolConstant {
+pub struct BoolImmediate {
     value: bool,
 }
 
-impl BoolConstant {
-    pub fn new(value: bool) -> Operand {
-        Operand::BoolConstant(BoolConstant { value })
+impl BoolImmediate {
+    pub fn new(value: bool) -> BoolImmediate {
+        BoolImmediate { value }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Register {
-    id: u32,
-}
-
-impl Register {
-    pub fn new(id: u32) -> Register {
-        Register { id }
-    }
-}
+pub type Value = Id;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Operand {
-    IntConstant(IntConstant),
-    FloatConstant(FloatConstant),
-    BoolConstant(BoolConstant),
-    Register(Register),
+    IntImmediate(IntImmediate),
+    FloatImmediate(FloatImmediate),
+    BoolImmediate(BoolImmediate),
+    Value(Value),
 }

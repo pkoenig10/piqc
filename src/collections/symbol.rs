@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 #[derive(Debug)]
-struct ScopeSymbolTable<'input, T> {
-    symbols: HashMap<&'input str, T>,
+struct ScopeSymbolTable<'a, T> {
+    symbols: HashMap<&'a str, T>,
 }
 
-impl<'input, T> ScopeSymbolTable<'input, T> {
-    pub fn new() -> ScopeSymbolTable<'input, T> {
+impl<'a, T> ScopeSymbolTable<'a, T> {
+    pub fn new() -> ScopeSymbolTable<'a, T> {
         ScopeSymbolTable { symbols: HashMap::new() }
     }
 
@@ -14,18 +14,18 @@ impl<'input, T> ScopeSymbolTable<'input, T> {
         self.symbols.get(name)
     }
 
-    fn insert(&mut self, name: &'input str, symbol: T) {
+    fn insert(&mut self, name: &'a str, symbol: T) {
         self.symbols.insert(name, symbol);
     }
 }
 
 #[derive(Debug)]
-pub struct SymbolTable<'input, T> {
-    symbol_tables: Vec<ScopeSymbolTable<'input, T>>,
+pub struct SymbolTable<'a, T> {
+    symbol_tables: Vec<ScopeSymbolTable<'a, T>>,
 }
 
-impl<'input, T> SymbolTable<'input, T> {
-    pub fn new() -> SymbolTable<'input, T> {
+impl<'a, T> SymbolTable<'a, T> {
+    pub fn new() -> SymbolTable<'a, T> {
         SymbolTable { symbol_tables: Vec::new() }
     }
 
@@ -47,7 +47,7 @@ impl<'input, T> SymbolTable<'input, T> {
         return None;
     }
 
-    pub fn insert(&mut self, name: &'input str, symbol: T) {
+    pub fn insert(&mut self, name: &'a str, symbol: T) {
         self.symbol_tables.last_mut().unwrap().insert(name, symbol);
     }
 }

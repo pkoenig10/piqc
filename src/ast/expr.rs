@@ -65,7 +65,6 @@ impl BoolLiteral {
 pub struct Identifier<'input> {
     location: Location,
     name: &'input str,
-    type_: Option<Type>,
 }
 
 impl<'input> Identifier<'input> {
@@ -73,20 +72,11 @@ impl<'input> Identifier<'input> {
         Identifier {
             location: Location::new(l, r),
             name,
-            type_: None,
         }
     }
 
     pub fn name(&self) -> &'input str {
         self.name
-    }
-
-    pub fn type_(&self) -> Option<Type> {
-        self.type_
-    }
-
-    pub fn set_type(&mut self, type_: Type) {
-        self.type_ = Some(type_);
     }
 }
 
@@ -113,7 +103,6 @@ pub struct UnaryExpr<'input> {
     location: Location,
     op: UnaryOp,
     expr: Box<Expr<'input>>,
-    type_: Option<Type>,
 }
 
 impl<'input> UnaryExpr<'input> {
@@ -122,7 +111,6 @@ impl<'input> UnaryExpr<'input> {
             location: Location::new(l, r),
             op,
             expr: Box::new(expr),
-            type_: None,
         })
     }
 
@@ -130,16 +118,8 @@ impl<'input> UnaryExpr<'input> {
         self.op
     }
 
-    pub fn expr(&mut self) -> &mut Expr<'input> {
-        &mut self.expr
-    }
-
-    pub fn type_(&self) -> Option<Type> {
-        self.type_
-    }
-
-    pub fn set_type(&mut self, type_: Type) {
-        self.type_ = Some(type_);
+    pub fn expr(&self) -> &Expr<'input> {
+        &self.expr
     }
 }
 
@@ -193,7 +173,6 @@ pub struct BinaryExpr<'input> {
     op: BinaryOp,
     left: Box<Expr<'input>>,
     right: Box<Expr<'input>>,
-    type_: Option<Type>,
 }
 
 impl<'input> BinaryExpr<'input> {
@@ -209,7 +188,6 @@ impl<'input> BinaryExpr<'input> {
             op,
             left: Box::new(left),
             right: Box::new(right),
-            type_: None,
         })
     }
 
@@ -217,20 +195,12 @@ impl<'input> BinaryExpr<'input> {
         self.op
     }
 
-    pub fn left(&mut self) -> &mut Expr<'input> {
-        &mut self.left
+    pub fn left(&self) -> &Expr<'input> {
+        &self.left
     }
 
-    pub fn right(&mut self) -> &mut Expr<'input> {
-        &mut self.right
-    }
-
-    pub fn type_(&self) -> Option<Type> {
-        self.type_
-    }
-
-    pub fn set_type(&mut self, type_: Type) {
-        self.type_ = Some(type_);
+    pub fn right(&self) -> &Expr<'input> {
+        &self.right
     }
 }
 
@@ -242,17 +212,4 @@ pub enum Expr<'input> {
     Identifier(Identifier<'input>),
     UnaryExpr(UnaryExpr<'input>),
     BinaryExpr(BinaryExpr<'input>),
-}
-
-impl<'input> Expr<'input> {
-    pub fn type_(&self) -> Option<Type> {
-        match *self {
-            Expr::IntLiteral(_) => Some(Type::Int),
-            Expr::FloatLiteral(_) => Some(Type::Float),
-            Expr::BoolLiteral(_) => Some(Type::Bool),
-            Expr::Identifier(ref identifier) => identifier.type_(),
-            Expr::UnaryExpr(ref expr) => expr.type_(),
-            Expr::BinaryExpr(ref expr) => expr.type_(),
-        }
-    }
 }

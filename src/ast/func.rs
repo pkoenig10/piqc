@@ -54,7 +54,7 @@ impl<'input> Func<'input> {
         &self.params
     }
 
-    pub fn stmt(&mut self) -> &mut Stmt<'input> {
-        &mut self.stmt
+    pub fn stmt(&self) -> &Stmt<'input> {
+        &self.stmt
     }
 }

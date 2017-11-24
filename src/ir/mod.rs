@@ -1,17 +1,20 @@
-mod block;
+mod builder;
 mod func;
 mod inst;
-mod ir_generator;
+mod generator;
 mod operand;
 mod prog;
+mod type_;
 
-pub use self::block::*;
 pub use self::func::*;
 pub use self::inst::*;
 pub use self::operand::*;
 pub use self::prog::*;
+pub use self::type_::*;
 
+pub use self::UnaryOp::*;
 pub use self::BinaryOp::*;
 pub use self::CompOp::*;
+pub use self::Type::*;
 
-pub use self::ir_generator::generate_ir;
+pub use self::generator::generate_ir;

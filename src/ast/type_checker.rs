@@ -1,13 +1,28 @@
 use ast::*;
-use ast::sym::*;
 use ast::Type::*;
 use ast::UnaryOp::*;
 use ast::BinaryOp::*;
-use sym::*;
+use collections::*;
 
-pub fn type_check(prog: &mut Prog) {
+pub fn type_check(prog: &Prog) {
     let mut type_checker = TypeChecker::new();
-    type_checker.visit_prog(prog);
+    type_checker.check_func(prog.func());
+}
+
+#[derive(Debug)]
+pub struct Symbol<'input> {
+    identifier: Identifier<'input>,
+    type_: Type,
+}
+
+impl<'input> Symbol<'input> {
+    pub fn new(identifier: Identifier<'input>, type_: Type) -> Symbol<'input> {
+        Symbol { identifier, type_ }
+    }
+
+    pub fn type_(&self) -> Type {
+        self.type_
+    }
 }
 
 struct TypeChecker<'input> {
@@ -18,80 +33,81 @@ impl<'input> TypeChecker<'input> {
     pub fn new() -> TypeChecker<'input> {
         TypeChecker { symbol_table: SymbolTable::new() }
     }
-}
 
-impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
-    fn visit_prog(&mut self, prog: &mut Prog<'input>) {
-        self.visit_func(prog.func());
-    }
-
-    fn visit_func(&mut self, func: &mut Func<'input>) {
+    fn check_func(&mut self, func: &Func<'input>) {
         self.symbol_table.push_scope();
 
         for param in func.params() {
-            let symbol = Symbol::new(*param.identifier(), param.type_());
-            self.symbol_table.insert(symbol.identifier().name(), symbol);
+            self.insert_symbol(param.identifier(), param.type_());
         }
 
-        self.visit_stmt(func.stmt());
+        self.check_stmt(func.stmt());
 
         self.symbol_table.pop_scope();
     }
 
-    fn visit_decl_stmt(&mut self, stmt: &mut DeclStmt<'input>) {
-        self.visit_expr(stmt.expr());
+    fn check_stmt(&mut self, stmt: &Stmt<'input>) {
+        match *stmt {
+            Stmt::DeclStmt(ref stmt) => self.check_decl_stmt(stmt),
+            Stmt::AssignStmt(ref stmt) => self.check_assign_stmt(stmt),
+            Stmt::ReturnStmt(_) => {}
+            Stmt::BlockStmt(ref stmt) => self.check_block_stmt(stmt),
+        }
+    }
+
+    fn check_decl_stmt(&mut self, stmt: &DeclStmt<'input>) {
+        let expr_type = self.check_expr(stmt.expr());
 
         let type_ = stmt.type_();
-        let expr_type = stmt.expr().type_().unwrap();
+
         if type_ != expr_type {
             panic!("Mismatched types '{}' and '{}'", type_, expr_type);
         }
 
-        let symbol = Symbol::new(*stmt.identifier(), type_);
-        self.symbol_table.insert(symbol.identifier().name(), symbol);
+        self.insert_symbol(stmt.identifier(), type_);
     }
 
-    fn visit_assign_stmt(&mut self, stmt: &mut AssignStmt<'input>) {
-        self.visit_expr(stmt.expr());
+    fn check_assign_stmt(&mut self, stmt: &AssignStmt<'input>) {
+        let expr_type = self.check_expr(stmt.expr());
 
-        let symbol = self.symbol_table.get(stmt.identifier().name()).unwrap();
-        let type_ = symbol.type_();
-        let expr_type = stmt.expr().type_().unwrap();
+        let type_ = self.check_identifier(stmt.identifier());
+
         if type_ != expr_type {
             panic!("Mismatched types '{}' and '{}'", type_, expr_type);
         }
     }
 
-    fn visit_return_stmt(&mut self, _stmt: &ReturnStmt) {}
-
-    fn visit_block_stmt(&mut self, stmt: &mut BlockStmt<'input>) {
+    fn check_block_stmt(&mut self, stmt: &BlockStmt<'input>) {
         self.symbol_table.push_scope();
 
         for stmt in stmt.stmts() {
-            self.visit_stmt(stmt);
+            self.check_stmt(stmt);
         }
 
         self.symbol_table.pop_scope();
     }
 
-    fn visit_int_literal(&mut self, _int_literal: &IntLiteral) {}
-
-    fn visit_float_literal(&mut self, _float_literal: &FloatLiteral) {}
-
-    fn visit_bool_literal(&mut self, _bool_literal: &BoolLiteral) {}
-
-    fn visit_identifier(&mut self, identifier: &mut Identifier) {
-        let symbol = self.symbol_table.get(identifier.name()).unwrap();
-        identifier.set_type(symbol.type_());
+    fn check_expr(&mut self, expr: &Expr) -> Type {
+        match *expr {
+            Expr::IntLiteral(_) => Int,
+            Expr::FloatLiteral(_) => Float,
+            Expr::BoolLiteral(_) => Bool,
+            Expr::Identifier(ref identifier) => self.check_identifier(identifier),
+            Expr::UnaryExpr(ref expr) => self.check_unary_expr(expr),
+            Expr::BinaryExpr(ref expr) => self.check_binary_expr(expr),
+        }
     }
 
-    fn visit_unary_expr(&mut self, expr: &mut UnaryExpr) {
-        self.visit_expr(expr.expr());
+    fn check_identifier(&mut self, identifier: &Identifier) -> Type {
+        self.get_symbol(identifier).type_()
+    }
+
+    fn check_unary_expr(&mut self, expr: &UnaryExpr) -> Type {
+        let expr_type = self.check_expr(expr.expr());
 
         let op = expr.op();
-        let expr_type = expr.expr().type_().unwrap();
 
-        let type_ = match (op, expr_type) {
+        match (op, expr_type) {
             (Negate, Int) | (BitNot, Int) => Int,
             (Negate, Float) => Float,
             (LogicalNot, Bool) => Bool,
@@ -102,20 +118,16 @@ impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
                     expr_type
                 )
             }
-        };
-
-        expr.set_type(type_);
+        }
     }
 
-    fn visit_binary_expr(&mut self, expr: &mut BinaryExpr) {
-        self.visit_expr(expr.left());
-        self.visit_expr(expr.right());
+    fn check_binary_expr(&mut self, expr: &BinaryExpr) -> Type {
+        let left_type = self.check_expr(expr.left());
+        let right_type = self.check_expr(expr.right());
 
         let op = expr.op();
-        let left_type = expr.left().type_().unwrap();
-        let right_type = expr.right().type_().unwrap();
 
-        let type_ = match (op, left_type, right_type) {
+        match (op, left_type, right_type) {
             (Add, Int, Int) |
             (Sub, Int, Int) |
             (Shl, Int, Int) |
@@ -150,8 +162,15 @@ impl<'input> AstVisitor<'input, (), (), (), ()> for TypeChecker<'input> {
                     right_type
                 )
             }
-        };
+        }
+    }
 
-        expr.set_type(type_);
+    fn insert_symbol(&mut self, identifier: &Identifier<'input>, type_: Type) {
+        let symbol = Symbol::new(*identifier, type_);
+        self.symbol_table.insert(identifier.name(), symbol);
+    }
+
+    fn get_symbol(&self, identifier: &Identifier) -> &Symbol<'input> {
+        self.symbol_table.get(identifier.name()).unwrap()
     }
 }

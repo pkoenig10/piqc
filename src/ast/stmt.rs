@@ -33,8 +33,8 @@ impl<'input> DeclStmt<'input> {
         &self.identifier
     }
 
-    pub fn expr(&mut self) -> &mut Expr<'input> {
-        &mut self.expr
+    pub fn expr(&self) -> &Expr<'input> {
+        &self.expr
     }
 }
 
@@ -63,8 +63,8 @@ impl<'input> AssignStmt<'input> {
         &self.identifier
     }
 
-    pub fn expr(&mut self) -> &mut Expr<'input> {
-        &mut self.expr
+    pub fn expr(&self) -> &Expr<'input> {
+        &self.expr
     }
 }
 
@@ -93,8 +93,8 @@ impl<'input> BlockStmt<'input> {
         }
     }
 
-    pub fn stmts(&mut self) -> &mut Vec<Stmt<'input>> {
-        &mut self.stmts
+    pub fn stmts(&self) -> &Vec<Stmt<'input>> {
+        &self.stmts
     }
 }
 

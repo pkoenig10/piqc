@@ -10,7 +10,7 @@ impl<'input> Prog<'input> {
         Prog { func }
     }
 
-    pub fn func(&mut self) -> &mut Func<'input> {
-        &mut self.func
+    pub fn func(&self) -> &Func<'input> {
+        &self.func
     }
 }
