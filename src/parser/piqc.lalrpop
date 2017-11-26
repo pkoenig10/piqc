@@ -153,10 +153,9 @@ Param: Param<'input> = {
     @L Type Identifier @R => Param::new(<>),
 };
 
-Params: Vec<Param<'input>> = {
-    Param => vec![<>],
-    <params: Params> "," <param: Param> => {
-        let mut params = params;
+Params: Params<'input> = {
+    <params: (<Params> ",")?> <param: Param> => {
+        let mut params = params.unwrap_or(Params::new());
         params.push(param);
         params
     },

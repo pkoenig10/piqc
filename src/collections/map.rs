@@ -6,21 +6,6 @@ pub trait Key: Copy {
     fn get(&self) -> usize;
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Id {
-    id: usize,
-}
-
-impl Key for Id {
-    fn new(id: usize) -> Self {
-        Id { id }
-    }
-
-    fn get(&self) -> usize {
-        self.id
-    }
-}
-
 #[derive(Debug)]
 pub struct Map<K, V> {
     values: Vec<V>,

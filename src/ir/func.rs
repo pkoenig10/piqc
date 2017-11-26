@@ -1,7 +1,28 @@
+use std::fmt;
+
 use collections::*;
 use ir::*;
 
-pub type BlockId = Id;
+#[derive(Debug, Clone, Copy)]
+pub struct BlockId {
+    id: usize,
+}
+
+impl Key for BlockId {
+    fn new(id: usize) -> Self {
+        BlockId { id }
+    }
+
+    fn get(&self) -> usize {
+        self.id
+    }
+}
+
+impl fmt::Display for BlockId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "block{}", self.id)
+    }
+}
 
 #[derive(Debug)]
 pub struct BlockData {
@@ -54,7 +75,26 @@ impl BlockData {
     }
 }
 
-pub type InstId = Id;
+#[derive(Debug, Clone, Copy)]
+pub struct InstId {
+    id: usize,
+}
+
+impl Key for InstId {
+    fn new(id: usize) -> Self {
+        InstId { id }
+    }
+
+    fn get(&self) -> usize {
+        self.id
+    }
+}
+
+impl fmt::Display for InstId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
 
 #[derive(Debug)]
 struct InstData {
@@ -70,6 +110,10 @@ impl InstData {
             prev_inst: None,
             next_inst: None,
         }
+    }
+
+    pub fn inst(&self) -> &Inst {
+        &self.inst
     }
 
     pub fn prev_inst(&self) -> Option<InstId> {
@@ -105,8 +149,38 @@ impl ValueData {
 }
 
 #[derive(Debug)]
-pub struct Func {
+struct Params {
     params: Vec<Value>,
+}
+
+impl Params {
+    pub fn new() -> Params {
+        Params { params: Vec::new() }
+    }
+
+    pub fn push(&mut self, value: Value) {
+        self.params.push(value);
+    }
+}
+
+impl fmt::Display for Params {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut first = true;
+        for param in &self.params {
+            if first {
+                first = false;
+            } else {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", param)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct Func {
+    params: Params,
     blocks: Map<BlockId, BlockData>,
     insts: Map<InstId, InstData>,
     values: Map<Value, ValueData>,
@@ -117,7 +191,7 @@ pub struct Func {
 impl Func {
     pub fn new() -> Func {
         Func {
-            params: Vec::new(),
+            params: Params::new(),
             values: Map::new(),
             blocks: Map::new(),
             insts: Map::new(),
@@ -140,6 +214,14 @@ impl Func {
 
     pub fn create_value(&mut self, type_: Type) -> Value {
         self.values.create(ValueData::new(type_))
+    }
+
+    fn blocks(&self) -> BlockIterator {
+        BlockIterator::new(self)
+    }
+
+    fn insts(&self, block_id: BlockId) -> InstIterator {
+        InstIterator::new(self, block_id)
     }
 
     pub fn get_value_type(&self, value: Value) -> Type {
@@ -171,5 +253,76 @@ impl Func {
             }
         }
         block_data.set_last_inst(inst_id);
+    }
+}
+
+impl fmt::Display for Func {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "func({}):", self.params)?;
+        for block_id in self.blocks() {
+            writeln!(f, "")?;
+            writeln!(f, "{}:", block_id)?;
+            for inst_id in self.insts(block_id) {
+                let inst = self.insts.get(inst_id).inst();
+                writeln!(f, "    {}", inst)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+struct BlockIterator<'a> {
+    func: &'a Func,
+    next: Option<BlockId>,
+}
+
+impl<'a> BlockIterator<'a> {
+    fn new(func: &Func) -> BlockIterator {
+        BlockIterator {
+            func,
+            next: func.first_block,
+        }
+    }
+}
+
+impl<'a> Iterator for BlockIterator<'a> {
+    type Item = BlockId;
+
+    fn next(&mut self) -> Option<BlockId> {
+        match self.next {
+            Some(block_id) => {
+                self.next = self.func.blocks.get(block_id).next_block();
+                Some(block_id)
+            }
+            None => None,
+        }
+    }
+}
+
+struct InstIterator<'a> {
+    func: &'a Func,
+    next: Option<InstId>,
+}
+
+impl<'a> InstIterator<'a> {
+    fn new(func: &Func, block_id: BlockId) -> InstIterator {
+        InstIterator {
+            func,
+            next: func.blocks.get(block_id).first_inst(),
+        }
+    }
+}
+
+impl<'a> Iterator for InstIterator<'a> {
+    type Item = InstId;
+
+    fn next(&mut self) -> Option<InstId> {
+        match self.next {
+            Some(inst_id) => {
+                self.next = self.func.insts.get(inst_id).next_inst();
+                Some(inst_id)
+            }
+            None => None,
+        }
     }
 }
