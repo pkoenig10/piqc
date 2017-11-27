@@ -106,12 +106,12 @@ pub struct UnaryExpr<'input> {
 }
 
 impl<'input> UnaryExpr<'input> {
-    pub fn new(l: usize, op: UnaryOp, expr: Expr<'input>, r: usize) -> Expr<'input> {
-        Expr::UnaryExpr(UnaryExpr {
+    pub fn new(l: usize, op: UnaryOp, expr: Expr<'input>, r: usize) -> UnaryExpr<'input> {
+        UnaryExpr {
             location: Location::new(l, r),
             op,
             expr: Box::new(expr),
-        })
+        }
     }
 
     pub fn op(&self) -> UnaryOp {
@@ -182,13 +182,13 @@ impl<'input> BinaryExpr<'input> {
         op: BinaryOp,
         right: Expr<'input>,
         r: usize,
-    ) -> Expr<'input> {
-        Expr::BinaryExpr(BinaryExpr {
+    ) -> BinaryExpr<'input> {
+        BinaryExpr {
             location: Location::new(l, r),
             op,
             left: Box::new(left),
             right: Box::new(right),
-        })
+        }
     }
 
     pub fn op(&self) -> BinaryOp {

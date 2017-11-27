@@ -28,7 +28,7 @@ impl<'input> Param<'input> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Params<'input> {
     params: Vec<Param<'input>>,
 }
@@ -71,7 +71,7 @@ impl<'input> Func<'input> {
         Func {
             location: Location::new(l, r),
             identifier,
-            params: params.unwrap_or(Params::new()),
+            params: params.unwrap_or_else(Params::new),
             stmt: Stmt::BlockStmt(stmt),
         }
     }

@@ -4,10 +4,10 @@ mod ir;
 mod parser;
 
 pub fn compile(s: &str) {
-    let mut prog = parser::parse(s).unwrap();
-    ast::type_check(&mut prog);
+    let prog = parser::parse(s).unwrap();
+    ast::type_check(&prog);
     // println!("{:#?}", prog);
 
-    let prog = ir::generate_ir(&mut prog);
+    let prog = ir::generate_ir(&prog);
     println!("{}", prog);
 }

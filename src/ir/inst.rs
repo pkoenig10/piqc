@@ -9,8 +9,8 @@ pub struct IntConstInst {
 }
 
 impl IntConstInst {
-    pub fn new(dest: Value, immediate: IntImmediate) -> Inst {
-        Inst::IntConstInst(IntConstInst { dest, immediate })
+    pub fn new(dest: Value, immediate: IntImmediate) -> IntConstInst {
+        IntConstInst { dest, immediate }
     }
 }
 
@@ -27,8 +27,8 @@ pub struct FloatConstInst {
 }
 
 impl FloatConstInst {
-    pub fn new(dest: Value, immediate: FloatImmediate) -> Inst {
-        Inst::FloatConstInst(FloatConstInst { dest, immediate })
+    pub fn new(dest: Value, immediate: FloatImmediate) -> FloatConstInst {
+        FloatConstInst { dest, immediate }
     }
 }
 
@@ -45,8 +45,8 @@ pub struct BoolConstInst {
 }
 
 impl BoolConstInst {
-    pub fn new(dest: Value, immediate: BoolImmediate) -> Inst {
-        Inst::BoolConstInst(BoolConstInst { dest, immediate })
+    pub fn new(dest: Value, immediate: BoolImmediate) -> BoolConstInst {
+        BoolConstInst { dest, immediate }
     }
 }
 
@@ -78,8 +78,8 @@ pub struct UnaryInst {
 }
 
 impl UnaryInst {
-    pub fn new(op: UnaryOp, dest: Value, src: Operand) -> Inst {
-        Inst::UnaryInst(UnaryInst { op, dest, src })
+    pub fn new(op: UnaryOp, dest: Value, src: Operand) -> UnaryInst {
+        UnaryInst { op, dest, src }
     }
 }
 
@@ -130,13 +130,13 @@ pub struct BinaryInst {
 }
 
 impl BinaryInst {
-    pub fn new(op: BinaryOp, dest: Value, left: Operand, right: Operand) -> Inst {
-        Inst::BinaryInst(BinaryInst {
+    pub fn new(op: BinaryOp, dest: Value, left: Operand, right: Operand) -> BinaryInst {
+        BinaryInst {
             op,
             dest,
             left,
             right,
-        })
+        }
     }
 }
 
@@ -186,13 +186,13 @@ pub struct IntCompInst {
 }
 
 impl IntCompInst {
-    pub fn new(op: CompOp, dest: Value, left: Operand, right: Operand) -> Inst {
-        Inst::IntCompInst(IntCompInst {
+    pub fn new(op: CompOp, dest: Value, left: Operand, right: Operand) -> IntCompInst {
+        IntCompInst {
             op,
             dest,
             left,
             right,
-        })
+        }
     }
 }
 
@@ -218,13 +218,13 @@ pub struct FloatCompInst {
 }
 
 impl FloatCompInst {
-    pub fn new(op: CompOp, dest: Value, left: Operand, right: Operand) -> Inst {
-        Inst::FloatCompInst(FloatCompInst {
+    pub fn new(op: CompOp, dest: Value, left: Operand, right: Operand) -> FloatCompInst {
+        FloatCompInst {
             op,
             dest,
             left,
             right,
-        })
+        }
     }
 }
 

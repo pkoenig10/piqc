@@ -44,7 +44,7 @@ impl<'a, T> SymbolTable<'a, T> {
                 return symbol;
             }
         }
-        return None;
+        None
     }
 
     pub fn insert(&mut self, name: &'a str, symbol: T) {

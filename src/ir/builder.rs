@@ -41,21 +41,21 @@ impl IrBuilder {
 
     pub fn push_int_const_inst(&mut self, immediate: IntImmediate) -> Value {
         let dest = self.func.create_value(Int);
-        let inst = IntConstInst::new(dest, immediate);
+        let inst = Inst::IntConstInst(IntConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
     }
 
     pub fn push_float_const_inst(&mut self, immediate: FloatImmediate) -> Value {
         let dest = self.func.create_value(Float);
-        let inst = FloatConstInst::new(dest, immediate);
+        let inst = Inst::FloatConstInst(FloatConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
     }
 
     pub fn push_bool_const_inst(&mut self, immediate: BoolImmediate) -> Value {
         let dest = self.func.create_value(Bool);
-        let inst = BoolConstInst::new(dest, immediate);
+        let inst = Inst::BoolConstInst(BoolConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
     }
@@ -63,7 +63,7 @@ impl IrBuilder {
     pub fn push_unary_inst(&mut self, op: UnaryOp, src: Operand) -> Value {
         let type_ = self.get_unary_inst_type(op, src);
         let dest = self.func.create_value(type_);
-        let inst = UnaryInst::new(op, dest, src);
+        let inst = Inst::UnaryInst(UnaryInst::new(op, dest, src));
         self.push_inst(inst);
         dest
     }
@@ -71,7 +71,7 @@ impl IrBuilder {
     pub fn push_binary_inst(&mut self, op: BinaryOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_binary_inst_type(op, left, right);
         let dest = self.func.create_value(type_);
-        let inst = BinaryInst::new(op, dest, left, right);
+        let inst = Inst::BinaryInst(BinaryInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
@@ -79,7 +79,7 @@ impl IrBuilder {
     pub fn push_int_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
         let dest = self.func.create_value(type_);
-        let inst = IntCompInst::new(op, dest, left, right);
+        let inst = Inst::IntCompInst(IntCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
@@ -87,7 +87,7 @@ impl IrBuilder {
     pub fn push_float_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
         let dest = self.func.create_value(type_);
-        let inst = FloatCompInst::new(op, dest, left, right);
+        let inst = Inst::FloatCompInst(FloatCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
@@ -130,7 +130,7 @@ impl IrBuilder {
             (Fsub, Float, Float) |
             (Fmul, Float, Float) => Float,
             (And, Bool, Bool) |
-            (Or, Bool, Bool) => Bool,
+            (Or, Bool, Bool) |
             (Xor, Bool, Bool) => Bool,
             _ => {
                 panic!(

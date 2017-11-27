@@ -30,10 +30,10 @@ where
     }
 
     pub fn get(&self, key: K) -> &V {
-        self.values.get(key.get()).unwrap()
+        &self.values[key.get()]
     }
 
     pub fn get_mut(&mut self, key: K) -> &mut V {
-        self.values.get_mut(key.get()).unwrap()
+        &mut self.values[key.get()]
     }
 }

@@ -6,7 +6,7 @@ use ir::Type::*;
 use ir::builder::IrBuilder;
 use collections::*;
 
-pub fn generate_ir<'input>(prog: &mut ast::Prog) -> Prog {
+pub fn generate_ir(prog: &ast::Prog) -> Prog {
     let generator = IrGenerator::new();
     let func = generator.generate_func(prog.func());
     Prog::new(func)
@@ -137,7 +137,7 @@ impl<'input> IrGenerator<'input> {
                     src,
                 )
             }
-            (ast::BitNot, Int) => builder.push_unary_inst(Not, src),
+            (ast::BitNot, Int) |
             (ast::LogicalNot, Bool) => builder.push_unary_inst(Not, src),
             _ => {
                 panic!(

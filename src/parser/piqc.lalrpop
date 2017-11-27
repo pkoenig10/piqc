@@ -1,3 +1,8 @@
+#![allow(unknown_lints)]
+#![allow(clippy)]
+
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
 use ast::*;
 
 grammar;
@@ -96,12 +101,12 @@ PrimaryExpr: Expr<'input> = {
 
 UnaryExpr: Expr<'input> = {
     PrimaryExpr,
-    @L UnaryOp UnaryExpr @R => UnaryExpr::new(<>),
+    @L UnaryOp UnaryExpr @R => Expr::UnaryExpr(UnaryExpr::new(<>)),
 };
 
 BinaryExpr<Op, PrevExpr>: Expr<'input> = {
     PrevExpr,
-    @L BinaryExpr<Op, PrevExpr> Op PrevExpr @R => BinaryExpr::new(<>),
+    @L BinaryExpr<Op, PrevExpr> Op PrevExpr @R => Expr::BinaryExpr(BinaryExpr::new(<>)),
 };
 
 MultiplicativeExpr = BinaryExpr<MultiplicativeOp, UnaryExpr>;
@@ -155,7 +160,7 @@ Param: Param<'input> = {
 
 Params: Params<'input> = {
     <params: (<Params> ",")?> <param: Param> => {
-        let mut params = params.unwrap_or(Params::new());
+        let mut params = params.unwrap_or_else(Params::new);
         params.push(param);
         params
     },
