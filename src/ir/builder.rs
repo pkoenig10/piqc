@@ -17,6 +17,10 @@ impl IrBuilder {
         self.func
     }
 
+    pub fn insert_block(&self) -> BlockId {
+        self.insert_block.unwrap()
+    }
+
     pub fn set_insert_block(&mut self, block_id: BlockId) {
         self.insert_block = Some(block_id);
     }
@@ -31,8 +35,16 @@ impl IrBuilder {
         self.func.create_block()
     }
 
-    pub fn get_value_type(&self, value: Value) -> Type {
-        self.func.get_value_type(value)
+    pub fn block(&self, block_id: BlockId) -> &BlockData {
+        self.func.block(block_id)
+    }
+
+    pub fn inst(&self, inst_id: InstId) -> &InstData {
+        self.func.inst(inst_id)
+    }
+
+    pub fn value(&self, value: Value) -> &ValueData {
+        self.func.value(value)
     }
 
     pub fn push_block(&mut self, block_id: BlockId) {
@@ -164,7 +176,7 @@ impl IrBuilder {
             Operand::IntImmediate(_) => Int,
             Operand::FloatImmediate(_) => Float,
             Operand::BoolImmediate(_) => Bool,
-            Operand::Value(value_id) => self.func.get_value_type(value_id),
+            Operand::Value(value_id) => self.func.value(value_id).type_(),
         }
     }
 }

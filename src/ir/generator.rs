@@ -40,6 +40,16 @@ impl<'input> IrGenerator<'input> {
 
         self.generate_stmt(func.stmt());
 
+        let block_id = self.builder.insert_block();
+        let inst_id = self.builder.block(block_id).last_inst();
+        let has_terminator = match inst_id {
+            Some(inst_id) => self.builder.inst(inst_id).inst().is_terminator(),
+            None => false,
+        };
+        if !has_terminator {
+            self.builder.push_return_inst();
+        }
+
         self.symbol_table.pop_scope();
 
         self.builder.func()
@@ -116,7 +126,7 @@ impl<'input> IrGenerator<'input> {
         let src_value = self.generate_expr(expr.expr());
 
         let op = expr.op();
-        let src_type = self.builder.get_value_type(src_value);
+        let src_type = self.builder.value(src_value).type_();
 
         let src = Operand::Value(src_value);
 
@@ -152,8 +162,8 @@ impl<'input> IrGenerator<'input> {
         let right_value = self.generate_expr(expr.right());
 
         let op = expr.op();
-        let left_type = self.builder.get_value_type(left_value);
-        let right_type = self.builder.get_value_type(right_value);
+        let left_type = self.builder.value(left_value).type_();
+        let right_type = self.builder.value(right_value).type_();
 
         let left = Operand::Value(left_value);
         let right = Operand::Value(right_value);

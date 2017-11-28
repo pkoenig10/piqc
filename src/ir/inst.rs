@@ -268,6 +268,21 @@ pub enum Inst {
     ReturnInst(ReturnInst),
 }
 
+impl Inst {
+    pub fn is_terminator(&self) -> bool {
+        match *self {
+            Inst::IntConstInst(_) |
+            Inst::FloatConstInst(_) |
+            Inst::BoolConstInst(_) |
+            Inst::UnaryInst(_) |
+            Inst::BinaryInst(_) |
+            Inst::IntCompInst(_) |
+            Inst::FloatCompInst(_) => false,
+            Inst::ReturnInst(_) => true,
+        }
+    }
+}
+
 impl fmt::Display for Inst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {

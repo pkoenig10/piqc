@@ -97,7 +97,7 @@ impl fmt::Display for InstId {
 }
 
 #[derive(Debug)]
-struct InstData {
+pub struct InstData {
     inst: Inst,
     prev_inst: Option<InstId>,
     next_inst: Option<InstId>,
@@ -134,7 +134,7 @@ impl InstData {
 }
 
 #[derive(Debug)]
-struct ValueData {
+pub struct ValueData {
     type_: Type,
 }
 
@@ -216,16 +216,24 @@ impl Func {
         self.values.create(ValueData::new(type_))
     }
 
+    pub fn block(&self, block_id: BlockId) -> &BlockData {
+        self.blocks.get(block_id)
+    }
+
     fn blocks(&self) -> BlockIterator {
         BlockIterator::new(self)
+    }
+
+    pub fn inst(&self, inst_id: InstId) -> &InstData {
+        self.insts.get(inst_id)
     }
 
     fn insts(&self, block_id: BlockId) -> InstIterator {
         InstIterator::new(self, block_id)
     }
 
-    pub fn get_value_type(&self, value: Value) -> Type {
-        self.values.get(value).type_()
+    pub fn value(&self, value: Value) -> &ValueData {
+        self.values.get(value)
     }
 
     pub fn push_block(&mut self, block_id: BlockId) {
