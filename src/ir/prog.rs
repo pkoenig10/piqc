@@ -11,6 +11,10 @@ impl Prog {
     pub fn new(func: Func) -> Prog {
         Prog { func }
     }
+
+    pub fn func(&self) -> &Func {
+        &self.func
+    }
 }
 
 impl fmt::Display for Prog {

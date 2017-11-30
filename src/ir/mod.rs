@@ -5,6 +5,7 @@ mod generator;
 mod operand;
 mod prog;
 mod type_;
+mod verifier;
 
 pub use self::func::*;
 pub use self::inst::*;
@@ -18,3 +19,4 @@ pub use self::CompOp::*;
 pub use self::Type::*;
 
 pub use self::generator::generate_ir;
+pub use self::verifier::verify_ir;

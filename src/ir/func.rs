@@ -3,7 +3,7 @@ use std::fmt;
 use collections::*;
 use ir::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockId {
     id: usize,
 }
@@ -75,7 +75,7 @@ impl BlockData {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InstId {
     id: usize,
 }
@@ -133,7 +133,7 @@ impl InstData {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ValueData {
     type_: Type,
 }
@@ -220,7 +220,7 @@ impl Func {
         self.blocks.get(block_id)
     }
 
-    fn blocks(&self) -> BlockIterator {
+    pub fn blocks(&self) -> BlockIterator {
         BlockIterator::new(self)
     }
 
@@ -228,7 +228,7 @@ impl Func {
         self.insts.get(inst_id)
     }
 
-    fn insts(&self, block_id: BlockId) -> InstIterator {
+    pub fn insts(&self, block_id: BlockId) -> InstIterator {
         InstIterator::new(self, block_id)
     }
 
@@ -279,7 +279,7 @@ impl fmt::Display for Func {
     }
 }
 
-struct BlockIterator<'a> {
+pub struct BlockIterator<'a> {
     func: &'a Func,
     next: Option<BlockId>,
 }
@@ -307,7 +307,7 @@ impl<'a> Iterator for BlockIterator<'a> {
     }
 }
 
-struct InstIterator<'a> {
+pub struct InstIterator<'a> {
     func: &'a Func,
     next: Option<InstId>,
 }

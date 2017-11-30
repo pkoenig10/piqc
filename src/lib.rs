@@ -10,4 +10,6 @@ pub fn compile(s: &str) {
 
     let prog = ir::generate_ir(&prog);
     println!("{}", prog);
+
+    ir::verify_ir(&prog);
 }
