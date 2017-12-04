@@ -25,9 +25,14 @@ impl IrBuilder {
         self.insert_block = Some(block_id);
     }
 
-    pub fn create_param(&mut self, type_: Type) -> Value {
+    pub fn create_func_param(&mut self, type_: Type) {
+        self.func.push_param(type_);
+    }
+
+    pub fn create_block_param(&mut self, type_: Type) -> Value {
+        let block_id = self.insert_block.unwrap();
         let value = self.func.create_value(type_);
-        self.func.push_param(value);
+        self.func.push_block_param(block_id, value);
         value
     }
 

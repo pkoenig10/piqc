@@ -28,15 +28,16 @@ impl<'input> IrGenerator<'input> {
     fn generate_func(mut self, func: &ast::Func<'input>) -> Func {
         self.symbol_table.push_scope();
 
-        for param in func.params() {
-            let type_ = self.generate_type(param.type_());
-            let value = self.builder.create_param(type_);
-            self.insert_symbol(param.identifier(), value);
-        }
-
         let block_id = self.builder.create_block();
         self.builder.push_block(block_id);
         self.builder.set_insert_block(block_id);
+
+        for param in func.params() {
+            let type_ = self.generate_type(param.type_());
+            self.builder.create_func_param(type_);
+            let value = self.builder.create_block_param(type_);
+            self.insert_symbol(param.identifier(), value);
+        }
 
         self.generate_stmt(func.stmt());
 
@@ -104,18 +105,18 @@ impl<'input> IrGenerator<'input> {
     }
 
     fn generate_int_literal(&mut self, int_literal: &ast::IntLiteral) -> Value {
-        let value = IntImmediate::new(int_literal.value());
-        self.builder.push_int_const_inst(value)
+        let immediate = IntImmediate::new(int_literal.value());
+        self.builder.push_int_const_inst(immediate)
     }
 
     fn generate_float_literal(&mut self, float_literal: &ast::FloatLiteral) -> Value {
-        let value = FloatImmediate::new(float_literal.value());
-        self.builder.push_float_const_inst(value)
+        let immediate = FloatImmediate::new(float_literal.value());
+        self.builder.push_float_const_inst(immediate)
     }
 
     fn generate_bool_literal(&mut self, bool_literal: &ast::BoolLiteral) -> Value {
-        let value = BoolImmediate::new(bool_literal.value());
-        self.builder.push_bool_const_inst(value)
+        let immediate = BoolImmediate::new(bool_literal.value());
+        self.builder.push_bool_const_inst(immediate)
     }
 
     fn generate_identifier(&mut self, identifier: &ast::Identifier) -> Value {
@@ -132,18 +133,12 @@ impl<'input> IrGenerator<'input> {
 
         match (op, src_type) {
             (ast::Negate, Int) => {
-                self.builder.push_binary_inst(
-                    Sub,
-                    Operand::IntImmediate(IntImmediate::new(0)),
-                    src,
-                )
+                let zero = Operand::IntImmediate(IntImmediate::new(0));
+                self.builder.push_binary_inst(Sub, zero, src)
             }
             (ast::Negate, Float) => {
-                self.builder.push_binary_inst(
-                    Fsub,
-                    Operand::FloatImmediate(FloatImmediate::new(0.)),
-                    src,
-                )
+                let zero = Operand::FloatImmediate(FloatImmediate::new(0.));
+                self.builder.push_binary_inst(Fsub, zero, src)
             }
             (ast::BitNot, Int) |
             (ast::LogicalNot, Bool) => self.builder.push_unary_inst(Not, src),
@@ -168,42 +163,24 @@ impl<'input> IrGenerator<'input> {
         let left = Operand::Value(left_value);
         let right = Operand::Value(right_value);
 
-        match (op, left_type, right_type) {
-            (ast::Mul, Float, Float) => self.builder.push_binary_inst(Fmul, left, right),
-            (ast::Add, Int, Int) => self.builder.push_binary_inst(Add, left, right),
-            (ast::Add, Float, Float) => self.builder.push_binary_inst(Fadd, left, right),
-            (ast::Sub, Int, Int) => self.builder.push_binary_inst(Sub, left, right),
-            (ast::Sub, Float, Float) => self.builder.push_binary_inst(Fsub, left, right),
-            (ast::Shl, Int, Int) => self.builder.push_binary_inst(Shl, left, right),
-            (ast::Shr, Int, Int) => self.builder.push_binary_inst(Asr, left, right),
-            (ast::BitAnd, Int, Int) |
-            (ast::LogicalAnd, Bool, Bool) => self.builder.push_binary_inst(And, left, right),
-            (ast::BitOr, Int, Int) |
-            (ast::LogicalOr, Bool, Bool) => self.builder.push_binary_inst(Or, left, right),
-            (ast::BitXor, Int, Int) => self.builder.push_binary_inst(Xor, left, right),
-            (ast::Eq, Int, Int) |
-            (ast::Eq, Bool, Bool) => self.builder.push_int_comp_inst(Eq, left, right),
-            (ast::Eq, Float, Float) => self.builder.push_float_comp_inst(Eq, left, right),
-            (ast::Ne, Int, Int) |
-            (ast::Ne, Bool, Bool) => self.builder.push_int_comp_inst(Ne, left, right),
-            (ast::Ne, Float, Float) => self.builder.push_float_comp_inst(Ne, left, right),
-            (ast::Lt, Int, Int) => self.builder.push_int_comp_inst(Lt, left, right),
-            (ast::Lt, Float, Float) => self.builder.push_float_comp_inst(Lt, left, right),
-            (ast::Gt, Int, Int) => self.builder.push_int_comp_inst(Gt, left, right),
-            (ast::Gt, Float, Float) => self.builder.push_float_comp_inst(Gt, left, right),
-            (ast::Le, Int, Int) => self.builder.push_int_comp_inst(Le, left, right),
-            (ast::Le, Float, Float) => self.builder.push_float_comp_inst(Le, left, right),
-            (ast::Ge, Int, Int) => self.builder.push_int_comp_inst(Ge, left, right),
-            (ast::Ge, Float, Float) => self.builder.push_float_comp_inst(Ge, left, right),
-            _ => {
-                panic!(
-                    "Invalid binary expression '{}' with operand types '{}' and '{}'",
-                    op,
-                    left_type,
-                    right_type
-                )
-            }
+        if let Some(op) = get_binary_op(op, left_type, right_type) {
+            return self.builder.push_binary_inst(op, left, right);
         }
+
+        if let Some(op) = get_int_comp_op(op, left_type, right_type) {
+            return self.builder.push_int_comp_inst(op, left, right);
+        }
+
+        if let Some(op) = get_float_comp_op(op, left_type, right_type) {
+            return self.builder.push_float_comp_inst(op, left, right);
+        }
+
+        panic!(
+            "Invalid binary expression '{}' with operand types '{}' and '{}'",
+            op,
+            left_type,
+            right_type
+        )
     }
 
     fn generate_type(&self, type_: ast::Type) -> Type {
@@ -220,5 +197,49 @@ impl<'input> IrGenerator<'input> {
 
     fn get_symbol(&self, identifier: &ast::Identifier) -> Value {
         *self.symbol_table.get(identifier.name()).unwrap()
+    }
+}
+
+fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<BinaryOp> {
+    match (op, left_type, right_type) {
+        (ast::Mul, Float, Float) => Some(Fmul),
+        (ast::Add, Int, Int) => Some(Add),
+        (ast::Add, Float, Float) => Some(Fadd),
+        (ast::Sub, Int, Int) => Some(Sub),
+        (ast::Sub, Float, Float) => Some(Fsub),
+        (ast::Shl, Int, Int) => Some(Shl),
+        (ast::Shr, Int, Int) => Some(Asr),
+        (ast::BitAnd, Int, Int) |
+        (ast::LogicalAnd, Bool, Bool) => Some(And),
+        (ast::BitOr, Int, Int) |
+        (ast::LogicalOr, Bool, Bool) => Some(Or),
+        (ast::BitXor, Int, Int) => Some(Xor),
+        _ => None,
+    }
+}
+
+fn get_int_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<CompOp> {
+    match (left_type, right_type) {
+        (Int, Int) | (Bool, Bool) => get_comp_op(op),
+        _ => None,
+    }
+}
+
+fn get_float_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<CompOp> {
+    match (left_type, right_type) {
+        (Float, Float) => get_comp_op(op),
+        _ => None,
+    }
+}
+
+fn get_comp_op(op: ast::BinaryOp) -> Option<CompOp> {
+    match op {
+        ast::Eq => Some(Eq),
+        ast::Ne => Some(Ne),
+        ast::Lt => Some(Lt),
+        ast::Gt => Some(Gt),
+        ast::Le => Some(Le),
+        ast::Ge => Some(Ge),
+        _ => None,
     }
 }

@@ -3,29 +3,9 @@ use std::fmt;
 use collections::*;
 use ir::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BlockId {
-    id: usize,
-}
-
-impl Key for BlockId {
-    fn new(id: usize) -> Self {
-        BlockId { id }
-    }
-
-    fn get(&self) -> usize {
-        self.id
-    }
-}
-
-impl fmt::Display for BlockId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "block{}", self.id)
-    }
-}
-
 #[derive(Debug)]
 pub struct BlockData {
+    block: Block,
     prev_block: Option<BlockId>,
     next_block: Option<BlockId>,
     first_inst: Option<InstId>,
@@ -35,11 +15,20 @@ pub struct BlockData {
 impl BlockData {
     pub fn new() -> BlockData {
         BlockData {
+            block: Block::new(),
             prev_block: None,
             next_block: None,
             first_inst: None,
             last_inst: None,
         }
+    }
+
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
+    pub fn block_mut(&mut self) -> &mut Block {
+        &mut self.block
     }
 
     pub fn prev_block(&self) -> Option<BlockId> {
@@ -72,27 +61,6 @@ impl BlockData {
 
     pub fn set_last_inst(&mut self, last_inst: InstId) {
         self.last_inst = Some(last_inst);
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InstId {
-    id: usize,
-}
-
-impl Key for InstId {
-    fn new(id: usize) -> Self {
-        InstId { id }
-    }
-
-    fn get(&self) -> usize {
-        self.id
-    }
-}
-
-impl fmt::Display for InstId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.id)
     }
 }
 
@@ -149,38 +117,8 @@ impl ValueData {
 }
 
 #[derive(Debug)]
-struct Params {
-    params: Vec<Value>,
-}
-
-impl Params {
-    pub fn new() -> Params {
-        Params { params: Vec::new() }
-    }
-
-    pub fn push(&mut self, value: Value) {
-        self.params.push(value);
-    }
-}
-
-impl fmt::Display for Params {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut first = true;
-        for param in &self.params {
-            if first {
-                first = false;
-            } else {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}", param)?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
 pub struct Func {
-    params: Params,
+    params: Params<Type>,
     blocks: Map<BlockId, BlockData>,
     insts: Map<InstId, InstData>,
     values: Map<Value, ValueData>,
@@ -200,8 +138,12 @@ impl Func {
         }
     }
 
-    pub fn push_param(&mut self, value: Value) {
-        self.params.push(value);
+    pub fn push_param(&mut self, type_: Type) {
+        self.params.push(type_);
+    }
+
+    pub fn push_block_param(&mut self, block_id: BlockId, value: Value) {
+        self.blocks.get_mut(block_id).block_mut().push_param(value);
     }
 
     pub fn create_block(&mut self) -> BlockId {
@@ -268,8 +210,9 @@ impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "func({}):", self.params)?;
         for block_id in self.blocks() {
+            let block = self.blocks.get(block_id).block();
             writeln!(f, "")?;
-            writeln!(f, "{}:", block_id)?;
+            writeln!(f, "{}({}):", block_id, block.params())?;
             for inst_id in self.insts(block_id) {
                 let inst = self.insts.get(inst_id).inst();
                 writeln!(f, "    {}", inst)?;

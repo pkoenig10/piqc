@@ -1,5 +1,6 @@
 use std::fmt;
 
+use collections::*;
 use ir::*;
 
 #[derive(Debug, Clone, Copy)]
@@ -253,6 +254,27 @@ impl ReturnInst {
 impl fmt::Display for ReturnInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ret")
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InstId {
+    id: usize,
+}
+
+impl Key for InstId {
+    fn new(id: usize) -> Self {
+        InstId { id }
+    }
+
+    fn get(&self) -> usize {
+        self.id
+    }
+}
+
+impl fmt::Display for InstId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.id)
     }
 }
 

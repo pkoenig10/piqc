@@ -11,9 +11,7 @@ pub struct Verifier<'a> {
 
 impl<'a> Verifier<'a> {
     pub fn new(func: &'a Func) -> Verifier<'a> {
-        Verifier {
-            func,
-        }
+        Verifier { func }
     }
 
     pub fn verify_func(self) {
@@ -29,11 +27,15 @@ impl<'a> Verifier<'a> {
         let is_terminator = self.func.inst(inst_id).inst().is_terminator();
 
         if !is_last_inst && is_terminator {
-            panic!("Instruction is not the last instruction in block but is a terminator instruction");
+            panic!(
+                "Instruction is not the last instruction in block but is a terminator instruction"
+            );
         }
 
         if is_last_inst && !is_terminator {
-            panic!("Instruction is the last instruction in block but is not a terminator instruction");
+            panic!(
+                "Instruction is the last instruction in block but is not a terminator instruction"
+            );
         }
     }
 }

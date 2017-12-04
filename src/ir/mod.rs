@@ -1,15 +1,19 @@
+mod block;
 mod builder;
 mod func;
 mod inst;
 mod generator;
 mod operand;
+mod params;
 mod prog;
 mod type_;
 mod verifier;
 
+pub use self::block::*;
 pub use self::func::*;
 pub use self::inst::*;
 pub use self::operand::*;
+pub use self::params::*;
 pub use self::prog::*;
 pub use self::type_::*;
 
