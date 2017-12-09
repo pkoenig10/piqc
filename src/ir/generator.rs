@@ -65,7 +65,7 @@ impl<'input> IrGenerator<'input> {
             self.insert_value(param.identifier(), value);
         }
 
-        self.generate_stmt(func.stmt());
+        self.generate_block_stmt(func.stmt());
 
         let block_id = self.builder.current_block();
         let inst_id = self.builder.block(block_id).last_inst();

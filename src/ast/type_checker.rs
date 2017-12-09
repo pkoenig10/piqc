@@ -75,7 +75,7 @@ impl<'input> TypeChecker<'input> {
             self.insert_symbol(param.identifier(), param.type_());
         }
 
-        self.check_stmt(func.stmt());
+        self.check_block_stmt(func.stmt());
 
         self.symbol_table.pop_scope();
     }
