@@ -41,6 +41,7 @@ impl<'a> ValueTable<'a> {
 struct IrGenerator<'input> {
     builder: IrBuilder,
     value_table: ValueTable<'input>,
+    predecessors: HashMap<BlockId, Vec<BlockId>>,
 }
 
 impl<'input> IrGenerator<'input> {
@@ -48,24 +49,25 @@ impl<'input> IrGenerator<'input> {
         IrGenerator {
             builder: IrBuilder::new(Func::new()),
             value_table: ValueTable::new(),
+            predecessors: HashMap::new(),
         }
     }
 
     fn generate_func(mut self, func: &ast::Func<'input>) -> Func {
-        let block_id = self.builder.create_block();
-        self.builder.push_block(block_id);
-        self.builder.set_insert_block(block_id);
+        let entry_block = self.builder.create_block();
+        self.builder.push_block(entry_block);
+        self.builder.set_current_block(entry_block);
 
         for param in func.params() {
             let type_ = self.generate_type(param.type_());
             self.builder.create_func_param(type_);
-            let value = self.builder.create_block_param(type_);
+            let value = self.builder.create_block_param(entry_block, type_);
             self.insert_value(param.identifier(), value);
         }
 
         self.generate_stmt(func.stmt());
 
-        let block_id = self.builder.insert_block();
+        let block_id = self.builder.current_block();
         let inst_id = self.builder.block(block_id).last_inst();
         let has_terminator = match inst_id {
             Some(inst_id) => self.builder.inst(inst_id).inst().is_terminator(),
@@ -74,6 +76,8 @@ impl<'input> IrGenerator<'input> {
         if !has_terminator {
             self.builder.push_return_inst();
         }
+
+        println!("{:#?}", self.predecessors);
 
         self.builder.func()
     }
@@ -107,20 +111,24 @@ impl<'input> IrGenerator<'input> {
     }
 
     fn generate_if_stmt(&mut self, stmt: &ast::IfStmt<'input>) {
+        let entry_block = self.builder.current_block();
         let if_block = self.builder.create_block();
         let merge_block = self.builder.create_block();
 
         let value = self.generate_expr(stmt.expr());
         self.builder.push_branch_inst(value, if_block, merge_block);
+        self.insert_predecessor(if_block, entry_block);
+        self.insert_predecessor(merge_block, entry_block);
 
         self.builder.push_block(if_block);
-        self.builder.set_insert_block(if_block);
+        self.builder.set_current_block(if_block);
 
         self.generate_block_stmt(stmt.stmt());
         self.builder.push_jump_inst(merge_block);
+        self.insert_predecessor(merge_block, if_block);
 
         self.builder.push_block(merge_block);
-        self.builder.set_insert_block(merge_block);
+        self.builder.set_current_block(merge_block);
     }
 
     fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
@@ -228,13 +236,57 @@ impl<'input> IrGenerator<'input> {
     }
 
     fn insert_value(&mut self, identifier: &ast::Identifier<'input>, value: Value) {
-        let block_id = self.builder.insert_block();
+        let block_id = self.builder.current_block();
         self.value_table.insert(identifier.name(), block_id, value);
     }
 
-    fn get_value(&self, identifier: &ast::Identifier) -> Value {
-        let block_id = self.builder.insert_block();
-        self.value_table.get(identifier.name(), block_id).unwrap()
+    fn get_value(&mut self, identifier: &ast::Identifier) -> Value {
+        let block = self.builder.current_block();
+        self.get_value_in_block(identifier.name(), block)
+    }
+
+    fn get_value_in_block(&mut self, name: &str, block: BlockId) -> Value {
+        match self.value_table.get(name, block) {
+            Some(value) => value,
+            None => {
+                let mut type_ = None;
+                for predecessor_block in self.predecessors[&block].clone() {
+                    let value = self.get_value_in_block(name, predecessor_block);
+
+                    let value_type = self.builder.value(value).type_();
+                    match type_ {
+                        Some(type_) => {
+                            if value_type != type_ {
+                                panic!(
+                                    "Variable defined with multiple types `{}` and `{}`",
+                                    type_,
+                                    value_type
+                                );
+                            }
+                        }
+                        None => {
+                            type_ = Some(value_type);
+                        }
+                    };
+
+                    let inst = self.builder.block(predecessor_block).last_inst().unwrap();
+                    let target = self.builder
+                        .inst_mut(inst)
+                        .inst_mut()
+                        .get_target_mut(block)
+                        .unwrap();
+                    target.push_arg(value);
+                }
+                self.builder.create_block_param(block, type_.unwrap())
+            }
+        }
+    }
+
+    fn insert_predecessor(&mut self, block: BlockId, predecessor: BlockId) {
+        self.predecessors
+            .entry(block)
+            .or_insert_with(Vec::new)
+            .push(predecessor);
     }
 }
 

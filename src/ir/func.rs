@@ -84,6 +84,10 @@ impl InstData {
         &self.inst
     }
 
+    pub fn inst_mut(&mut self) -> &mut Inst {
+        &mut self.inst
+    }
+
     pub fn prev_inst(&self) -> Option<InstId> {
         self.prev_inst
     }
@@ -168,6 +172,10 @@ impl Func {
 
     pub fn inst(&self, inst_id: InstId) -> &InstData {
         self.insts.get(inst_id)
+    }
+
+    pub fn inst_mut(&mut self, inst_id: InstId) -> &mut InstData {
+        self.insts.get_mut(inst_id)
     }
 
     pub fn insts(&self, block_id: BlockId) -> InstIterator {

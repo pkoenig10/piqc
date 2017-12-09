@@ -9,9 +9,10 @@ fn main(int i, float f) {
     bool baz = !true;
 
     if (baz) {
-        foo = 1234;
+        bar = bar + f;
     }
 
+    bar = bar + 1.0;
     return;
 }
 ",

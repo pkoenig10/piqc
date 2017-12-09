@@ -244,12 +244,20 @@ impl fmt::Display for FloatCompInst {
 
 #[derive(Debug)]
 pub struct JumpInst {
-    dest: BlockId,
+    target: Target,
 }
 
 impl JumpInst {
-    pub fn new(dest: BlockId) -> JumpInst {
-        JumpInst { dest }
+    pub fn new(target: Target) -> JumpInst {
+        JumpInst { target }
+    }
+
+    pub fn target(&self) -> &Target {
+        &self.target
+    }
+
+    pub fn target_mut(&mut self) -> &mut Target {
+        &mut self.target
     }
 }
 
@@ -258,7 +266,7 @@ impl fmt::Display for JumpInst {
         write!(
             f,
             "jmp {}",
-            self.dest,
+            self.target,
         )
     }
 }
@@ -266,17 +274,33 @@ impl fmt::Display for JumpInst {
 #[derive(Debug)]
 pub struct BranchInst {
     cond: Value,
-    true_block: BlockId,
-    false_block: BlockId,
+    true_target: Target,
+    false_target: Target,
 }
 
 impl BranchInst {
-    pub fn new(cond: Value, true_block: BlockId, false_block: BlockId) -> BranchInst {
+    pub fn new(cond: Value, true_target: Target, false_target: Target) -> BranchInst {
         BranchInst {
             cond,
-            true_block,
-            false_block,
+            true_target,
+            false_target,
         }
+    }
+
+    pub fn true_target(&self) -> &Target {
+        &self.true_target
+    }
+
+    pub fn true_target_mut(&mut self) -> &mut Target {
+        &mut self.true_target
+    }
+
+    pub fn false_target(&self) -> &Target {
+        &self.false_target
+    }
+
+    pub fn false_target_mut(&mut self) -> &mut Target {
+        &mut self.false_target
     }
 }
 
@@ -286,8 +310,8 @@ impl fmt::Display for BranchInst {
             f,
             "br {} {}, {}",
             self.cond,
-            self.true_block,
-            self.false_block
+            self.true_target,
+            self.false_target
         )
     }
 }
@@ -355,6 +379,35 @@ impl Inst {
             Inst::JumpInst(_) |
             Inst::BranchInst(_) |
             Inst::ReturnInst(_) => true,
+        }
+    }
+
+    pub fn get_target_mut(&mut self, block_id: BlockId) -> Option<&mut Target> {
+        match *self {
+            Inst::IntConstInst(_) |
+            Inst::FloatConstInst(_) |
+            Inst::BoolConstInst(_) |
+            Inst::UnaryInst(_) |
+            Inst::BinaryInst(_) |
+            Inst::IntCompInst(_) |
+            Inst::FloatCompInst(_) |
+            Inst::ReturnInst(_) => None,
+            Inst::JumpInst(ref mut inst) => {
+                if inst.target().block() == block_id {
+                    Some(inst.target_mut())
+                } else {
+                    None
+                }
+            }
+            Inst::BranchInst(ref mut inst) => {
+                if inst.true_target().block() == block_id {
+                    Some(inst.true_target_mut())
+                } else if inst.false_target().block() == block_id {
+                    Some(inst.false_target_mut())
+                } else {
+                    None
+                }
+            }
         }
     }
 }

@@ -2,14 +2,14 @@ use ir::*;
 
 pub struct IrBuilder {
     func: Func,
-    insert_block: Option<BlockId>,
+    current_block: Option<BlockId>,
 }
 
 impl IrBuilder {
     pub fn new(func: Func) -> IrBuilder {
         IrBuilder {
             func,
-            insert_block: None,
+            current_block: None,
         }
     }
 
@@ -17,20 +17,19 @@ impl IrBuilder {
         self.func
     }
 
-    pub fn insert_block(&self) -> BlockId {
-        self.insert_block.unwrap()
+    pub fn current_block(&self) -> BlockId {
+        self.current_block.unwrap()
     }
 
-    pub fn set_insert_block(&mut self, block_id: BlockId) {
-        self.insert_block = Some(block_id);
+    pub fn set_current_block(&mut self, block_id: BlockId) {
+        self.current_block = Some(block_id);
     }
 
     pub fn create_func_param(&mut self, type_: Type) {
         self.func.push_param(type_);
     }
 
-    pub fn create_block_param(&mut self, type_: Type) -> Value {
-        let block_id = self.insert_block.unwrap();
+    pub fn create_block_param(&mut self, block_id: BlockId, type_: Type) -> Value {
         let value = self.func.create_value(type_);
         self.func.push_block_param(block_id, value);
         value
@@ -46,6 +45,10 @@ impl IrBuilder {
 
     pub fn inst(&self, inst_id: InstId) -> &InstData {
         self.func.inst(inst_id)
+    }
+
+    pub fn inst_mut(&mut self, inst_id: InstId) -> &mut InstData {
+        self.func.inst_mut(inst_id)
     }
 
     pub fn value(&self, value: Value) -> &ValueData {
@@ -109,13 +112,16 @@ impl IrBuilder {
         dest
     }
 
-    pub fn push_jump_inst(&mut self, dest: BlockId) {
-        let inst = Inst::JumpInst(JumpInst::new(dest));
+    pub fn push_jump_inst(&mut self, block: BlockId) {
+        let target = Target::new(block);
+        let inst = Inst::JumpInst(JumpInst::new(target));
         self.push_inst(inst);
     }
 
     pub fn push_branch_inst(&mut self, cond: Value, true_block: BlockId, false_block: BlockId) {
-        let inst = Inst::BranchInst(BranchInst::new(cond, true_block, false_block));
+        let true_target = Target::new(true_block);
+        let false_target = Target::new(false_block);
+        let inst = Inst::BranchInst(BranchInst::new(cond, true_target, false_target));
         self.push_inst(inst);
     }
 
@@ -125,7 +131,7 @@ impl IrBuilder {
     }
 
     fn push_inst(&mut self, inst: Inst) {
-        let block_id = self.insert_block.unwrap();
+        let block_id = self.current_block.unwrap();
         let inst_id = self.func.create_inst(inst);
         self.func.push_inst(block_id, inst_id);
     }

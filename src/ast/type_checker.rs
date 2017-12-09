@@ -128,6 +128,8 @@ impl<'input> TypeChecker<'input> {
         if expr_type != Bool {
             panic!("If statement expression with type '{}'", expr_type);
         }
+
+        self.check_block_stmt(stmt.stmt());
     }
 
     fn check_expr(&mut self, expr: &Expr) -> Type {
