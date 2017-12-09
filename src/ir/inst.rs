@@ -243,11 +243,61 @@ impl fmt::Display for FloatCompInst {
 }
 
 #[derive(Debug)]
+pub struct JumpInst {
+    dest: BlockId,
+}
+
+impl JumpInst {
+    pub fn new(dest: BlockId) -> JumpInst {
+        JumpInst { dest }
+    }
+}
+
+impl fmt::Display for JumpInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "jmp {}",
+            self.dest,
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct BranchInst {
+    cond: Value,
+    true_block: BlockId,
+    false_block: BlockId,
+}
+
+impl BranchInst {
+    pub fn new(cond: Value, true_block: BlockId, false_block: BlockId) -> BranchInst {
+        BranchInst {
+            cond,
+            true_block,
+            false_block,
+        }
+    }
+}
+
+impl fmt::Display for BranchInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "br {} {}, {}",
+            self.cond,
+            self.true_block,
+            self.false_block
+        )
+    }
+}
+
+#[derive(Debug)]
 pub struct ReturnInst {}
 
 impl ReturnInst {
-    pub fn new() -> Inst {
-        Inst::ReturnInst(ReturnInst {})
+    pub fn new() -> ReturnInst {
+        ReturnInst {}
     }
 }
 
@@ -287,6 +337,8 @@ pub enum Inst {
     BinaryInst(BinaryInst),
     IntCompInst(IntCompInst),
     FloatCompInst(FloatCompInst),
+    JumpInst(JumpInst),
+    BranchInst(BranchInst),
     ReturnInst(ReturnInst),
 }
 
@@ -300,6 +352,8 @@ impl Inst {
             Inst::BinaryInst(_) |
             Inst::IntCompInst(_) |
             Inst::FloatCompInst(_) => false,
+            Inst::JumpInst(_) |
+            Inst::BranchInst(_) |
             Inst::ReturnInst(_) => true,
         }
     }
@@ -308,14 +362,16 @@ impl Inst {
 impl fmt::Display for Inst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Inst::IntConstInst(ref int_const_inst) => write!(f, "{}", int_const_inst),
-            Inst::FloatConstInst(ref float_const_inst) => write!(f, "{}", float_const_inst),
-            Inst::BoolConstInst(ref bool_const_inst) => write!(f, "{}", bool_const_inst),
-            Inst::UnaryInst(ref unary_inst) => write!(f, "{}", unary_inst),
-            Inst::BinaryInst(ref binary_inst) => write!(f, "{}", binary_inst),
-            Inst::IntCompInst(ref int_comp_inst) => write!(f, "{}", int_comp_inst),
-            Inst::FloatCompInst(ref float_comp_inst) => write!(f, "{}", float_comp_inst),
-            Inst::ReturnInst(ref return_inst) => write!(f, "{}", return_inst),
+            Inst::IntConstInst(ref inst) => write!(f, "{}", inst),
+            Inst::FloatConstInst(ref inst) => write!(f, "{}", inst),
+            Inst::BoolConstInst(ref inst) => write!(f, "{}", inst),
+            Inst::UnaryInst(ref inst) => write!(f, "{}", inst),
+            Inst::BinaryInst(ref inst) => write!(f, "{}", inst),
+            Inst::IntCompInst(ref inst) => write!(f, "{}", inst),
+            Inst::FloatCompInst(ref inst) => write!(f, "{}", inst),
+            Inst::JumpInst(ref inst) => write!(f, "{}", inst),
+            Inst::BranchInst(ref inst) => write!(f, "{}", inst),
+            Inst::ReturnInst(ref inst) => write!(f, "{}", inst),
         }
     }
 }

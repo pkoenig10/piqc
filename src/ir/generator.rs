@@ -24,7 +24,10 @@ impl<'a> ValueTable<'a> {
     }
 
     pub fn insert(&mut self, name: &'a str, block_id: BlockId, value: Value) {
-        self.table.entry(name).or_insert_with(HashMap::new).insert(block_id, value);
+        self.table.entry(name).or_insert_with(HashMap::new).insert(
+            block_id,
+            value,
+        );
     }
 
     pub fn get(&self, name: &str, block_id: BlockId) -> Option<Value> {
@@ -77,10 +80,17 @@ impl<'input> IrGenerator<'input> {
 
     fn generate_stmt(&mut self, stmt: &ast::Stmt<'input>) {
         match *stmt {
+            ast::Stmt::BlockStmt(ref stmt) => self.generate_block_stmt(stmt),
             ast::Stmt::DeclStmt(ref stmt) => self.generate_decl_stmt(stmt),
             ast::Stmt::AssignStmt(ref stmt) => self.generate_assign_stmt(stmt),
+            ast::Stmt::IfStmt(ref stmt) => self.generate_if_stmt(stmt),
             ast::Stmt::ReturnStmt(ref stmt) => self.generate_return_stmt(stmt),
-            ast::Stmt::BlockStmt(ref stmt) => self.generate_block_stmt(stmt),
+        }
+    }
+
+    fn generate_block_stmt(&mut self, stmt: &ast::BlockStmt<'input>) {
+        for stmt in stmt.stmts() {
+            self.generate_stmt(stmt);
         }
     }
 
@@ -96,14 +106,25 @@ impl<'input> IrGenerator<'input> {
         self.insert_value(stmt.identifier(), value);
     }
 
-    fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
-        self.builder.push_return_inst();
+    fn generate_if_stmt(&mut self, stmt: &ast::IfStmt<'input>) {
+        let if_block = self.builder.create_block();
+        let merge_block = self.builder.create_block();
+
+        let value = self.generate_expr(stmt.expr());
+        self.builder.push_branch_inst(value, if_block, merge_block);
+
+        self.builder.push_block(if_block);
+        self.builder.set_insert_block(if_block);
+
+        self.generate_block_stmt(stmt.stmt());
+        self.builder.push_jump_inst(merge_block);
+
+        self.builder.push_block(merge_block);
+        self.builder.set_insert_block(merge_block);
     }
 
-    fn generate_block_stmt(&mut self, stmt: &ast::BlockStmt<'input>) {
-        for stmt in stmt.stmts() {
-            self.generate_stmt(stmt);
-        }
+    fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
+        self.builder.push_return_inst();
     }
 
     fn generate_expr(&mut self, expr: &ast::Expr) -> Value {

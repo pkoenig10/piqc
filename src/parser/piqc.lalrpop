@@ -131,6 +131,10 @@ Expr: Expr<'input> = {
     LogicalOrExpr,
 };
 
+BlockStmt: BlockStmt<'input> = {
+    <@L> "{" <Stmt*> "}" <@R> => BlockStmt::new(<>),
+};
+
 DeclStmt: DeclStmt<'input> = {
     <@L> <Type> <Identifier> "=" <Expr> ";" <@R> => DeclStmt::new(<>),
 };
@@ -139,19 +143,20 @@ AssignStmt: AssignStmt<'input> = {
     <@L> <Identifier> "=" <Expr> ";" <@R> => AssignStmt::new(<>),
 };
 
+IfStmt: IfStmt<'input> = {
+    <@L> "if" "(" <Expr> ")" <BlockStmt> <@R> => IfStmt::new(<>),
+};
+
 ReturnStmt: ReturnStmt = {
     <@L> "return" ";" <@R> => ReturnStmt::new(<>),
 };
 
-BlockStmt: BlockStmt<'input> = {
-    <@L> "{" <Stmt*> "}" <@R> => BlockStmt::new(<>),
-};
-
 Stmt: Stmt<'input> = {
+    BlockStmt => Stmt::BlockStmt(<>),
     DeclStmt => Stmt::DeclStmt(<>),
     AssignStmt => Stmt::AssignStmt(<>),
+    IfStmt => Stmt::IfStmt(<>),
     ReturnStmt => Stmt::ReturnStmt(<>),
-    BlockStmt => Stmt::BlockStmt(<>),
 };
 
 Param: Param<'input> = {

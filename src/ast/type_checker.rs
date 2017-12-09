@@ -82,11 +82,22 @@ impl<'input> TypeChecker<'input> {
 
     fn check_stmt(&mut self, stmt: &Stmt<'input>) {
         match *stmt {
+            Stmt::BlockStmt(ref stmt) => self.check_block_stmt(stmt),
             Stmt::DeclStmt(ref stmt) => self.check_decl_stmt(stmt),
             Stmt::AssignStmt(ref stmt) => self.check_assign_stmt(stmt),
+            Stmt::IfStmt(ref stmt) => self.check_if_stmt(stmt),
             Stmt::ReturnStmt(_) => {}
-            Stmt::BlockStmt(ref stmt) => self.check_block_stmt(stmt),
         }
+    }
+
+    fn check_block_stmt(&mut self, stmt: &BlockStmt<'input>) {
+        self.symbol_table.push_scope();
+
+        for stmt in stmt.stmts() {
+            self.check_stmt(stmt);
+        }
+
+        self.symbol_table.pop_scope();
     }
 
     fn check_decl_stmt(&mut self, stmt: &DeclStmt<'input>) {
@@ -111,14 +122,12 @@ impl<'input> TypeChecker<'input> {
         }
     }
 
-    fn check_block_stmt(&mut self, stmt: &BlockStmt<'input>) {
-        self.symbol_table.push_scope();
+    fn check_if_stmt(&mut self, stmt: &IfStmt<'input>) {
+        let expr_type = self.check_expr(stmt.expr());
 
-        for stmt in stmt.stmts() {
-            self.check_stmt(stmt);
+        if expr_type != Bool {
+            panic!("If statement expression with type '{}'", expr_type);
         }
-
-        self.symbol_table.pop_scope();
     }
 
     fn check_expr(&mut self, expr: &Expr) -> Type {

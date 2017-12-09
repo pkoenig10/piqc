@@ -2,6 +2,25 @@ use ast::*;
 use ast::loc::*;
 
 #[derive(Debug)]
+pub struct BlockStmt<'input> {
+    location: Location,
+    stmts: Vec<Stmt<'input>>,
+}
+
+impl<'input> BlockStmt<'input> {
+    pub fn new(l: usize, stmts: Vec<Stmt<'input>>, r: usize) -> BlockStmt<'input> {
+        BlockStmt {
+            location: Location::new(l, r),
+            stmts,
+        }
+    }
+
+    pub fn stmts(&self) -> &Vec<Stmt<'input>> {
+        &self.stmts
+    }
+}
+
+#[derive(Debug)]
 pub struct DeclStmt<'input> {
     location: Location,
     type_: Type,
@@ -80,28 +99,35 @@ impl ReturnStmt {
 }
 
 #[derive(Debug)]
-pub struct BlockStmt<'input> {
+pub struct IfStmt<'input> {
     location: Location,
-    stmts: Vec<Stmt<'input>>,
+    expr: Expr<'input>,
+    stmt: BlockStmt<'input>,
 }
 
-impl<'input> BlockStmt<'input> {
-    pub fn new(l: usize, stmts: Vec<Stmt<'input>>, r: usize) -> BlockStmt<'input> {
-        BlockStmt {
+impl<'input> IfStmt<'input> {
+    pub fn new(l: usize, expr: Expr<'input>, stmt: BlockStmt<'input>, r: usize) -> IfStmt<'input> {
+        IfStmt {
             location: Location::new(l, r),
-            stmts,
+            expr,
+            stmt,
         }
     }
 
-    pub fn stmts(&self) -> &Vec<Stmt<'input>> {
-        &self.stmts
+    pub fn expr(&self) -> &Expr<'input> {
+        &self.expr
+    }
+
+    pub fn stmt(&self) -> &BlockStmt<'input> {
+        &self.stmt
     }
 }
 
 #[derive(Debug)]
 pub enum Stmt<'input> {
+    BlockStmt(BlockStmt<'input>),
     DeclStmt(DeclStmt<'input>),
     AssignStmt(AssignStmt<'input>),
+    IfStmt(IfStmt<'input>),
     ReturnStmt(ReturnStmt),
-    BlockStmt(BlockStmt<'input>),
 }

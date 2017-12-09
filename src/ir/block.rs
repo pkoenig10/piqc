@@ -20,7 +20,7 @@ impl Key for BlockId {
 
 impl fmt::Display for BlockId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "block{}", self.id)
+        write!(f, "b{}", self.id)
     }
 }
 

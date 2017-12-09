@@ -109,8 +109,18 @@ impl IrBuilder {
         dest
     }
 
+    pub fn push_jump_inst(&mut self, dest: BlockId) {
+        let inst = Inst::JumpInst(JumpInst::new(dest));
+        self.push_inst(inst);
+    }
+
+    pub fn push_branch_inst(&mut self, cond: Value, true_block: BlockId, false_block: BlockId) {
+        let inst = Inst::BranchInst(BranchInst::new(cond, true_block, false_block));
+        self.push_inst(inst);
+    }
+
     pub fn push_return_inst(&mut self) {
-        let inst = ReturnInst::new();
+        let inst = Inst::ReturnInst(ReturnInst::new());
         self.push_inst(inst);
     }
 
