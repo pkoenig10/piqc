@@ -257,7 +257,7 @@ impl fmt::Display for ReturnInst {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InstId {
     id: usize,
 }

@@ -3,7 +3,7 @@ use std::fmt;
 use collections::*;
 use ir::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BlockId {
     id: usize,
 }

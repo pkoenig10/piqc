@@ -1,8 +1,9 @@
+use std::collections::HashMap;
+
 use ast::*;
 use ast::Type::*;
 use ast::UnaryOp::*;
 use ast::BinaryOp::*;
-use collections::*;
 
 pub fn type_check(prog: &Prog) {
     let mut type_checker = TypeChecker::new();
@@ -10,7 +11,7 @@ pub fn type_check(prog: &Prog) {
 }
 
 #[derive(Debug)]
-pub struct Symbol<'input> {
+struct Symbol<'input> {
     identifier: Identifier<'input>,
     type_: Type,
 }
@@ -25,8 +26,41 @@ impl<'input> Symbol<'input> {
     }
 }
 
+#[derive(Debug)]
+struct SymbolTable<'a> {
+    maps: Vec<HashMap<&'a str, Symbol<'a>>>,
+}
+
+impl<'a> SymbolTable<'a> {
+    pub fn new() -> SymbolTable<'a> {
+        SymbolTable { maps: Vec::new() }
+    }
+
+    pub fn push_scope(&mut self) {
+        self.maps.push(HashMap::new());
+    }
+
+    pub fn pop_scope(&mut self) {
+        self.maps.pop().unwrap();
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Symbol<'a>> {
+        for scope in self.maps.iter().rev() {
+            let symbol = scope.get(name);
+            if symbol.is_some() {
+                return symbol;
+            }
+        }
+        None
+    }
+
+    pub fn insert(&mut self, name: &'a str, symbol: Symbol<'a>) {
+        self.maps.last_mut().unwrap().insert(name, symbol);
+    }
+}
+
 struct TypeChecker<'input> {
-    symbol_table: SymbolTable<'input, Symbol<'input>>,
+    symbol_table: SymbolTable<'input>,
 }
 
 impl<'input> TypeChecker<'input> {

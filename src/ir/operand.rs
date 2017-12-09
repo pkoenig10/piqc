@@ -54,7 +54,7 @@ impl fmt::Display for BoolImmediate {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Value {
     id: usize,
 }

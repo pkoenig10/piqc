@@ -1,10 +1,11 @@
+use std::collections::HashMap;
+
 use ast;
 use ir::*;
 use ir::BinaryOp::*;
 use ir::CompOp::*;
 use ir::Type::*;
 use ir::builder::IrBuilder;
-use collections::*;
 
 pub fn generate_ir(prog: &ast::Prog) -> Prog {
     let generator = IrGenerator::new();
@@ -12,22 +13,42 @@ pub fn generate_ir(prog: &ast::Prog) -> Prog {
     Prog::new(func)
 }
 
+#[derive(Debug)]
+struct ValueTable<'a> {
+    table: HashMap<&'a str, HashMap<BlockId, Value>>,
+}
+
+impl<'a> ValueTable<'a> {
+    pub fn new() -> ValueTable<'a> {
+        ValueTable { table: HashMap::new() }
+    }
+
+    pub fn insert(&mut self, name: &'a str, block_id: BlockId, value: Value) {
+        self.table.entry(name).or_insert_with(HashMap::new).insert(block_id, value);
+    }
+
+    pub fn get(&self, name: &str, block_id: BlockId) -> Option<Value> {
+        match self.table.get(name) {
+            Some(values) => values.get(&block_id).cloned(),
+            None => None,
+        }
+    }
+}
+
 struct IrGenerator<'input> {
     builder: IrBuilder,
-    symbol_table: SymbolTable<'input, Value>,
+    value_table: ValueTable<'input>,
 }
 
 impl<'input> IrGenerator<'input> {
     pub fn new() -> IrGenerator<'input> {
         IrGenerator {
             builder: IrBuilder::new(Func::new()),
-            symbol_table: SymbolTable::new(),
+            value_table: ValueTable::new(),
         }
     }
 
     fn generate_func(mut self, func: &ast::Func<'input>) -> Func {
-        self.symbol_table.push_scope();
-
         let block_id = self.builder.create_block();
         self.builder.push_block(block_id);
         self.builder.set_insert_block(block_id);
@@ -36,7 +57,7 @@ impl<'input> IrGenerator<'input> {
             let type_ = self.generate_type(param.type_());
             self.builder.create_func_param(type_);
             let value = self.builder.create_block_param(type_);
-            self.insert_symbol(param.identifier(), value);
+            self.insert_value(param.identifier(), value);
         }
 
         self.generate_stmt(func.stmt());
@@ -50,8 +71,6 @@ impl<'input> IrGenerator<'input> {
         if !has_terminator {
             self.builder.push_return_inst();
         }
-
-        self.symbol_table.pop_scope();
 
         self.builder.func()
     }
@@ -68,13 +87,13 @@ impl<'input> IrGenerator<'input> {
     fn generate_decl_stmt(&mut self, stmt: &ast::DeclStmt<'input>) {
         let value = self.generate_expr(stmt.expr());
 
-        self.insert_symbol(stmt.identifier(), value);
+        self.insert_value(stmt.identifier(), value);
     }
 
     fn generate_assign_stmt(&mut self, stmt: &ast::AssignStmt<'input>) {
         let value = self.generate_expr(stmt.expr());
 
-        self.insert_symbol(stmt.identifier(), value);
+        self.insert_value(stmt.identifier(), value);
     }
 
     fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
@@ -82,13 +101,9 @@ impl<'input> IrGenerator<'input> {
     }
 
     fn generate_block_stmt(&mut self, stmt: &ast::BlockStmt<'input>) {
-        self.symbol_table.push_scope();
-
         for stmt in stmt.stmts() {
             self.generate_stmt(stmt);
         }
-
-        self.symbol_table.pop_scope();
     }
 
     fn generate_expr(&mut self, expr: &ast::Expr) -> Value {
@@ -120,7 +135,7 @@ impl<'input> IrGenerator<'input> {
     }
 
     fn generate_identifier(&mut self, identifier: &ast::Identifier) -> Value {
-        self.get_symbol(identifier)
+        self.get_value(identifier)
     }
 
     fn generate_unary_expr(&mut self, expr: &ast::UnaryExpr) -> Value {
@@ -191,12 +206,14 @@ impl<'input> IrGenerator<'input> {
         }
     }
 
-    fn insert_symbol(&mut self, identifier: &ast::Identifier<'input>, value: Value) {
-        self.symbol_table.insert(identifier.name(), value);
+    fn insert_value(&mut self, identifier: &ast::Identifier<'input>, value: Value) {
+        let block_id = self.builder.insert_block();
+        self.value_table.insert(identifier.name(), block_id, value);
     }
 
-    fn get_symbol(&self, identifier: &ast::Identifier) -> Value {
-        *self.symbol_table.get(identifier.name()).unwrap()
+    fn get_value(&self, identifier: &ast::Identifier) -> Value {
+        let block_id = self.builder.insert_block();
+        self.value_table.get(identifier.name(), block_id).unwrap()
     }
 }
 

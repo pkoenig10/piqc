@@ -101,7 +101,7 @@ impl InstData {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ValueData {
     type_: Type,
 }
