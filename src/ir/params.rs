@@ -1,6 +1,9 @@
 use std::fmt;
+use std::slice::Iter;
+use std::vec::IntoIter;
 
-#[derive(Debug)]
+
+#[derive(Debug, Clone)]
 pub struct Params<T> {
     params: Vec<T>,
 }
@@ -12,6 +15,24 @@ impl<T> Params<T> {
 
     pub fn push(&mut self, param: T) {
         self.params.push(param);
+    }
+}
+
+impl<'a, T> IntoIterator for &'a Params<T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.params.iter()
+    }
+}
+
+impl<T> IntoIterator for Params<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.params.into_iter()
     }
 }
 

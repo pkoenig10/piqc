@@ -147,6 +147,10 @@ IfStmt: IfStmt<'input> = {
     <@L> "if" "(" <Expr> ")" <BlockStmt> <@R> => IfStmt::new(<>),
 };
 
+WhileStmt: WhileStmt<'input> = {
+    <@L> "while" "(" <Expr> ")" <BlockStmt> <@R> => WhileStmt::new(<>),
+};
+
 ReturnStmt: ReturnStmt = {
     <@L> "return" ";" <@R> => ReturnStmt::new(<>),
 };
@@ -156,6 +160,7 @@ Stmt: Stmt<'input> = {
     DeclStmt => Stmt::DeclStmt(<>),
     AssignStmt => Stmt::AssignStmt(<>),
     IfStmt => Stmt::IfStmt(<>),
+    WhileStmt => Stmt::WhileStmt(<>),
     ReturnStmt => Stmt::ReturnStmt(<>),
 };
 

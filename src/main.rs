@@ -12,7 +12,11 @@ fn main(int i, float f) {
         bar = bar + f;
     }
 
-    bar = bar + 1.0;
+    while (baz) {
+        bar = bar + f;
+    }
+
+    bar = bar + f;
     return;
 }
 ",

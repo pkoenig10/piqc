@@ -86,6 +86,7 @@ impl<'input> TypeChecker<'input> {
             Stmt::DeclStmt(ref stmt) => self.check_decl_stmt(stmt),
             Stmt::AssignStmt(ref stmt) => self.check_assign_stmt(stmt),
             Stmt::IfStmt(ref stmt) => self.check_if_stmt(stmt),
+            Stmt::WhileStmt(ref stmt) => self.check_while_stmt(stmt),
             Stmt::ReturnStmt(_) => {}
         }
     }
@@ -127,6 +128,16 @@ impl<'input> TypeChecker<'input> {
 
         if expr_type != Bool {
             panic!("If statement expression with type '{}'", expr_type);
+        }
+
+        self.check_block_stmt(stmt.stmt());
+    }
+
+    fn check_while_stmt(&mut self, stmt: &WhileStmt<'input>) {
+        let expr_type = self.check_expr(stmt.expr());
+
+        if expr_type != Bool {
+            panic!("While statement expression with type '{}'", expr_type);
         }
 
         self.check_block_stmt(stmt.stmt());

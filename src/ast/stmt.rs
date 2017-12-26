@@ -124,10 +124,36 @@ impl<'input> IfStmt<'input> {
 }
 
 #[derive(Debug)]
+pub struct WhileStmt<'input> {
+    location: Location,
+    expr: Expr<'input>,
+    stmt: BlockStmt<'input>,
+}
+
+impl<'input> WhileStmt<'input> {
+    pub fn new(l: usize, expr: Expr<'input>, stmt: BlockStmt<'input>, r: usize) -> WhileStmt<'input> {
+        WhileStmt {
+            location: Location::new(l, r),
+            expr,
+            stmt,
+        }
+    }
+
+    pub fn expr(&self) -> &Expr<'input> {
+        &self.expr
+    }
+
+    pub fn stmt(&self) -> &BlockStmt<'input> {
+        &self.stmt
+    }
+}
+
+#[derive(Debug)]
 pub enum Stmt<'input> {
     BlockStmt(BlockStmt<'input>),
     DeclStmt(DeclStmt<'input>),
     AssignStmt(AssignStmt<'input>),
     IfStmt(IfStmt<'input>),
+    WhileStmt(WhileStmt<'input>),
     ReturnStmt(ReturnStmt),
 }

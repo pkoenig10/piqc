@@ -50,10 +50,10 @@ pub struct Target {
 }
 
 impl Target {
-    pub fn new(block: BlockId) -> Target {
+    pub fn new(block: BlockId, args: Params<Value>) -> Target {
         Target {
             block,
-            args: Params::new(),
+            args: args,
         }
     }
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use ast;
 use ir::*;
@@ -42,6 +43,7 @@ struct IrGenerator<'input> {
     builder: IrBuilder,
     value_table: ValueTable<'input>,
     predecessors: HashMap<BlockId, Vec<BlockId>>,
+    params: HashMap<Value, &'input str>,
 }
 
 impl<'input> IrGenerator<'input> {
@@ -50,6 +52,7 @@ impl<'input> IrGenerator<'input> {
             builder: IrBuilder::new(Func::new()),
             value_table: ValueTable::new(),
             predecessors: HashMap::new(),
+            params: HashMap::new(),
         }
     }
 
@@ -63,6 +66,7 @@ impl<'input> IrGenerator<'input> {
             self.builder.create_func_param(type_);
             let value = self.builder.create_block_param(entry_block, type_);
             self.insert_value(param.identifier(), value);
+            self.params.insert(value, param.identifier().name());
         }
 
         self.generate_block_stmt(func.stmt());
@@ -77,8 +81,6 @@ impl<'input> IrGenerator<'input> {
             self.builder.push_return_inst();
         }
 
-        println!("{:#?}", self.predecessors);
-
         self.builder.func()
     }
 
@@ -88,6 +90,7 @@ impl<'input> IrGenerator<'input> {
             ast::Stmt::DeclStmt(ref stmt) => self.generate_decl_stmt(stmt),
             ast::Stmt::AssignStmt(ref stmt) => self.generate_assign_stmt(stmt),
             ast::Stmt::IfStmt(ref stmt) => self.generate_if_stmt(stmt),
+            ast::Stmt::WhileStmt(ref stmt) => self.generate_while_stmt(stmt),
             ast::Stmt::ReturnStmt(ref stmt) => self.generate_return_stmt(stmt),
         }
     }
@@ -116,26 +119,55 @@ impl<'input> IrGenerator<'input> {
         let merge_block = self.builder.create_block();
 
         let value = self.generate_expr(stmt.expr());
-        self.builder.push_branch_inst(value, if_block, merge_block);
+        self.push_branch_inst(value, if_block, merge_block);
         self.insert_predecessor(if_block, entry_block);
         self.insert_predecessor(merge_block, entry_block);
 
         self.builder.push_block(if_block);
         self.builder.set_current_block(if_block);
-
         self.generate_block_stmt(stmt.stmt());
-        self.builder.push_jump_inst(merge_block);
-        self.insert_predecessor(merge_block, if_block);
+        self.push_jump_inst(merge_block);
+
+        let last_if_block = self.builder.current_block();
+        self.insert_predecessor(merge_block, last_if_block);
 
         self.builder.push_block(merge_block);
         self.builder.set_current_block(merge_block);
+    }
+
+    fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
+        let entry_block = self.builder.current_block();
+        let header_block = self.builder.create_block();
+        let loop_block = self.builder.create_block();
+        let after_block = self.builder.create_block();
+
+        self.push_jump_inst(header_block);
+        self.insert_predecessor(header_block, entry_block);
+
+        self.builder.push_block(header_block);
+        self.builder.set_current_block(header_block);
+
+        let value = self.generate_expr(stmt.expr());
+        self.push_branch_inst(value, loop_block, after_block);
+        self.insert_predecessor(loop_block, header_block);
+        self.insert_predecessor(after_block, header_block);
+
+        self.builder.push_block(loop_block);
+        self.builder.set_current_block(loop_block);
+
+        self.generate_block_stmt(stmt.stmt());
+        self.push_jump_inst(header_block);
+        self.insert_predecessor(header_block, loop_block);
+
+        self.builder.push_block(after_block);
+        self.builder.set_current_block(after_block);
     }
 
     fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
         self.builder.push_return_inst();
     }
 
-    fn generate_expr(&mut self, expr: &ast::Expr) -> Value {
+    fn generate_expr(&mut self, expr: &ast::Expr<'input>) -> Value {
         match *expr {
             ast::Expr::IntLiteral(ref int_literal) => self.generate_int_literal(int_literal),
             ast::Expr::FloatLiteral(ref float_literal) => {
@@ -163,11 +195,11 @@ impl<'input> IrGenerator<'input> {
         self.builder.push_bool_const_inst(immediate)
     }
 
-    fn generate_identifier(&mut self, identifier: &ast::Identifier) -> Value {
+    fn generate_identifier(&mut self, identifier: &ast::Identifier<'input>) -> Value {
         self.get_value(identifier)
     }
 
-    fn generate_unary_expr(&mut self, expr: &ast::UnaryExpr) -> Value {
+    fn generate_unary_expr(&mut self, expr: &ast::UnaryExpr<'input>) -> Value {
         let src_value = self.generate_expr(expr.expr());
 
         let op = expr.op();
@@ -196,7 +228,7 @@ impl<'input> IrGenerator<'input> {
         }
     }
 
-    fn generate_binary_expr(&mut self, expr: &ast::BinaryExpr) -> Value {
+    fn generate_binary_expr(&mut self, expr: &ast::BinaryExpr<'input>) -> Value {
         let left_value = self.generate_expr(expr.left());
         let right_value = self.generate_expr(expr.right());
 
@@ -240,44 +272,59 @@ impl<'input> IrGenerator<'input> {
         self.value_table.insert(identifier.name(), block_id, value);
     }
 
-    fn get_value(&mut self, identifier: &ast::Identifier) -> Value {
+    fn get_value(&mut self, identifier: &ast::Identifier<'input>) -> Value {
         let block = self.builder.current_block();
-        self.get_value_in_block(identifier.name(), block)
+        self.get_value_in_block(identifier.name(), block, &mut HashSet::new()).unwrap()
     }
 
-    fn get_value_in_block(&mut self, name: &str, block: BlockId) -> Value {
+    fn get_value_in_block(&mut self, name: &'input str, block: BlockId,
+        visited: &mut HashSet<BlockId>) -> Option<Value> {
         match self.value_table.get(name, block) {
-            Some(value) => value,
+            Some(value) => Some(value),
             None => {
+                if !visited.insert(block) {
+                    return None;
+                }
+
                 let mut type_ = None;
                 for predecessor_block in self.predecessors[&block].clone() {
-                    let value = self.get_value_in_block(name, predecessor_block);
-
-                    let value_type = self.builder.value(value).type_();
-                    match type_ {
-                        Some(type_) => {
-                            if value_type != type_ {
-                                panic!(
-                                    "Variable defined with multiple types `{}` and `{}`",
-                                    type_,
-                                    value_type
-                                );
+                    let value = self.get_value_in_block(name, predecessor_block, visited);
+                    if let Some(value) = value {
+                        let value_type = self.builder.value(value).type_();
+                        match type_ {
+                            Some(type_) => {
+                                if value_type != type_ {
+                                    panic!(
+                                        "Variable defined with multiple types `{}` and `{}`",
+                                        type_,
+                                        value_type
+                                    );
+                                }
                             }
-                        }
-                        None => {
-                            type_ = Some(value_type);
-                        }
-                    };
+                            None => {
+                                type_ = Some(value_type);
+                            }
+                        };
 
-                    let inst = self.builder.block(predecessor_block).last_inst().unwrap();
-                    let target = self.builder
-                        .inst_mut(inst)
-                        .inst_mut()
-                        .get_target_mut(block)
-                        .unwrap();
-                    target.push_arg(value);
+                        let inst = self.builder.block(predecessor_block).last_inst().unwrap();
+                        let target = self.builder
+                            .inst_mut(inst)
+                            .inst_mut()
+                            .get_target_mut(block)
+                            .unwrap();
+                        target.push_arg(value);
+                    }
                 }
-                self.builder.create_block_param(block, type_.unwrap())
+
+                match type_ {
+                    Some(type_) => {
+                        let value = self.builder.create_block_param(block, type_);
+                        self.value_table.insert(name, block, value);
+                        self.params.insert(value, name);
+                        Some(value)
+                    }
+                    None => None
+                }
             }
         }
     }
@@ -287,6 +334,30 @@ impl<'input> IrGenerator<'input> {
             .entry(block)
             .or_insert_with(Vec::new)
             .push(predecessor);
+    }
+
+    fn push_jump_inst(&mut self, block: BlockId) {
+        let target = self.create_target(block);
+        self.builder.push_jump_inst(target);
+    }
+
+    fn push_branch_inst(&mut self, cond: Value, true_block: BlockId, false_block: BlockId) {
+        let true_target = self.create_target(true_block);
+        let false_target = self.create_target(false_block);
+        self.builder.push_branch_inst(cond, true_target, false_target);
+    }
+
+    fn create_target(&mut self, block_id: BlockId) -> Target {
+        let mut args = Params::new();
+
+        let current_block = self.builder.current_block();
+
+        for param in (*self.builder.block(block_id).block().params()).clone() {
+            let name = self.params[&param];
+            let value = self.get_value_in_block(name, current_block, &mut HashSet::new()).unwrap();
+            args.push(value);
+        }
+        Target::new(block_id, args)
     }
 }
 
