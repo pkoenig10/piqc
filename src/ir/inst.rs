@@ -332,13 +332,13 @@ impl fmt::Display for ReturnInst {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InstId {
+pub struct Inst {
     id: usize,
 }
 
-impl Key for InstId {
+impl Key for Inst {
     fn new(id: usize) -> Self {
-        InstId { id }
+        Inst { id }
     }
 
     fn get(&self) -> usize {
@@ -346,14 +346,14 @@ impl Key for InstId {
     }
 }
 
-impl fmt::Display for InstId {
+impl fmt::Display for Inst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.id)
     }
 }
 
 #[derive(Debug)]
-pub enum Inst {
+pub enum InstData {
     IntConstInst(IntConstInst),
     FloatConstInst(FloatConstInst),
     BoolConstInst(BoolConstInst),
@@ -366,65 +366,66 @@ pub enum Inst {
     ReturnInst(ReturnInst),
 }
 
-impl Inst {
+impl InstData {
     pub fn is_terminator(&self) -> bool {
         match *self {
-            Inst::IntConstInst(_) |
-            Inst::FloatConstInst(_) |
-            Inst::BoolConstInst(_) |
-            Inst::UnaryInst(_) |
-            Inst::BinaryInst(_) |
-            Inst::IntCompInst(_) |
-            Inst::FloatCompInst(_) => false,
-            Inst::JumpInst(_) |
-            Inst::BranchInst(_) |
-            Inst::ReturnInst(_) => true,
+            InstData::IntConstInst(_) |
+            InstData::FloatConstInst(_) |
+            InstData::BoolConstInst(_) |
+            InstData::UnaryInst(_) |
+            InstData::BinaryInst(_) |
+            InstData::IntCompInst(_) |
+            InstData::FloatCompInst(_) => false,
+            InstData::JumpInst(_) |
+            InstData::BranchInst(_) |
+            InstData::ReturnInst(_) => true,
         }
     }
 
-    pub fn get_target_mut(&mut self, block_id: BlockId) -> Option<&mut Target> {
-        match *self {
-            Inst::IntConstInst(_) |
-            Inst::FloatConstInst(_) |
-            Inst::BoolConstInst(_) |
-            Inst::UnaryInst(_) |
-            Inst::BinaryInst(_) |
-            Inst::IntCompInst(_) |
-            Inst::FloatCompInst(_) |
-            Inst::ReturnInst(_) => None,
-            Inst::JumpInst(ref mut inst) => {
-                if inst.target().block() == block_id {
+    pub fn get_target_mut(&mut self, block: Block) -> &mut Target {
+        let target = match *self {
+            InstData::IntConstInst(_) |
+            InstData::FloatConstInst(_) |
+            InstData::BoolConstInst(_) |
+            InstData::UnaryInst(_) |
+            InstData::BinaryInst(_) |
+            InstData::IntCompInst(_) |
+            InstData::FloatCompInst(_) |
+            InstData::ReturnInst(_) => None,
+            InstData::JumpInst(ref mut inst) => {
+                if inst.target().block() == block {
                     Some(inst.target_mut())
                 } else {
                     None
                 }
             }
-            Inst::BranchInst(ref mut inst) => {
-                if inst.true_target().block() == block_id {
+            InstData::BranchInst(ref mut inst) => {
+                if inst.true_target().block() == block {
                     Some(inst.true_target_mut())
-                } else if inst.false_target().block() == block_id {
+                } else if inst.false_target().block() == block {
                     Some(inst.false_target_mut())
                 } else {
                     None
                 }
             }
-        }
+        };
+        target.unwrap()
     }
 }
 
-impl fmt::Display for Inst {
+impl fmt::Display for InstData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Inst::IntConstInst(ref inst) => write!(f, "{}", inst),
-            Inst::FloatConstInst(ref inst) => write!(f, "{}", inst),
-            Inst::BoolConstInst(ref inst) => write!(f, "{}", inst),
-            Inst::UnaryInst(ref inst) => write!(f, "{}", inst),
-            Inst::BinaryInst(ref inst) => write!(f, "{}", inst),
-            Inst::IntCompInst(ref inst) => write!(f, "{}", inst),
-            Inst::FloatCompInst(ref inst) => write!(f, "{}", inst),
-            Inst::JumpInst(ref inst) => write!(f, "{}", inst),
-            Inst::BranchInst(ref inst) => write!(f, "{}", inst),
-            Inst::ReturnInst(ref inst) => write!(f, "{}", inst),
+            InstData::IntConstInst(ref inst) => write!(f, "{}", inst),
+            InstData::FloatConstInst(ref inst) => write!(f, "{}", inst),
+            InstData::BoolConstInst(ref inst) => write!(f, "{}", inst),
+            InstData::UnaryInst(ref inst) => write!(f, "{}", inst),
+            InstData::BinaryInst(ref inst) => write!(f, "{}", inst),
+            InstData::IntCompInst(ref inst) => write!(f, "{}", inst),
+            InstData::FloatCompInst(ref inst) => write!(f, "{}", inst),
+            InstData::JumpInst(ref inst) => write!(f, "{}", inst),
+            InstData::BranchInst(ref inst) => write!(f, "{}", inst),
+            InstData::ReturnInst(ref inst) => write!(f, "{}", inst),
         }
     }
 }

@@ -131,7 +131,12 @@ pub struct WhileStmt<'input> {
 }
 
 impl<'input> WhileStmt<'input> {
-    pub fn new(l: usize, expr: Expr<'input>, stmt: BlockStmt<'input>, r: usize) -> WhileStmt<'input> {
+    pub fn new(
+        l: usize,
+        expr: Expr<'input>,
+        stmt: BlockStmt<'input>,
+        r: usize,
+    ) -> WhileStmt<'input> {
         WhileStmt {
             location: Location::new(l, r),
             expr,

@@ -4,18 +4,18 @@ use collections::*;
 use ir::*;
 
 #[derive(Debug)]
-pub struct BlockData {
-    block: Block,
-    prev_block: Option<BlockId>,
-    next_block: Option<BlockId>,
-    first_inst: Option<InstId>,
-    last_inst: Option<InstId>,
+struct BlockNode {
+    data: BlockData,
+    prev_block: Option<Block>,
+    next_block: Option<Block>,
+    first_inst: Option<Inst>,
+    last_inst: Option<Inst>,
 }
 
-impl BlockData {
-    pub fn new() -> BlockData {
-        BlockData {
-            block: Block::new(),
+impl BlockNode {
+    pub fn new() -> BlockNode {
+        BlockNode {
+            data: BlockData::new(),
             prev_block: None,
             next_block: None,
             first_inst: None,
@@ -23,111 +23,96 @@ impl BlockData {
         }
     }
 
-    pub fn block(&self) -> &Block {
-        &self.block
+    pub fn data(&self) -> &BlockData {
+        &self.data
     }
 
-    pub fn block_mut(&mut self) -> &mut Block {
-        &mut self.block
+    pub fn data_mut(&mut self) -> &mut BlockData {
+        &mut self.data
     }
 
-    pub fn prev_block(&self) -> Option<BlockId> {
+    pub fn prev_block(&self) -> Option<Block> {
         self.prev_block
     }
 
-    pub fn set_prev_block(&mut self, prev_block: BlockId) {
+    pub fn set_prev_block(&mut self, prev_block: Block) {
         self.prev_block = Some(prev_block);
     }
 
-    pub fn next_block(&self) -> Option<BlockId> {
+    pub fn next_block(&self) -> Option<Block> {
         self.next_block
     }
 
-    pub fn set_next_block(&mut self, next_block: BlockId) {
+    pub fn set_next_block(&mut self, next_block: Block) {
         self.next_block = Some(next_block);
     }
 
-    pub fn first_inst(&self) -> Option<InstId> {
+    pub fn first_inst(&self) -> Option<Inst> {
         self.first_inst
     }
 
-    pub fn set_first_inst(&mut self, first_inst: InstId) {
+    pub fn set_first_inst(&mut self, first_inst: Inst) {
         self.first_inst = Some(first_inst);
     }
 
-    pub fn last_inst(&self) -> Option<InstId> {
+    pub fn last_inst(&self) -> Option<Inst> {
         self.last_inst
     }
 
-    pub fn set_last_inst(&mut self, last_inst: InstId) {
+    pub fn set_last_inst(&mut self, last_inst: Inst) {
         self.last_inst = Some(last_inst);
     }
 }
 
 #[derive(Debug)]
-pub struct InstData {
-    inst: Inst,
-    prev_inst: Option<InstId>,
-    next_inst: Option<InstId>,
+struct InstNode {
+    data: InstData,
+    prev_inst: Option<Inst>,
+    next_inst: Option<Inst>,
 }
 
-impl InstData {
-    pub fn new(inst: Inst) -> InstData {
-        InstData {
-            inst,
+impl InstNode {
+    pub fn new(data: InstData) -> InstNode {
+        InstNode {
+            data,
             prev_inst: None,
             next_inst: None,
         }
     }
 
-    pub fn inst(&self) -> &Inst {
-        &self.inst
+    pub fn data(&self) -> &InstData {
+        &self.data
     }
 
-    pub fn inst_mut(&mut self) -> &mut Inst {
-        &mut self.inst
+    pub fn data_mut(&mut self) -> &mut InstData {
+        &mut self.data
     }
 
-    pub fn prev_inst(&self) -> Option<InstId> {
+    pub fn prev_inst(&self) -> Option<Inst> {
         self.prev_inst
     }
 
-    pub fn set_prev_inst(&mut self, prev_inst: InstId) {
+    pub fn set_prev_inst(&mut self, prev_inst: Inst) {
         self.prev_inst = Some(prev_inst);
     }
 
-    pub fn next_inst(&self) -> Option<InstId> {
+    pub fn next_inst(&self) -> Option<Inst> {
         self.next_inst
     }
 
-    pub fn set_next_inst(&mut self, next_inst: InstId) {
+    pub fn set_next_inst(&mut self, next_inst: Inst) {
         self.next_inst = Some(next_inst);
-    }
-}
-
-#[derive(Debug)]
-pub struct ValueData {
-    type_: Type,
-}
-
-impl ValueData {
-    pub fn new(type_: Type) -> ValueData {
-        ValueData { type_ }
-    }
-
-    pub fn type_(&self) -> Type {
-        self.type_
     }
 }
 
 #[derive(Debug)]
 pub struct Func {
     params: Params<Type>,
-    blocks: Map<BlockId, BlockData>,
-    insts: Map<InstId, InstData>,
+    blocks: Map<Block, BlockNode>,
+    insts: Map<Inst, InstNode>,
     values: Map<Value, ValueData>,
-    first_block: Option<BlockId>,
-    last_block: Option<BlockId>,
+    first_block: Option<Block>,
+    last_block: Option<Block>,
 }
 
 impl Func {
@@ -146,84 +131,88 @@ impl Func {
         self.params.push(type_);
     }
 
-    pub fn push_block_param(&mut self, block_id: BlockId, value: Value) {
-        self.blocks.get_mut(block_id).block_mut().push_param(value);
+    pub fn push_block_param(&mut self, block: Block, value: Value) {
+        self.blocks.get_mut(block).data_mut().push_param(value);
     }
 
-    pub fn create_block(&mut self) -> BlockId {
-        self.blocks.create(BlockData::new())
+    pub fn create_block(&mut self) -> Block {
+        self.blocks.create(BlockNode::new())
     }
 
-    pub fn create_inst(&mut self, inst: Inst) -> InstId {
-        self.insts.create(InstData::new(inst))
+    pub fn create_inst(&mut self, data: InstData) -> Inst {
+        self.insts.create(InstNode::new(data))
     }
 
     pub fn create_value(&mut self, type_: Type) -> Value {
         self.values.create(ValueData::new(type_))
     }
 
-    pub fn block(&self, block_id: BlockId) -> &BlockData {
-        self.blocks.get(block_id)
+    pub fn block(&self, block: Block) -> &BlockData {
+        self.blocks.get(block).data()
+    }
+
+    pub fn last_inst(&self, block: Block) -> Inst {
+        self.blocks.get(block).last_inst().unwrap()
     }
 
     pub fn blocks(&self) -> BlockIterator {
         BlockIterator::new(self)
     }
 
-    pub fn inst(&self, inst_id: InstId) -> &InstData {
-        self.insts.get(inst_id)
+    pub fn inst(&self, inst: Inst) -> &InstData {
+        self.insts.get(inst).data()
     }
 
-    pub fn inst_mut(&mut self, inst_id: InstId) -> &mut InstData {
-        self.insts.get_mut(inst_id)
+    pub fn inst_mut(&mut self, inst: Inst) -> &mut InstData {
+        self.insts.get_mut(inst).data_mut()
     }
 
-    pub fn insts(&self, block_id: BlockId) -> InstIterator {
-        InstIterator::new(self, block_id)
+    pub fn insts(&self, block: Block) -> InstIterator {
+        InstIterator::new(self, block)
     }
 
     pub fn value(&self, value: Value) -> &ValueData {
         self.values.get(value)
     }
 
-    pub fn push_block(&mut self, block_id: BlockId) {
+    pub fn push_block(&mut self, block: Block) {
         match self.last_block {
             Some(last_block) => {
-                self.blocks.get_mut(last_block).set_next_block(block_id);
-                self.blocks.get_mut(block_id).set_prev_block(last_block);
+                self.blocks.get_mut(last_block).set_next_block(block);
+                self.blocks.get_mut(block).set_prev_block(last_block);
             }
             None => {
-                self.first_block = Some(block_id);
+                self.first_block = Some(block);
             }
         }
-        self.last_block = Some(block_id);
+        self.last_block = Some(block);
     }
 
-    pub fn push_inst(&mut self, block_id: BlockId, inst_id: InstId) {
-        let block_data = self.blocks.get_mut(block_id);
+    pub fn push_inst(&mut self, block: Block, inst: Inst) {
+        let block_data = self.blocks.get_mut(block);
         match block_data.last_inst() {
             Some(last_inst) => {
-                self.insts.get_mut(last_inst).set_next_inst(inst_id);
-                self.insts.get_mut(inst_id).set_prev_inst(last_inst);
+                self.insts.get_mut(last_inst).set_next_inst(inst);
+                self.insts.get_mut(inst).set_prev_inst(last_inst);
             }
             None => {
-                block_data.set_first_inst(inst_id);
+                block_data.set_first_inst(inst);
             }
         }
-        block_data.set_last_inst(inst_id);
+        block_data.set_last_inst(inst);
     }
 }
 
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "func({}):", self.params)?;
-        for block_id in self.blocks() {
-            let block = self.blocks.get(block_id).block();
+        for block in self.blocks() {
+            let block_data = self.block(block);
             writeln!(f, "")?;
-            writeln!(f, "{}({}):", block_id, block.params())?;
-            for inst_id in self.insts(block_id) {
-                let inst = self.insts.get(inst_id).inst();
-                writeln!(f, "    {}", inst)?;
+            writeln!(f, "{}({}):", block, block_data.params())?;
+            for inst in self.insts(block) {
+                let inst_data = self.inst(inst);
+                writeln!(f, "    {}", inst_data)?;
             }
         }
         Ok(())
@@ -232,7 +221,7 @@ impl fmt::Display for Func {
 
 pub struct BlockIterator<'a> {
     func: &'a Func,
-    next: Option<BlockId>,
+    next: Option<Block>,
 }
 
 impl<'a> BlockIterator<'a> {
@@ -245,13 +234,13 @@ impl<'a> BlockIterator<'a> {
 }
 
 impl<'a> Iterator for BlockIterator<'a> {
-    type Item = BlockId;
+    type Item = Block;
 
-    fn next(&mut self) -> Option<BlockId> {
+    fn next(&mut self) -> Option<Block> {
         match self.next {
-            Some(block_id) => {
-                self.next = self.func.blocks.get(block_id).next_block();
-                Some(block_id)
+            Some(block) => {
+                self.next = self.func.blocks.get(block).next_block();
+                Some(block)
             }
             None => None,
         }
@@ -260,26 +249,26 @@ impl<'a> Iterator for BlockIterator<'a> {
 
 pub struct InstIterator<'a> {
     func: &'a Func,
-    next: Option<InstId>,
+    next: Option<Inst>,
 }
 
 impl<'a> InstIterator<'a> {
-    fn new(func: &Func, block_id: BlockId) -> InstIterator {
+    fn new(func: &Func, block: Block) -> InstIterator {
         InstIterator {
             func,
-            next: func.blocks.get(block_id).first_inst(),
+            next: func.blocks.get(block).first_inst(),
         }
     }
 }
 
 impl<'a> Iterator for InstIterator<'a> {
-    type Item = InstId;
+    type Item = Inst;
 
-    fn next(&mut self) -> Option<InstId> {
+    fn next(&mut self) -> Option<Inst> {
         match self.next {
-            Some(inst_id) => {
-                self.next = self.func.insts.get(inst_id).next_inst();
-                Some(inst_id)
+            Some(inst) => {
+                self.next = self.func.insts.get(inst).next_inst();
+                Some(inst)
             }
             None => None,
         }

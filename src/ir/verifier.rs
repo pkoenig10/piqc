@@ -15,16 +15,16 @@ impl<'a> Verifier<'a> {
     }
 
     pub fn verify_func(self) {
-        for block_id in self.func.blocks() {
-            for inst_id in self.func.insts(block_id) {
-                self.verify_inst(block_id, inst_id);
+        for block in self.func.blocks() {
+            for inst in self.func.insts(block) {
+                self.verify_inst(block, inst);
             }
         }
     }
 
-    pub fn verify_inst(&self, block_id: BlockId, inst_id: InstId) {
-        let is_last_inst = self.func.block(block_id).last_inst() == Some(inst_id);
-        let is_terminator = self.func.inst(inst_id).inst().is_terminator();
+    pub fn verify_inst(&self, block: Block, inst: Inst) {
+        let is_last_inst = self.func.last_inst(block) == inst;
+        let is_terminator = self.func.inst(inst).is_terminator();
 
         if !is_last_inst && is_terminator {
             panic!(

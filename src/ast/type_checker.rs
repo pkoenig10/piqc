@@ -11,41 +11,41 @@ pub fn type_check(prog: &Prog) {
 }
 
 #[derive(Debug)]
-struct Symbol<'input> {
-    identifier: Identifier<'input>,
+struct Symbol<'a> {
+    identifier: Identifier<'a>,
     type_: Type,
 }
 
-impl<'input> Symbol<'input> {
-    pub fn new(identifier: Identifier<'input>, type_: Type) -> Symbol<'input> {
+impl<'a> Symbol<'a> {
+    fn new(identifier: Identifier<'a>, type_: Type) -> Symbol<'a> {
         Symbol { identifier, type_ }
     }
 
-    pub fn type_(&self) -> Type {
+    fn type_(&self) -> Type {
         self.type_
     }
 }
 
 #[derive(Debug)]
 struct SymbolTable<'a> {
-    maps: Vec<HashMap<&'a str, Symbol<'a>>>,
+    scopes: Vec<HashMap<&'a str, Symbol<'a>>>,
 }
 
 impl<'a> SymbolTable<'a> {
-    pub fn new() -> SymbolTable<'a> {
-        SymbolTable { maps: Vec::new() }
+    fn new() -> SymbolTable<'a> {
+        SymbolTable { scopes: Vec::new() }
     }
 
-    pub fn push_scope(&mut self) {
-        self.maps.push(HashMap::new());
+    fn push_scope(&mut self) {
+        self.scopes.push(HashMap::new());
     }
 
-    pub fn pop_scope(&mut self) {
-        self.maps.pop().unwrap();
+    fn pop_scope(&mut self) {
+        self.scopes.pop().unwrap();
     }
 
-    pub fn get(&self, name: &str) -> Option<&Symbol<'a>> {
-        for scope in self.maps.iter().rev() {
+    fn get(&self, name: &str) -> Option<&Symbol<'a>> {
+        for scope in self.scopes.iter().rev() {
             let symbol = scope.get(name);
             if symbol.is_some() {
                 return symbol;
@@ -54,22 +54,22 @@ impl<'a> SymbolTable<'a> {
         None
     }
 
-    pub fn insert(&mut self, name: &'a str, symbol: Symbol<'a>) {
-        self.maps.last_mut().unwrap().insert(name, symbol);
+    fn insert(&mut self, name: &'a str, symbol: Symbol<'a>) {
+        self.scopes.last_mut().unwrap().insert(name, symbol);
     }
 }
 
 struct TypeChecker<'input> {
-    symbol_table: SymbolTable<'input>,
+    symbols: SymbolTable<'input>,
 }
 
 impl<'input> TypeChecker<'input> {
-    pub fn new() -> TypeChecker<'input> {
-        TypeChecker { symbol_table: SymbolTable::new() }
+    fn new() -> TypeChecker<'input> {
+        TypeChecker { symbols: SymbolTable::new() }
     }
 
     fn check_func(&mut self, func: &Func<'input>) {
-        self.symbol_table.push_scope();
+        self.symbols.push_scope();
 
         for param in func.params() {
             self.insert_symbol(param.identifier(), param.type_());
@@ -77,7 +77,7 @@ impl<'input> TypeChecker<'input> {
 
         self.check_block_stmt(func.stmt());
 
-        self.symbol_table.pop_scope();
+        self.symbols.pop_scope();
     }
 
     fn check_stmt(&mut self, stmt: &Stmt<'input>) {
@@ -92,13 +92,13 @@ impl<'input> TypeChecker<'input> {
     }
 
     fn check_block_stmt(&mut self, stmt: &BlockStmt<'input>) {
-        self.symbol_table.push_scope();
+        self.symbols.push_scope();
 
         for stmt in stmt.stmts() {
             self.check_stmt(stmt);
         }
 
-        self.symbol_table.pop_scope();
+        self.symbols.pop_scope();
     }
 
     fn check_decl_stmt(&mut self, stmt: &DeclStmt<'input>) {
@@ -223,10 +223,10 @@ impl<'input> TypeChecker<'input> {
 
     fn insert_symbol(&mut self, identifier: &Identifier<'input>, type_: Type) {
         let symbol = Symbol::new(*identifier, type_);
-        self.symbol_table.insert(identifier.name(), symbol);
+        self.symbols.insert(identifier.name(), symbol);
     }
 
     fn get_symbol(&self, identifier: &Identifier) -> &Symbol<'input> {
-        self.symbol_table.get(identifier.name()).unwrap()
+        self.symbols.get(identifier.name()).unwrap()
     }
 }

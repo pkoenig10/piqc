@@ -1,6 +1,7 @@
 use std::fmt;
 
 use collections::*;
+use ir::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct IntImmediate {
@@ -72,6 +73,21 @@ impl Key for Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "%{}", self.id)
+    }
+}
+
+#[derive(Debug)]
+pub struct ValueData {
+    type_: Type,
+}
+
+impl ValueData {
+    pub fn new(type_: Type) -> ValueData {
+        ValueData { type_ }
+    }
+
+    pub fn type_(&self) -> Type {
+        self.type_
     }
 }
 
