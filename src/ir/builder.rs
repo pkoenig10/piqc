@@ -3,9 +3,6 @@ use std::collections::HashSet;
 
 use ast;
 use ir::*;
-use ir::BinaryOp::*;
-use ir::CompOp::*;
-use ir::Type::*;
 
 pub fn generate_ir(prog: &ast::Prog) -> Prog {
     let builder = IrBuilder::new();
@@ -108,7 +105,11 @@ impl<'input> IrBuilder<'input> {
 
         for param in func.params() {
             let name = param.identifier().name();
-            let type_ = self.generate_type(param.type_());
+            let type_ = match param.type_() {
+                ast::Int => Type::new(Uniform, Int),
+                ast::Float => Type::new(Uniform, Float),
+                ast::Bool => Type::new(Uniform, Bool),
+            };
             self.create_func_param(type_);
             self.create_block_param(name, entry_block, type_);
         }
@@ -248,7 +249,7 @@ impl<'input> IrBuilder<'input> {
 
         let src = Operand::Value(src_value);
 
-        match (op, src_type) {
+        match (op, src_type.type_()) {
             (ast::Negate, Int) => {
                 let zero = Operand::IntImmediate(IntImmediate::new(0));
                 self.push_binary_inst(Sub, zero, src)
@@ -298,14 +299,6 @@ impl<'input> IrBuilder<'input> {
             left_type,
             right_type
         )
-    }
-
-    fn generate_type(&self, type_: ast::Type) -> Type {
-        match type_ {
-            ast::Int => Int,
-            ast::Float => Float,
-            ast::Bool => Bool,
-        }
     }
 
     fn current_block(&self) -> Block {
@@ -414,35 +407,40 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn push_int_const_inst(&mut self, immediate: IntImmediate) -> Value {
-        let dest = self.func.create_value(Int);
+        let type_ = Type::new(Uniform, Int);
+        let dest = self.func.create_value(type_);
         let inst = InstData::IntConstInst(IntConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
     }
 
     fn push_float_const_inst(&mut self, immediate: FloatImmediate) -> Value {
-        let dest = self.func.create_value(Float);
+        let type_ = Type::new(Uniform, Float);
+        let dest = self.func.create_value(type_);
         let inst = InstData::FloatConstInst(FloatConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
     }
 
     fn push_bool_const_inst(&mut self, immediate: BoolImmediate) -> Value {
-        let dest = self.func.create_value(Bool);
+        let type_ = Type::new(Uniform, Bool);
+        let dest = self.func.create_value(type_);
         let inst = InstData::BoolConstInst(BoolConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
     }
 
     fn push_index_inst(&mut self) -> Value {
-        let dest = self.func.create_value(Int);
+        let type_ = Type::new(Varying, Int);
+        let dest = self.func.create_value(type_);
         let inst = InstData::IndexInst(IndexInst::new(dest));
         self.push_inst(inst);
         dest
     }
 
     fn push_count_inst(&mut self) -> Value {
-        let dest = self.func.create_value(Int);
+        let type_ = Type::new(Uniform, Int);
+        let dest = self.func.create_value(type_);
         let inst = InstData::CountInst(CountInst::new(dest));
         self.push_inst(inst);
         dest
@@ -512,53 +510,33 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn get_unary_inst_type(&self, op: UnaryOp, src: Operand) -> Type {
-        let src_type = self.get_operand_type(src);
-
-        match (op, src_type) {
-            (Not, Int) => Int,
-            (Not, Bool) => Bool,
-            _ => {
-                panic!(
-                "Invalid unary instruction '{}' with operand type '{}'",
-                op,
-                src_type,
-            )
-            }
-        }
+        self.get_operand_type(src)
     }
 
     fn get_binary_inst_type(&self, op: BinaryOp, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
 
-        match (op, left_type, right_type) {
-            (Add, Int, Int) | (Sub, Int, Int) | (Asr, Int, Int) | (Shl, Int, Int) |
-            (Min, Int, Int) | (Max, Int, Int) | (And, Int, Int) | (Or, Int, Int) |
-            (Xor, Int, Int) => Int,
-            (Fadd, Float, Float) |
-            (Fsub, Float, Float) |
-            (Fmul, Float, Float) |
-            (Fmin, Float, Float) |
-            (Fmax, Float, Float) => Float,
-            (And, Bool, Bool) |
-            (Or, Bool, Bool) |
-            (Xor, Bool, Bool) => Bool,
-            _ => {
-                panic!(
-                    "Invalid binary instruction '{}' with operand types '{}' and '{}'",
-                    op,
-                    left_type,
-                    right_type
-                )
-            }
-        }
+        if left_type.type_() != right_type.type_() {
+            panic!(
+                "Invalid binary instruction '{}' with operand types '{}' and '{}'",
+                op,
+                left_type,
+                right_type
+            )
+        };
+
+        let type_ = left_type.type_();
+        let qualifier = get_type_qualifier(left_type, right_type);
+
+        Type::new(qualifier, type_)
     }
 
     fn get_comp_inst_type(&self, op: CompOp, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
 
-        if left_type != right_type {
+        if left_type.type_() != right_type.type_() {
             panic!(
                 "Invalid comparison instruction '{}' with operand types '{}' and '{}'",
                 op,
@@ -567,21 +545,23 @@ impl<'input> IrBuilder<'input> {
             )
         }
 
-        Bool
+        let qualifier = get_type_qualifier(left_type, right_type);
+
+        Type::new(qualifier, Bool)
     }
 
     fn get_operand_type(&self, operand: Operand) -> Type {
         match operand {
-            Operand::IntImmediate(_) => Int,
-            Operand::FloatImmediate(_) => Float,
-            Operand::BoolImmediate(_) => Bool,
+            Operand::IntImmediate(_) => Type::new(Uniform, Int),
+            Operand::FloatImmediate(_) => Type::new(Uniform, Float),
+            Operand::BoolImmediate(_) => Type::new(Uniform, Bool),
             Operand::Value(value) => self.func.value(value).type_(),
         }
     }
 }
 
 fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<BinaryOp> {
-    match (op, left_type, right_type) {
+    match (op, left_type.type_(), right_type.type_()) {
         (ast::Mul, Float, Float) => Some(Fmul),
         (ast::Add, Int, Int) => Some(Add),
         (ast::Add, Float, Float) => Some(Fadd),
@@ -603,14 +583,14 @@ fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option
 }
 
 fn get_int_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<CompOp> {
-    match (left_type, right_type) {
+    match (left_type.type_(), right_type.type_()) {
         (Int, Int) | (Bool, Bool) => get_comp_op(op),
         _ => None,
     }
 }
 
 fn get_float_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<CompOp> {
-    match (left_type, right_type) {
+    match (left_type.type_(), right_type.type_()) {
         (Float, Float) => get_comp_op(op),
         _ => None,
     }
@@ -625,5 +605,12 @@ fn get_comp_op(op: ast::BinaryOp) -> Option<CompOp> {
         ast::Le => Some(Le),
         ast::Ge => Some(Ge),
         _ => None,
+    }
+}
+
+pub fn get_type_qualifier(left_type: Type, right_type: Type) -> TypeQualifier {
+    match (left_type.qualifier(), right_type.qualifier()) {
+        (Uniform, Uniform) => Uniform,
+        _ => Varying,
     }
 }
