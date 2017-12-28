@@ -58,6 +58,40 @@ impl fmt::Display for BoolConstInst {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct IndexInst {
+    dest: Value,
+}
+
+impl IndexInst {
+    pub fn new(dest: Value) -> IndexInst {
+        IndexInst { dest }
+    }
+}
+
+impl fmt::Display for IndexInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} = index", self.dest)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CountInst {
+    dest: Value,
+}
+
+impl CountInst {
+    pub fn new(dest: Value) -> CountInst {
+        CountInst { dest }
+    }
+}
+
+impl fmt::Display for CountInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} = count", self.dest)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     Not,
 }
@@ -365,6 +399,8 @@ pub enum InstData {
     IntConstInst(IntConstInst),
     FloatConstInst(FloatConstInst),
     BoolConstInst(BoolConstInst),
+    IndexInst(IndexInst),
+    CountInst(CountInst),
     UnaryInst(UnaryInst),
     BinaryInst(BinaryInst),
     IntCompInst(IntCompInst),
@@ -380,6 +416,8 @@ impl InstData {
             InstData::IntConstInst(_) |
             InstData::FloatConstInst(_) |
             InstData::BoolConstInst(_) |
+            InstData::IndexInst(_) |
+            InstData::CountInst(_) |
             InstData::UnaryInst(_) |
             InstData::BinaryInst(_) |
             InstData::IntCompInst(_) |
@@ -395,6 +433,8 @@ impl InstData {
             InstData::IntConstInst(_) |
             InstData::FloatConstInst(_) |
             InstData::BoolConstInst(_) |
+            InstData::IndexInst(_) |
+            InstData::CountInst(_) |
             InstData::UnaryInst(_) |
             InstData::BinaryInst(_) |
             InstData::IntCompInst(_) |
@@ -427,6 +467,8 @@ impl fmt::Display for InstData {
             InstData::IntConstInst(ref inst) => write!(f, "{}", inst),
             InstData::FloatConstInst(ref inst) => write!(f, "{}", inst),
             InstData::BoolConstInst(ref inst) => write!(f, "{}", inst),
+            InstData::IndexInst(ref inst) => write!(f, "{}", inst),
+            InstData::CountInst(ref inst) => write!(f, "{}", inst),
             InstData::UnaryInst(ref inst) => write!(f, "{}", inst),
             InstData::BinaryInst(ref inst) => write!(f, "{}", inst),
             InstData::IntCompInst(ref inst) => write!(f, "{}", inst),

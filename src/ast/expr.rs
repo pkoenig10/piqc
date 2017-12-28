@@ -62,6 +62,32 @@ impl BoolLiteral {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct Index {
+    location: Location,
+}
+
+impl Index {
+    pub fn new(l: usize, r: usize) -> Index {
+        Index {
+            location: Location::new(l, r),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Count {
+    location: Location,
+}
+
+impl Count {
+    pub fn new(l: usize, r: usize) -> Count {
+        Count {
+            location: Location::new(l, r),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Identifier<'input> {
     location: Location,
     name: &'input str,
@@ -213,6 +239,8 @@ pub enum Expr<'input> {
     IntLiteral(IntLiteral),
     FloatLiteral(FloatLiteral),
     BoolLiteral(BoolLiteral),
+    Index(Index),
+    Count(Count),
     Identifier(Identifier<'input>),
     UnaryExpr(UnaryExpr<'input>),
     BinaryExpr(BinaryExpr<'input>),

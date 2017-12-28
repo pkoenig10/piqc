@@ -205,6 +205,8 @@ impl<'input> IrBuilder<'input> {
                 self.generate_float_literal(float_literal)
             }
             ast::Expr::BoolLiteral(ref bool_literal) => self.generate_bool_literal(bool_literal),
+            ast::Expr::Index(_) => self.generate_index(),
+            ast::Expr::Count(_) => self.generate_count(),
             ast::Expr::Identifier(ref identifier) => self.generate_identifier(identifier),
             ast::Expr::UnaryExpr(ref expr) => self.generate_unary_expr(expr),
             ast::Expr::BinaryExpr(ref expr) => self.generate_binary_expr(expr),
@@ -224,6 +226,14 @@ impl<'input> IrBuilder<'input> {
     fn generate_bool_literal(&mut self, bool_literal: &ast::BoolLiteral) -> Value {
         let immediate = BoolImmediate::new(bool_literal.value());
         self.push_bool_const_inst(immediate)
+    }
+
+    fn generate_index(&mut self) -> Value {
+        self.push_index_inst()
+    }
+
+    fn generate_count(&mut self) -> Value {
+        self.push_count_inst()
     }
 
     fn generate_identifier(&mut self, identifier: &ast::Identifier<'input>) -> Value {
@@ -420,6 +430,20 @@ impl<'input> IrBuilder<'input> {
     fn push_bool_const_inst(&mut self, immediate: BoolImmediate) -> Value {
         let dest = self.func.create_value(Bool);
         let inst = InstData::BoolConstInst(BoolConstInst::new(dest, immediate));
+        self.push_inst(inst);
+        dest
+    }
+
+    fn push_index_inst(&mut self) -> Value {
+        let dest = self.func.create_value(Int);
+        let inst = InstData::IndexInst(IndexInst::new(dest));
+        self.push_inst(inst);
+        dest
+    }
+
+    fn push_count_inst(&mut self) -> Value {
+        let dest = self.func.create_value(Int);
+        let inst = InstData::CountInst(CountInst::new(dest));
         self.push_inst(inst);
         dest
     }

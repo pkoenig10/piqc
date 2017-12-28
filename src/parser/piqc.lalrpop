@@ -80,10 +80,6 @@ LogicalOrOp: BinaryOp = {
     "||" => LogicalOr,
 };
 
-Identifier: Identifier<'input> = {
-    @L r"[A-Za-z_][0-9A-Za-z_]*" @R => Identifier::new(<>),
-};
-
 IntLiteral: IntLiteral = {
     @L Int @R => IntLiteral::new(<>),
 };
@@ -96,10 +92,24 @@ BoolLiteral: BoolLiteral = {
     @L Bool @R => BoolLiteral::new(<>),
 };
 
+Index: Index = {
+    <@L> "@index" <@R> => Index::new(<>),
+};
+
+Count: Count = {
+    <@L> "@count" <@R> => Count::new(<>),
+};
+
+Identifier: Identifier<'input> = {
+    @L r"[A-Za-z_][0-9A-Za-z_]*" @R => Identifier::new(<>),
+};
+
 PrimaryExpr: Expr<'input> = {
     IntLiteral => Expr::IntLiteral(<>),
     FloatLiteral => Expr::FloatLiteral(<>),
     BoolLiteral => Expr::BoolLiteral(<>),
+    Index => Expr::Index(<>),
+    Count => Expr::Count(<>),
     Identifier => Expr::Identifier(<>),
     "(" <Expr> ")" => <>,
 };
