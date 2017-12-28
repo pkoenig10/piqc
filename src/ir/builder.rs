@@ -509,10 +509,13 @@ impl<'input> IrBuilder<'input> {
 
         match (op, left_type, right_type) {
             (Add, Int, Int) | (Sub, Int, Int) | (Asr, Int, Int) | (Shl, Int, Int) |
-            (And, Int, Int) | (Or, Int, Int) | (Xor, Int, Int) => Int,
+            (Min, Int, Int) | (Max, Int, Int) | (And, Int, Int) | (Or, Int, Int) |
+            (Xor, Int, Int) => Int,
             (Fadd, Float, Float) |
             (Fsub, Float, Float) |
-            (Fmul, Float, Float) => Float,
+            (Fmul, Float, Float) |
+            (Fmin, Float, Float) |
+            (Fmax, Float, Float) => Float,
             (And, Bool, Bool) |
             (Or, Bool, Bool) |
             (Xor, Bool, Bool) => Bool,
@@ -562,6 +565,10 @@ fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option
         (ast::Sub, Float, Float) => Some(Fsub),
         (ast::Shl, Int, Int) => Some(Shl),
         (ast::Shr, Int, Int) => Some(Asr),
+        (ast::Min, Int, Int) => Some(Min),
+        (ast::Min, Float, Float) => Some(Fmin),
+        (ast::Max, Int, Int) => Some(Max),
+        (ast::Max, Float, Float) => Some(Fmax),
         (ast::BitAnd, Int, Int) |
         (ast::LogicalAnd, Bool, Bool) => Some(And),
         (ast::BitOr, Int, Int) |

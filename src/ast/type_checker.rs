@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
 use ast::*;
-use ast::Type::*;
-use ast::UnaryOp::*;
-use ast::BinaryOp::*;
 
 pub fn type_check(prog: &Prog) {
     let mut type_checker = TypeChecker::new();
@@ -190,10 +187,14 @@ impl<'input> TypeChecker<'input> {
             (Shr, Int, Int) |
             (BitAnd, Int, Int) |
             (BitXor, Int, Int) |
-            (BitOr, Int, Int) => Int,
+            (BitOr, Int, Int) |
+            (Min, Int, Int) |
+            (Max, Int, Int) => Int,
             (Mul, Float, Float) |
             (Add, Float, Float) |
-            (Sub, Float, Float) => Float,
+            (Sub, Float, Float) |
+            (Min, Float, Float) |
+            (Max, Float, Float) => Float,
             (Eq, Int, Int) |
             (Eq, Float, Float) |
             (Eq, Bool, Bool) |

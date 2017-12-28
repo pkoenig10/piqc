@@ -58,6 +58,11 @@ BitOrOp: BinaryOp = {
     "|" => BitOr,
 };
 
+OrderOp: BinaryOp = {
+    "<?" => Min,
+    ">?" => Max,
+};
+
 ComparisonOp: BinaryOp = {
     "==" => Eq,
     "!=" => Ne,
@@ -121,7 +126,9 @@ BitXorExpr = BinaryExpr<BitXorOp, BitAndExpr>;
 
 BitOrExpr = BinaryExpr<BitOrOp, BitXorExpr>;
 
-ComparisonExpr = BinaryExpr<ComparisonOp, BitOrExpr>;
+OrderExpr = BinaryExpr<OrderOp, BitOrExpr>;
+
+ComparisonExpr = BinaryExpr<ComparisonOp, OrderExpr>;
 
 LogicalAndExpr = BinaryExpr<LogicalAndOp, ComparisonExpr>;
 

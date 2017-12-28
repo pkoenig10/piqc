@@ -93,30 +93,38 @@ impl fmt::Display for UnaryInst {
 #[derive(Debug, Clone, Copy)]
 pub enum BinaryOp {
     Add,
-    Fadd,
     Sub,
-    Fsub,
-    Fmul,
     Asr,
     Shl,
+    Min,
+    Max,
     And,
     Or,
     Xor,
+    Fadd,
+    Fsub,
+    Fmul,
+    Fmin,
+    Fmax,
 }
 
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match *self {
             Add => "add",
-            Fadd => "fadd",
             Sub => "sub",
-            Fsub => "fsub",
-            Fmul => "fmul",
             Asr => "asr",
             Shl => "shl",
+            Min => "min",
+            Max => "max",
             And => "and",
             Or => "or",
             Xor => "xor",
+            Fadd => "fadd",
+            Fsub => "fsub",
+            Fmul => "fmul",
+            Fmin => "fmin",
+            Fmax => "fmax",
         };
         write!(f, "{}", op)
     }
