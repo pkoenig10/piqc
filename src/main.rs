@@ -1,24 +1,14 @@
 extern crate piqc;
 
+use std::env;
+use std::fs::File;
+use std::io::prelude::*;
+
 fn main() {
-    piqc::compile(
-        "
-fn main(int i, float f) {
-    int foo = -i + @index;
-    float bar = f <? 42.0;
-    bool baz = !true;
+    let filename = env::args().nth(1).expect("filename not given");
+    let mut file = File::open(filename).expect("file not found");
+    let mut input = String::new();
+    file.read_to_string(&mut input).expect("unable to read file");
 
-    if (baz) {
-        bar = bar + f;
-    }
-
-    while (baz) {
-        bar = bar + f;
-    }
-
-    bar = bar + f;
-    return;
-}
-",
-    );
+    piqc::compile(&input);
 }
