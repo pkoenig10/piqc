@@ -57,7 +57,7 @@ pub struct Func<'input> {
     location: Location,
     identifier: Identifier<'input>,
     params: Params<'input>,
-    stmt: BlockStmt<'input>,
+    stmt: Box<Stmt<'input>>,
 }
 
 impl<'input> Func<'input> {
@@ -65,14 +65,14 @@ impl<'input> Func<'input> {
         l: usize,
         identifier: Identifier<'input>,
         params: Option<Params<'input>>,
-        stmt: BlockStmt<'input>,
+        stmt: Stmt<'input>,
         r: usize,
     ) -> Func<'input> {
         Func {
             location: Location::new(l, r),
             identifier,
             params: params.unwrap_or_else(Params::new),
-            stmt,
+            stmt: Box::new(stmt),
         }
     }
 
@@ -80,7 +80,7 @@ impl<'input> Func<'input> {
         &self.params
     }
 
-    pub fn stmt(&self) -> &BlockStmt<'input> {
+    pub fn stmt(&self) -> &Stmt<'input> {
         &self.stmt
     }
 }

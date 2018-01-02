@@ -72,7 +72,7 @@ impl<'input> TypeChecker<'input> {
             self.insert_symbol(param.identifier(), param.type_());
         }
 
-        self.check_block_stmt(func.stmt());
+        self.check_stmt(func.stmt());
 
         self.symbols.pop_scope();
     }
@@ -127,7 +127,11 @@ impl<'input> TypeChecker<'input> {
             panic!("If statement expression with type '{}'", expr_type);
         }
 
-        self.check_block_stmt(stmt.stmt());
+        self.check_stmt(stmt.if_stmt());
+
+        if let Some(else_stmt) = stmt.else_stmt() {
+            self.check_stmt(else_stmt);
+        }
     }
 
     fn check_while_stmt(&mut self, stmt: &WhileStmt<'input>) {
@@ -137,7 +141,7 @@ impl<'input> TypeChecker<'input> {
             panic!("While statement expression with type '{}'", expr_type);
         }
 
-        self.check_block_stmt(stmt.stmt());
+        self.check_stmt(stmt.stmt());
     }
 
     fn check_expr(&mut self, expr: &Expr) -> Type {

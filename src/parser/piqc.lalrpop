@@ -160,12 +160,25 @@ AssignStmt: AssignStmt<'input> = {
     <@L> <Identifier> "=" <Expr> ";" <@R> => AssignStmt::new(<>),
 };
 
+IfBlock: Stmt<'input> = {
+    BlockStmt => Stmt::BlockStmt(<>),
+};
+
+ElseBlock: Stmt<'input> = {
+    BlockStmt => Stmt::BlockStmt(<>),
+    IfStmt => Stmt::IfStmt(<>),
+};
+
 IfStmt: IfStmt<'input> = {
-    <@L> "if" "(" <Expr> ")" <BlockStmt> <@R> => IfStmt::new(<>),
+    <@L> "if" "(" <Expr> ")" <IfBlock> <("else" <ElseBlock>)?> <@R> => IfStmt::new(<>),
+};
+
+WhileBlock: Stmt<'input> = {
+    BlockStmt => Stmt::BlockStmt(<>),
 };
 
 WhileStmt: WhileStmt<'input> = {
-    <@L> "while" "(" <Expr> ")" <BlockStmt> <@R> => WhileStmt::new(<>),
+    <@L> "while" "(" <Expr> ")" <WhileBlock> <@R> => WhileStmt::new(<>),
 };
 
 ReturnStmt: ReturnStmt = {
@@ -193,8 +206,12 @@ Params: Params<'input> = {
     },
 };
 
+FuncBlock: Stmt<'input> = {
+    BlockStmt => Stmt::BlockStmt(<>),
+};
+
 Func: Func<'input> = {
-    <@L> "fn" <Identifier> "(" <Params?> ")" <BlockStmt> <@R> => Func::new(<>),
+    <@L> "fn" <Identifier> "(" <Params?> ")" <FuncBlock> <@R> => Func::new(<>),
 };
 
 pub Prog: Prog<'input> = {

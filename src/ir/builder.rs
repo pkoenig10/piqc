@@ -114,7 +114,7 @@ impl<'input> IrBuilder<'input> {
             self.create_block_param(name, entry_block, type_);
         }
 
-        self.generate_block_stmt(func.stmt());
+        self.generate_stmt(func.stmt());
 
         let block = self.current_block();
         let inst = self.func.last_inst(block);
@@ -159,19 +159,44 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn generate_if_stmt(&mut self, stmt: &ast::IfStmt<'input>) {
-        let if_block = self.create_block();
-        let merge_block = self.create_block();
+        match stmt.else_stmt() {
+            None => {
+                let if_block = self.create_block();
+                let merge_block = self.create_block();
 
-        let value = self.generate_expr(stmt.expr());
-        self.push_branch_inst(value, if_block, merge_block);
+                let value = self.generate_expr(stmt.expr());
+                self.push_branch_inst(value, if_block, merge_block);
 
-        self.push_block(if_block);
-        self.set_current_block(if_block);
-        self.generate_block_stmt(stmt.stmt());
-        self.push_jump_inst(merge_block);
+                self.push_block(if_block);
+                self.set_current_block(if_block);
+                self.generate_stmt(stmt.if_stmt());
+                self.push_jump_inst(merge_block);
 
-        self.push_block(merge_block);
-        self.set_current_block(merge_block);
+                self.push_block(merge_block);
+                self.set_current_block(merge_block);
+            },
+            Some(else_stmt) => {
+                let if_block = self.create_block();
+                let else_block = self.create_block();
+                let merge_block = self.create_block();
+
+                let value = self.generate_expr(stmt.expr());
+                self.push_branch_inst(value, if_block, else_block);
+
+                self.push_block(if_block);
+                self.set_current_block(if_block);
+                self.generate_stmt(stmt.if_stmt());
+                self.push_jump_inst(merge_block);
+
+                self.push_block(else_block);
+                self.set_current_block(else_block);
+                self.generate_stmt(else_stmt);
+                self.push_jump_inst(merge_block);
+
+                self.push_block(merge_block);
+                self.set_current_block(merge_block);
+            }
+        };
     }
 
     fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
@@ -188,7 +213,7 @@ impl<'input> IrBuilder<'input> {
 
         self.push_block(loop_block);
         self.set_current_block(loop_block);
-        self.generate_block_stmt(stmt.stmt());
+        self.generate_stmt(stmt.stmt());
         self.push_jump_inst(header_block);
 
         self.push_block(after_block);

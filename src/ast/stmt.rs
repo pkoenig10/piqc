@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use ast::*;
 use ast::loc::*;
 
@@ -102,15 +104,17 @@ impl ReturnStmt {
 pub struct IfStmt<'input> {
     location: Location,
     expr: Expr<'input>,
-    stmt: BlockStmt<'input>,
+    if_stmt: Box<Stmt<'input>>,
+    else_stmt: Option<Box<Stmt<'input>>>,
 }
 
 impl<'input> IfStmt<'input> {
-    pub fn new(l: usize, expr: Expr<'input>, stmt: BlockStmt<'input>, r: usize) -> IfStmt<'input> {
+    pub fn new(l: usize, expr: Expr<'input>, if_stmt: Stmt<'input>, else_stmt: Option<Stmt<'input>>, r: usize) -> IfStmt<'input> {
         IfStmt {
             location: Location::new(l, r),
             expr,
-            stmt,
+            if_stmt: Box::new(if_stmt),
+            else_stmt: else_stmt.map(Box::new),
         }
     }
 
@@ -118,8 +122,12 @@ impl<'input> IfStmt<'input> {
         &self.expr
     }
 
-    pub fn stmt(&self) -> &BlockStmt<'input> {
-        &self.stmt
+    pub fn if_stmt(&self) -> &Stmt<'input> {
+        &self.if_stmt
+    }
+
+    pub fn else_stmt(&self) -> Option<&Stmt<'input>> {
+        self.else_stmt.as_ref().map(Box::deref)
     }
 }
 
@@ -127,20 +135,20 @@ impl<'input> IfStmt<'input> {
 pub struct WhileStmt<'input> {
     location: Location,
     expr: Expr<'input>,
-    stmt: BlockStmt<'input>,
+    stmt: Box<Stmt<'input>>,
 }
 
 impl<'input> WhileStmt<'input> {
     pub fn new(
         l: usize,
         expr: Expr<'input>,
-        stmt: BlockStmt<'input>,
+        stmt: Stmt<'input>,
         r: usize,
     ) -> WhileStmt<'input> {
         WhileStmt {
             location: Location::new(l, r),
             expr,
-            stmt,
+            stmt: Box::new(stmt),
         }
     }
 
@@ -148,7 +156,7 @@ impl<'input> WhileStmt<'input> {
         &self.expr
     }
 
-    pub fn stmt(&self) -> &BlockStmt<'input> {
+    pub fn stmt(&self) -> &Stmt<'input> {
         &self.stmt
     }
 }
