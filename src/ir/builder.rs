@@ -194,94 +194,132 @@ impl<'input> IrBuilder<'input> {
         let condition_value = self.generate_expr(stmt.expr());
 
         let qualifier = self.func.value(condition_value).type_().qualifier();
+
+        let if_stmt = stmt.if_stmt();
         let else_stmt = stmt.else_stmt();
 
         match (qualifier, else_stmt) {
             (Uniform, None) => {
-                let if_block = self.create_block();
-                let merge_block = self.create_block();
-
-                self.push_branch_inst(condition_value, if_block, merge_block);
-
-                self.push_block(if_block);
-                self.set_current_block(if_block);
-                self.generate_stmt(stmt.if_stmt());
-                self.push_jump_inst(merge_block);
-
-                self.push_block(merge_block);
-                self.set_current_block(merge_block);
+                self.generate_uniform_if_statement(condition_value, if_stmt);
             }
             (Uniform, Some(else_stmt)) => {
-                let if_block = self.create_block();
-                let else_block = self.create_block();
-                let merge_block = self.create_block();
-
-                self.push_branch_inst(condition_value, if_block, else_block);
-
-                self.push_block(if_block);
-                self.set_current_block(if_block);
-                self.generate_stmt(stmt.if_stmt());
-                self.push_jump_inst(merge_block);
-
-                self.push_block(else_block);
-                self.set_current_block(else_block);
-                self.generate_stmt(else_stmt);
-                self.push_jump_inst(merge_block);
-
-                self.push_block(merge_block);
-                self.set_current_block(merge_block);
+                self.generate_uniform_if_else_statement(condition_value, if_stmt, else_stmt);
             }
             (Varying, None) => {
-                let current_block = self.current_block();
-                let predicate_value = self.get_value(Variable::Predicate);
-                let count_value = self.get_value(Variable::Count);
-
-                let count = Operand::Value(count_value);
-                let one = Operand::IntImmediate(IntImmediate::new(1));
-                let inc_count_value = self.push_binary_inst(Add, count, one);
-                let inc_count = Operand::Value(inc_count_value);
-                let count_value = self.push_select_inst(predicate_value, count, inc_count);
-                self.values.insert_value(
-                    current_block,
-                    Variable::Count,
-                    count_value,
-                );
-
-                let predicate = Operand::Value(predicate_value);
-                let condition = Operand::Value(condition_value);
-                let predicate_value = self.push_select_inst(predicate_value, condition, predicate);
-                self.values.insert_value(
-                    current_block,
-                    Variable::Predicate,
-                    predicate_value,
-                );
-
-                self.generate_stmt(stmt.if_stmt());
-
-                let current_block = self.current_block();
-                let count_value = self.get_value(Variable::Count);
-
-                let count = Operand::Value(count_value);
-                let zero = Operand::IntImmediate(IntImmediate::new(0));
-                let predicate_value = self.push_int_comp_inst(Eq, count, zero);
-                self.values.insert_value(
-                    current_block,
-                    Variable::Predicate,
-                    predicate_value,
-                );
-
-                let one = Operand::IntImmediate(IntImmediate::new(1));
-                let dec_count_value = self.push_binary_inst(Sub, count, one);
-                let dec_count = Operand::Value(dec_count_value);
-                let count_value = self.push_select_inst(predicate_value, count, dec_count);
-                self.values.insert_value(
-                    current_block,
-                    Variable::Count,
-                    count_value,
-                );
+                self.generate_varying_if_statement(condition_value, if_stmt);
             }
-            (Varying, Some(else_stmt)) => panic!("Not implemented"),
+            (Varying, Some(else_stmt)) => {
+                self.generate_varying_if_else_statement(condition_value, if_stmt, else_stmt);
+            }
         };
+    }
+
+    fn generate_uniform_if_statement(
+        &mut self,
+        condition_value: Value,
+        if_stmt: &ast::Stmt<'input>,
+    ) {
+        let if_block = self.create_block();
+        let merge_block = self.create_block();
+
+        self.push_branch_inst(condition_value, if_block, merge_block);
+
+        self.push_block(if_block);
+        self.set_current_block(if_block);
+        self.generate_stmt(if_stmt);
+        self.push_jump_inst(merge_block);
+
+        self.push_block(merge_block);
+        self.set_current_block(merge_block);
+    }
+
+    fn generate_uniform_if_else_statement(
+        &mut self,
+        condition_value: Value,
+        if_stmt: &ast::Stmt<'input>,
+        else_stmt: &ast::Stmt<'input>,
+    ) {
+        let if_block = self.create_block();
+        let else_block = self.create_block();
+        let merge_block = self.create_block();
+
+        self.push_branch_inst(condition_value, if_block, else_block);
+
+        self.push_block(if_block);
+        self.set_current_block(if_block);
+        self.generate_stmt(if_stmt);
+        self.push_jump_inst(merge_block);
+
+        self.push_block(else_block);
+        self.set_current_block(else_block);
+        self.generate_stmt(else_stmt);
+        self.push_jump_inst(merge_block);
+
+        self.push_block(merge_block);
+        self.set_current_block(merge_block);
+    }
+
+    fn generate_varying_if_statement(
+        &mut self,
+        condition_value: Value,
+        if_stmt: &ast::Stmt<'input>,
+    ) {
+        let current_block = self.current_block();
+        let predicate_value = self.get_value(Variable::Predicate);
+        let count_value = self.get_value(Variable::Count);
+
+        let count = Operand::Value(count_value);
+        let one = Operand::IntImmediate(IntImmediate::new(1));
+        let inc_count_value = self.push_binary_inst(Add, count, one);
+        let inc_count = Operand::Value(inc_count_value);
+        let count_value = self.push_select_inst(predicate_value, count, inc_count);
+        self.values.insert_value(
+            current_block,
+            Variable::Count,
+            count_value,
+        );
+
+        let predicate = Operand::Value(predicate_value);
+        let condition = Operand::Value(condition_value);
+        let predicate_value = self.push_select_inst(predicate_value, condition, predicate);
+        self.values.insert_value(
+            current_block,
+            Variable::Predicate,
+            predicate_value,
+        );
+
+        self.generate_stmt(if_stmt);
+
+        let current_block = self.current_block();
+        let count_value = self.get_value(Variable::Count);
+
+        let count = Operand::Value(count_value);
+        let zero = Operand::IntImmediate(IntImmediate::new(0));
+        let predicate_value = self.push_int_comp_inst(Eq, count, zero);
+        self.values.insert_value(
+            current_block,
+            Variable::Predicate,
+            predicate_value,
+        );
+
+        let one = Operand::IntImmediate(IntImmediate::new(1));
+        let dec_count_value = self.push_binary_inst(Sub, count, one);
+        let dec_count = Operand::Value(dec_count_value);
+        let count_value = self.push_select_inst(predicate_value, count, dec_count);
+        self.values.insert_value(
+            current_block,
+            Variable::Count,
+            count_value,
+        );
+    }
+
+    fn generate_varying_if_else_statement(
+        &mut self,
+        condition_value: Value,
+        if_stmt: &ast::Stmt<'input>,
+        else_stmt: &ast::Stmt<'input>,
+    ) {
+        panic!("Not implemented");
     }
 
     fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
