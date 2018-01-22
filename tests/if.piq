@@ -1,0 +1,12 @@
+fn if_test(bool bar) {
+    int foo = 0;
+    int i = @index;
+    if (i < 20) {
+        foo = 1;
+        if (bar) {
+            foo = 2;
+        }
+    }
+
+    return;
+}

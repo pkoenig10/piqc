@@ -285,6 +285,38 @@ impl fmt::Display for FloatCompInst {
 }
 
 #[derive(Debug)]
+pub struct SelectInst {
+    dest: Value,
+    cond: Value,
+    left: Operand,
+    right: Operand,
+}
+
+impl SelectInst {
+    pub fn new(dest: Value, cond: Value, left: Operand, right: Operand) -> SelectInst {
+        SelectInst {
+            dest,
+            cond,
+            left,
+            right,
+        }
+    }
+}
+
+impl fmt::Display for SelectInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} = select {}, {}, {}",
+            self.dest,
+            self.cond,
+            self.left,
+            self.right,
+        )
+    }
+}
+
+#[derive(Debug)]
 pub struct JumpInst {
     target: Target,
 }
@@ -405,6 +437,7 @@ pub enum InstData {
     BinaryInst(BinaryInst),
     IntCompInst(IntCompInst),
     FloatCompInst(FloatCompInst),
+    SelectInst(SelectInst),
     JumpInst(JumpInst),
     BranchInst(BranchInst),
     ReturnInst(ReturnInst),
@@ -421,7 +454,8 @@ impl InstData {
             InstData::UnaryInst(_) |
             InstData::BinaryInst(_) |
             InstData::IntCompInst(_) |
-            InstData::FloatCompInst(_) => false,
+            InstData::FloatCompInst(_) |
+            InstData::SelectInst(_) => false,
             InstData::JumpInst(_) |
             InstData::BranchInst(_) |
             InstData::ReturnInst(_) => true,
@@ -439,6 +473,7 @@ impl InstData {
             InstData::BinaryInst(_) |
             InstData::IntCompInst(_) |
             InstData::FloatCompInst(_) |
+            InstData::SelectInst(_) |
             InstData::ReturnInst(_) => None,
             InstData::JumpInst(ref mut inst) => {
                 if inst.target().block() == block {
@@ -473,6 +508,7 @@ impl fmt::Display for InstData {
             InstData::BinaryInst(ref inst) => write!(f, "{}", inst),
             InstData::IntCompInst(ref inst) => write!(f, "{}", inst),
             InstData::FloatCompInst(ref inst) => write!(f, "{}", inst),
+            InstData::SelectInst(ref inst) => write!(f, "{}", inst),
             InstData::JumpInst(ref inst) => write!(f, "{}", inst),
             InstData::BranchInst(ref inst) => write!(f, "{}", inst),
             InstData::ReturnInst(ref inst) => write!(f, "{}", inst),

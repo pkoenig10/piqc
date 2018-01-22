@@ -3,7 +3,7 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeQualifier {
     Uniform,
-    Varying
+    Varying,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,10 +21,7 @@ pub struct Type {
 
 impl Type {
     pub fn new(qualifier: TypeQualifier, type_: BaseType) -> Type {
-        Type {
-            qualifier,
-            type_,
-        }
+        Type { qualifier, type_ }
     }
 
     pub fn qualifier(&self) -> TypeQualifier {

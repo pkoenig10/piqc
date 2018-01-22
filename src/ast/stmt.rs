@@ -109,7 +109,13 @@ pub struct IfStmt<'input> {
 }
 
 impl<'input> IfStmt<'input> {
-    pub fn new(l: usize, expr: Expr<'input>, if_stmt: Stmt<'input>, else_stmt: Option<Stmt<'input>>, r: usize) -> IfStmt<'input> {
+    pub fn new(
+        l: usize,
+        expr: Expr<'input>,
+        if_stmt: Stmt<'input>,
+        else_stmt: Option<Stmt<'input>>,
+        r: usize,
+    ) -> IfStmt<'input> {
         IfStmt {
             location: Location::new(l, r),
             expr,
@@ -139,12 +145,7 @@ pub struct WhileStmt<'input> {
 }
 
 impl<'input> WhileStmt<'input> {
-    pub fn new(
-        l: usize,
-        expr: Expr<'input>,
-        stmt: Stmt<'input>,
-        r: usize,
-    ) -> WhileStmt<'input> {
+    pub fn new(l: usize, expr: Expr<'input>, stmt: Stmt<'input>, r: usize) -> WhileStmt<'input> {
         WhileStmt {
             location: Location::new(l, r),
             expr,
