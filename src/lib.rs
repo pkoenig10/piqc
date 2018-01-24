@@ -6,7 +6,7 @@ mod parser;
 pub fn compile(s: &str) {
     let prog = parser::parse(s).unwrap();
     ast::type_check(&prog);
-    println!("{:#?}", prog);
+    // println!("{:#?}", prog);
 
     let prog = ir::generate_ir(&prog);
     println!("{}", prog);

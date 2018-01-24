@@ -40,8 +40,8 @@ impl<'a> BlockValues<'a> {
         self.insert_value(variable, value);
     }
 
-    fn get_value(&self, variable: &Variable<'a>) -> Option<Value> {
-        self.values.get(variable).cloned()
+    fn get_value(&self, variable: Variable<'a>) -> Option<Value> {
+        self.values.get(&variable).cloned()
     }
 
     fn insert_value(&mut self, variable: Variable<'a>, value: Value) {
@@ -73,7 +73,7 @@ impl<'a> ValueTable<'a> {
         self.get_values_mut(block).insert_value(variable, value);
     }
 
-    fn get_value(&self, block: Block, variable: &Variable<'a>) -> Option<Value> {
+    fn get_value(&self, block: Block, variable: Variable<'a>) -> Option<Value> {
         self.get_values(block).and_then(
             |values| values.get_value(variable),
         )
@@ -460,58 +460,62 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn get_value(&mut self, variable: Variable<'input>) -> Value {
+        enum Call {
+            Visit(Block),
+            Finish(Block),
+        }
+
         let block = self.current_block();
-        self.get_value_in_block(block, variable, &mut HashSet::new())
-            .unwrap()
-    }
+        if let Some(value) = self.values.get_value(block, variable) {
+            return value;
+        }
 
-    fn get_value_in_block(
-        &mut self,
-        block: Block,
-        variable: Variable<'input>,
-        visited: &mut HashSet<Block>,
-    ) -> Option<Value> {
-        match self.values.get_value(block, &variable) {
-            Some(value) => Some(value),
-            None => {
-                if !visited.insert(block) {
-                    panic!("Attempted to get value from previously visisted block");
+        let mut visited = HashSet::new();
+        let mut calls = Vec::new();
+
+        calls.push(Call::Visit(block));
+
+        while let Some(call) = calls.pop() {
+            match call {
+                Call::Visit(block) => {
+                    if self.values.get_value(block, variable).is_none() {
+                        assert!(visited.insert(block), "Variable not defined");
+
+                        calls.push(Call::Finish(block));
+                        for predecessor in &self.predecessors[&block] {
+                            calls.push(Call::Visit(*predecessor));
+                        }
+                    }
                 }
-
-                let mut type_ = None;
-                for predecessor_block in self.predecessors[&block].clone() {
-                    let value = self.get_value_in_block(predecessor_block, variable, visited);
-                    if let Some(value) = value {
+                Call::Finish(block) => {
+                    let mut type_ = None;
+                    for predecessor in self.predecessors[&block].clone() {
+                        let value = self.values.get_value(predecessor, variable).unwrap();
                         let value_type = self.func.value(value).type_();
                         match type_ {
-                            Some(type_) => {
-                                if value_type != type_ {
-                                    panic!(
-                                        "Variable defined with multiple types `{}` and `{}`",
-                                        type_,
-                                        value_type
-                                    );
-                                }
-                            }
                             None => {
                                 type_ = Some(value_type);
                             }
+                            Some(type_) => {
+                                assert!(
+                                    value_type == type_,
+                                    "Variable defined with multiple types '{}' and '{}'",
+                                    type_,
+                                    value_type
+                                )
+                            }
                         };
 
-                        let inst = self.func.last_inst(predecessor_block);
+                        let inst = self.func.last_inst(predecessor);
                         self.push_target_arg(inst, block, value);
                     }
-                }
 
-                match type_ {
-                    Some(type_) => {
-                        let value = self.create_block_param(variable, block, type_);
-                        Some(value)
-                    }
-                    None => None,
+                    self.create_block_param(variable, block, type_.unwrap());
                 }
             }
         }
+
+        self.values.get_value(block, variable).unwrap()
     }
 
     fn insert_predecessor(&mut self, block: Block, predecessor: Block) {
