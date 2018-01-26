@@ -271,6 +271,7 @@ impl<'input> IrBuilder<'input> {
         let count = Operand::Value(count_value);
         let one = Operand::IntImmediate(IntImmediate::new(1));
         let inc_count_value = self.push_binary_inst(Add, count, one);
+
         let inc_count = Operand::Value(inc_count_value);
         let count_value = self.push_select_inst(predicate_value, count, inc_count);
         self.values.insert_value(
@@ -302,8 +303,10 @@ impl<'input> IrBuilder<'input> {
             predicate_value,
         );
 
+        let count = Operand::Value(count_value);
         let one = Operand::IntImmediate(IntImmediate::new(1));
         let dec_count_value = self.push_binary_inst(Sub, count, one);
+
         let dec_count = Operand::Value(dec_count_value);
         let count_value = self.push_select_inst(predicate_value, count, dec_count);
         self.values.insert_value(
@@ -319,7 +322,78 @@ impl<'input> IrBuilder<'input> {
         if_stmt: &ast::Stmt<'input>,
         else_stmt: &ast::Stmt<'input>,
     ) {
-        panic!("Not implemented");
+        let current_block = self.current_block();
+        let predicate_value = self.get_value(Variable::Predicate);
+        let count_value = self.get_value(Variable::Count);
+
+        let count = Operand::Value(count_value);
+        let one = Operand::IntImmediate(IntImmediate::new(1));
+        let inc_count_value = self.push_binary_inst(Add, count, one);
+
+        let inc_count = Operand::Value(inc_count_value);
+        let count_value = self.push_select_inst(predicate_value, count, inc_count);
+        self.values.insert_value(
+            current_block,
+            Variable::Count,
+            count_value,
+        );
+
+        let predicate = Operand::Value(predicate_value);
+        let condition = Operand::Value(condition_value);
+        let predicate_value = self.push_select_inst(predicate_value, condition, predicate);
+        self.values.insert_value(
+            current_block,
+            Variable::Predicate,
+            predicate_value,
+        );
+
+        self.generate_stmt(if_stmt);
+
+        let current_block = self.current_block();
+        let count_value = self.get_value(Variable::Count);
+        let predicate_value = self.get_value(Variable::Predicate);
+
+        let predicate = Operand::Value(predicate_value);
+        let not_predciate_value = self.push_unary_inst(Not, predicate);
+
+        let count = Operand::Value(count_value);
+        let zero = Operand::IntImmediate(IntImmediate::new(0));
+        let count_zero_value = self.push_int_comp_inst(Eq, count, zero);
+
+        let not_predicate = Operand::Value(not_predciate_value);
+        let count_zero = Operand::Value(count_zero_value);
+        let predicate_value = self.push_binary_inst(And, not_predicate, count_zero);
+        self.values.insert_value(
+            current_block,
+            Variable::Predicate,
+            predicate_value,
+        );
+
+        self.generate_stmt(else_stmt);
+
+        let current_block = self.current_block();
+        let count_value = self.get_value(Variable::Count);
+
+        let count = Operand::Value(count_value);
+        let zero = Operand::IntImmediate(IntImmediate::new(0));
+        let predicate_value = self.push_int_comp_inst(Eq, count, zero);
+        self.values.insert_value(
+            current_block,
+            Variable::Predicate,
+            predicate_value,
+        );
+
+        let count = Operand::Value(count_value);
+        let one = Operand::IntImmediate(IntImmediate::new(1));
+        let dec_count_value = self.push_binary_inst(Sub, count, one);
+
+        let dec_count = Operand::Value(dec_count_value);
+        let count_value = self.push_select_inst(predicate_value, count, dec_count);
+        self.values.insert_value(
+            current_block,
+            Variable::Count,
+            count_value,
+        );
     }
 
     fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
