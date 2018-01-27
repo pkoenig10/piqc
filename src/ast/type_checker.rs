@@ -102,10 +102,12 @@ impl<'input> TypeChecker<'input> {
         let expr_type = self.check_expr(stmt.expr());
 
         let type_ = stmt.type_();
-
-        if type_ != expr_type {
-            panic!("Mismatched types '{}' and '{}'", type_, expr_type);
-        }
+        assert!(
+            type_ == expr_type,
+            "Mismatched types '{}' and '{}'",
+            type_,
+            expr_type
+        );
 
         self.insert_symbol(stmt.identifier(), type_);
     }
@@ -114,18 +116,21 @@ impl<'input> TypeChecker<'input> {
         let expr_type = self.check_expr(stmt.expr());
 
         let type_ = self.check_identifier(stmt.identifier());
-
-        if type_ != expr_type {
-            panic!("Mismatched types '{}' and '{}'", type_, expr_type);
-        }
+        assert!(
+            type_ == expr_type,
+            "Mismatched types '{}' and '{}'",
+            type_,
+            expr_type
+        );
     }
 
     fn check_if_stmt(&mut self, stmt: &IfStmt<'input>) {
         let expr_type = self.check_expr(stmt.expr());
-
-        if expr_type != Bool {
-            panic!("If statement expression with type '{}'", expr_type);
-        }
+        assert!(
+            expr_type == Bool,
+            "If statement expression with type '{}'",
+            expr_type
+        );
 
         self.check_stmt(stmt.if_stmt());
 
@@ -136,10 +141,11 @@ impl<'input> TypeChecker<'input> {
 
     fn check_while_stmt(&mut self, stmt: &WhileStmt<'input>) {
         let expr_type = self.check_expr(stmt.expr());
-
-        if expr_type != Bool {
-            panic!("While statement expression with type '{}'", expr_type);
-        }
+        assert!(
+            expr_type == Bool,
+            "While statement expression with type '{}'",
+            expr_type
+        );
 
         self.check_stmt(stmt.stmt());
     }

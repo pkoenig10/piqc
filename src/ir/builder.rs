@@ -757,15 +757,13 @@ impl<'input> IrBuilder<'input> {
     fn get_binary_inst_type(&self, op: BinaryOp, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
-
-        if left_type.type_() != right_type.type_() {
-            panic!(
-                "Invalid binary instruction '{}' with operand types '{}' and '{}'",
-                op,
-                left_type,
-                right_type
-            )
-        };
+        assert!(
+            left_type.type_() == right_type.type_(),
+            "Invalid binary instruction '{}' with operand types '{}' and '{}'",
+            op,
+            left_type,
+            right_type
+        );
 
         let type_ = left_type.type_();
         let qualifier = get_type_qualifier(left_type, right_type);
@@ -776,15 +774,13 @@ impl<'input> IrBuilder<'input> {
     fn get_comp_inst_type(&self, op: CompOp, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
-
-        if left_type.type_() != right_type.type_() {
-            panic!(
-                "Invalid comparison instruction '{}' with operand types '{}' and '{}'",
-                op,
-                left_type,
-                right_type
-            )
-        }
+        assert!(
+            left_type.type_() == right_type.type_(),
+            "Invalid comparison instruction '{}' with operand types '{}' and '{}'",
+            op,
+            left_type,
+            right_type
+        );
 
         let qualifier = get_type_qualifier(left_type, right_type);
 
@@ -794,14 +790,12 @@ impl<'input> IrBuilder<'input> {
     fn get_select_inst_type(&self, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
-
-        if left_type.type_() != right_type.type_() {
-            panic!(
-                "Invalid select instruction with operand types '{}' and '{}'",
-                left_type,
-                right_type
-            )
-        };
+        assert!(
+            left_type.type_() == right_type.type_(),
+            "Invalid select instruction with operand types '{}' and '{}'",
+            left_type,
+            right_type
+        );
 
         let type_ = left_type.type_();
         let qualifier = get_type_qualifier(left_type, right_type);
