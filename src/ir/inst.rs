@@ -345,16 +345,34 @@ impl fmt::Display for JumpInst {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum BranchOp {
+    Any,
+    All,
+}
+
+impl fmt::Display for BranchOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let op = match *self {
+            Any => "any",
+            All => "all",
+        };
+        write!(f, "{}", op)
+    }
+}
+
 #[derive(Debug)]
 pub struct BranchInst {
+    op: BranchOp,
     cond: Value,
     true_target: Target,
     false_target: Target,
 }
 
 impl BranchInst {
-    pub fn new(cond: Value, true_target: Target, false_target: Target) -> BranchInst {
+    pub fn new(op: BranchOp, cond: Value, true_target: Target, false_target: Target) -> BranchInst {
         BranchInst {
+            op,
             cond,
             true_target,
             false_target,
@@ -382,7 +400,8 @@ impl fmt::Display for BranchInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "br {} {}, {}",
+            "br {} {} {}, {}",
+            self.op,
             self.cond,
             self.true_target,
             self.false_target

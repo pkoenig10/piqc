@@ -1,0 +1,10 @@
+fn if_varying(bool bar) {
+    int foo = 0;
+
+    int index = @index;
+    if (index < 42) {
+        foo = 1;
+    }
+
+    foo = foo + 1;
+}

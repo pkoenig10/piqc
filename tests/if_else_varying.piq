@@ -1,0 +1,12 @@
+fn if_else_varying(bool bar) {
+    int foo = 0;
+
+    int index = @index;
+    if (index < 42) {
+        foo = 1;
+    } else {
+        foo = 2;
+    }
+
+    foo = foo + 1;
+}

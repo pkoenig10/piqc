@@ -1,0 +1,9 @@
+fn if_uniform(bool bar) {
+    int foo = 0;
+
+    if (bar) {
+        foo = 1;
+    }
+
+    foo = foo + 1;
+}

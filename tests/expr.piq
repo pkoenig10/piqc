@@ -1,4 +1,4 @@
-fn expr_test(int i, float f) {
+fn expr(int i, float f) {
     int foo = -i + 1;
     float bar = f <? 42.0;
     bool baz = !true;

@@ -1,0 +1,11 @@
+fn while_varying() {
+    int foo = 0;
+
+    int bar = 0;
+    int index = @index;
+    while (bar < index) {
+        bar = bar + 1;
+    }
+
+    foo = foo + 1;
+}

@@ -225,7 +225,7 @@ impl<'input> IrBuilder<'input> {
         let if_block = self.create_block();
         let merge_block = self.create_block();
 
-        self.push_branch_inst(condition_value, if_block, merge_block);
+        self.push_branch_inst(All, condition_value, if_block, merge_block);
 
         self.push_block(if_block);
         self.set_current_block(if_block);
@@ -246,7 +246,7 @@ impl<'input> IrBuilder<'input> {
         let else_block = self.create_block();
         let merge_block = self.create_block();
 
-        self.push_branch_inst(condition_value, if_block, else_block);
+        self.push_branch_inst(All, condition_value, if_block, else_block);
 
         self.push_block(if_block);
         self.set_current_block(if_block);
@@ -295,25 +295,79 @@ impl<'input> IrBuilder<'input> {
         self.decrement_count();
     }
 
+
+
     fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
         let header_block = self.create_block();
-        let loop_block = self.create_block();
-        let after_block = self.create_block();
+
+        self.increment_count();
 
         self.push_jump_inst(header_block);
 
         self.push_block(header_block);
         self.set_current_block(header_block);
-        let value = self.generate_expr(stmt.expr());
-        self.push_branch_inst(value, loop_block, after_block);
+        let condition_value = self.generate_expr(stmt.expr());
+
+        let qualifier = self.func
+            .value(condition_value)
+            .type_()
+            .unwrap()
+            .qualifier();
+        let while_stmt = stmt.stmt();
+
+        match qualifier {
+            Uniform => self.generate_uniform_while_statement(condition_value, while_stmt),
+            Varying => self.generate_varying_while_statement(condition_value, while_stmt),
+        }
+
+        self.decrement_count();
+    }
+
+    fn generate_uniform_while_statement(
+        &mut self,
+        condition_value: Value,
+        while_stmt: &ast::Stmt<'input>,
+    ) {
+        let header_block = self.current_block();
+
+        let loop_block = self.create_block();
+        let after_block = self.create_block();
+
+        self.push_branch_inst(All, condition_value, loop_block, after_block);
 
         self.push_block(loop_block);
         self.set_current_block(loop_block);
-        self.generate_stmt(stmt.stmt());
+        self.generate_stmt(while_stmt);
         self.push_jump_inst(header_block);
 
         self.push_block(after_block);
         self.set_current_block(after_block);
+    }
+
+    fn generate_varying_while_statement(
+        &mut self,
+        condition_value: Value,
+        while_stmt: &ast::Stmt<'input>,
+    ) {
+        let header_block = self.current_block();
+
+        let loop_block = self.create_block();
+        let after_block = self.create_block();
+
+        self.set_predicate(condition_value);
+
+        let predicate_value = self.get_value(Variable::Predicate);
+        self.push_branch_inst(Any, predicate_value, loop_block, after_block);
+
+        self.push_block(loop_block);
+        self.set_current_block(loop_block);
+        self.generate_stmt(while_stmt);
+        self.push_jump_inst(header_block);
+
+        self.push_block(after_block);
+        self.set_current_block(after_block);
+
+        self.unset_predicate();
     }
 
     fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
@@ -707,10 +761,16 @@ impl<'input> IrBuilder<'input> {
         self.insert_predecessor(block, current_block);
     }
 
-    fn push_branch_inst(&mut self, cond: Value, true_block: Block, false_block: Block) {
+    fn push_branch_inst(
+        &mut self,
+        op: BranchOp,
+        cond: Value,
+        true_block: Block,
+        false_block: Block,
+    ) {
         let true_target = self.create_target(true_block);
         let false_target = self.create_target(false_block);
-        let inst = InstData::BranchInst(BranchInst::new(cond, true_target, false_target));
+        let inst = InstData::BranchInst(BranchInst::new(op, cond, true_target, false_target));
         self.push_inst(inst);
 
         let current_block = self.current_block();

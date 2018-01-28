@@ -1,12 +1,10 @@
-fn while_test() {
+fn while_uniform() {
     int foo = 0;
 
     int bar = 0;
-    while (bar < 10) {
+    while (bar < 42) {
         bar = bar + 1;
     }
 
-    foo = 1;
-
-    return;
+    foo = foo + 1;
 }

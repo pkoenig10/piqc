@@ -1,0 +1,11 @@
+fn if_else_uniform(bool bar) {
+    int foo = 0;
+
+    if (bar) {
+        foo = 1;
+    } else {
+        foo = 2;
+    }
+
+    foo = foo + 1;
+}

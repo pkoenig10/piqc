@@ -21,6 +21,7 @@ pub use self::type_::*;
 pub use self::UnaryOp::*;
 pub use self::BinaryOp::*;
 pub use self::CompOp::*;
+pub use self::BranchOp::*;
 pub use self::TypeQualifier::*;
 pub use self::BaseType::*;
 
