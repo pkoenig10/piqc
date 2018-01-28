@@ -1,8 +1,12 @@
 fn while_test() {
-    foo = 0;
-    while (foo < 10) {
-        foo = foo + 1;
+    int foo = 0;
+
+    int bar = 0;
+    while (bar < 10) {
+        bar = bar + 1;
     }
+
+    foo = 1;
 
     return;
 }

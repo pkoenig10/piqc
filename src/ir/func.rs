@@ -143,7 +143,7 @@ impl Func {
         self.insts.create(InstNode::new(data))
     }
 
-    pub fn create_value(&mut self, type_: Type) -> Value {
+    pub fn create_value(&mut self, type_: Option<Type>) -> Value {
         self.values.create(ValueData::new(type_))
     }
 
@@ -173,6 +173,10 @@ impl Func {
 
     pub fn value(&self, value: Value) -> &ValueData {
         self.values.get(value)
+    }
+
+    pub fn value_mut(&mut self, value: Value) -> &mut ValueData {
+        self.values.get_mut(value)
     }
 
     pub fn push_block(&mut self, block: Block) {

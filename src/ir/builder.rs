@@ -119,7 +119,7 @@ impl<'input> IrBuilder<'input> {
                 ast::Bool => Type::new(Uniform, Bool),
             };
             self.create_func_param(type_);
-            self.create_block_param(variable, entry_block, type_);
+            self.create_block_param(variable, entry_block, Some(type_));
         }
 
         let predicate_value = self.push_bool_const_inst(BoolImmediate::new(true));
@@ -193,8 +193,11 @@ impl<'input> IrBuilder<'input> {
     fn generate_if_stmt(&mut self, stmt: &ast::IfStmt<'input>) {
         let condition_value = self.generate_expr(stmt.expr());
 
-        let qualifier = self.func.value(condition_value).type_().qualifier();
-
+        let qualifier = self.func
+            .value(condition_value)
+            .type_()
+            .unwrap()
+            .qualifier();
         let if_stmt = stmt.if_stmt();
         let else_stmt = stmt.else_stmt();
 
@@ -264,56 +267,13 @@ impl<'input> IrBuilder<'input> {
         condition_value: Value,
         if_stmt: &ast::Stmt<'input>,
     ) {
-        let current_block = self.current_block();
-        let predicate_value = self.get_value(Variable::Predicate);
-        let count_value = self.get_value(Variable::Count);
-
-        let count = Operand::Value(count_value);
-        let one = Operand::IntImmediate(IntImmediate::new(1));
-        let inc_count_value = self.push_binary_inst(Add, count, one);
-
-        let inc_count = Operand::Value(inc_count_value);
-        let count_value = self.push_select_inst(predicate_value, count, inc_count);
-        self.values.insert_value(
-            current_block,
-            Variable::Count,
-            count_value,
-        );
-
-        let predicate = Operand::Value(predicate_value);
-        let condition = Operand::Value(condition_value);
-        let predicate_value = self.push_select_inst(predicate_value, condition, predicate);
-        self.values.insert_value(
-            current_block,
-            Variable::Predicate,
-            predicate_value,
-        );
+        self.increment_count();
+        self.set_predicate(condition_value);
 
         self.generate_stmt(if_stmt);
 
-        let current_block = self.current_block();
-        let count_value = self.get_value(Variable::Count);
-
-        let count = Operand::Value(count_value);
-        let zero = Operand::IntImmediate(IntImmediate::new(0));
-        let predicate_value = self.push_int_comp_inst(Eq, count, zero);
-        self.values.insert_value(
-            current_block,
-            Variable::Predicate,
-            predicate_value,
-        );
-
-        let count = Operand::Value(count_value);
-        let one = Operand::IntImmediate(IntImmediate::new(1));
-        let dec_count_value = self.push_binary_inst(Sub, count, one);
-
-        let dec_count = Operand::Value(dec_count_value);
-        let count_value = self.push_select_inst(predicate_value, count, dec_count);
-        self.values.insert_value(
-            current_block,
-            Variable::Count,
-            count_value,
-        );
+        self.unset_predicate();
+        self.decrement_count();
     }
 
     fn generate_varying_if_else_statement(
@@ -322,78 +282,17 @@ impl<'input> IrBuilder<'input> {
         if_stmt: &ast::Stmt<'input>,
         else_stmt: &ast::Stmt<'input>,
     ) {
-        let current_block = self.current_block();
-        let predicate_value = self.get_value(Variable::Predicate);
-        let count_value = self.get_value(Variable::Count);
-
-        let count = Operand::Value(count_value);
-        let one = Operand::IntImmediate(IntImmediate::new(1));
-        let inc_count_value = self.push_binary_inst(Add, count, one);
-
-        let inc_count = Operand::Value(inc_count_value);
-        let count_value = self.push_select_inst(predicate_value, count, inc_count);
-        self.values.insert_value(
-            current_block,
-            Variable::Count,
-            count_value,
-        );
-
-        let predicate = Operand::Value(predicate_value);
-        let condition = Operand::Value(condition_value);
-        let predicate_value = self.push_select_inst(predicate_value, condition, predicate);
-        self.values.insert_value(
-            current_block,
-            Variable::Predicate,
-            predicate_value,
-        );
+        self.increment_count();
+        self.set_predicate(condition_value);
 
         self.generate_stmt(if_stmt);
 
-        let current_block = self.current_block();
-        let count_value = self.get_value(Variable::Count);
-        let predicate_value = self.get_value(Variable::Predicate);
-
-        let predicate = Operand::Value(predicate_value);
-        let not_predciate_value = self.push_unary_inst(Not, predicate);
-
-        let count = Operand::Value(count_value);
-        let zero = Operand::IntImmediate(IntImmediate::new(0));
-        let count_zero_value = self.push_int_comp_inst(Eq, count, zero);
-
-        let not_predicate = Operand::Value(not_predciate_value);
-        let count_zero = Operand::Value(count_zero_value);
-        let predicate_value = self.push_binary_inst(And, not_predicate, count_zero);
-        self.values.insert_value(
-            current_block,
-            Variable::Predicate,
-            predicate_value,
-        );
+        self.invert_predicate();
 
         self.generate_stmt(else_stmt);
 
-        let current_block = self.current_block();
-        let count_value = self.get_value(Variable::Count);
-
-        let count = Operand::Value(count_value);
-        let zero = Operand::IntImmediate(IntImmediate::new(0));
-        let predicate_value = self.push_int_comp_inst(Eq, count, zero);
-        self.values.insert_value(
-            current_block,
-            Variable::Predicate,
-            predicate_value,
-        );
-
-        let count = Operand::Value(count_value);
-        let one = Operand::IntImmediate(IntImmediate::new(1));
-        let dec_count_value = self.push_binary_inst(Sub, count, one);
-
-        let dec_count = Operand::Value(dec_count_value);
-        let count_value = self.push_select_inst(predicate_value, count, dec_count);
-        self.values.insert_value(
-            current_block,
-            Variable::Count,
-            count_value,
-        );
+        self.unset_predicate();
+        self.decrement_count();
     }
 
     fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
@@ -469,7 +368,7 @@ impl<'input> IrBuilder<'input> {
         let src_value = self.generate_expr(expr.expr());
 
         let op = expr.op();
-        let src_type = self.func.value(src_value).type_();
+        let src_type = self.func.value(src_value).type_().unwrap();
 
         let src = Operand::Value(src_value);
 
@@ -499,8 +398,8 @@ impl<'input> IrBuilder<'input> {
         let right_value = self.generate_expr(expr.right());
 
         let op = expr.op();
-        let left_type = self.func.value(left_value).type_();
-        let right_type = self.func.value(right_value).type_();
+        let left_type = self.func.value(left_value).type_().unwrap();
+        let right_type = self.func.value(right_value).type_().unwrap();
 
         let left = Operand::Value(left_value);
         let right = Operand::Value(right_value);
@@ -534,59 +433,63 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn get_value(&mut self, variable: Variable<'input>) -> Value {
-        enum Call {
-            Visit(Block),
-            Finish(Block),
-        }
-
         let block = self.current_block();
         if let Some(value) = self.values.get_value(block, variable) {
             return value;
         }
 
-        let mut visited = HashSet::new();
-        let mut calls = Vec::new();
+        let mut blocks = Vec::new();
+        blocks.push((block, None));
 
-        calls.push(Call::Visit(block));
+        let mut values = HashSet::new();
+        let mut type_ = None;
 
-        while let Some(call) = calls.pop() {
-            match call {
-                Call::Visit(block) => {
-                    if self.values.get_value(block, variable).is_none() {
-                        assert!(visited.insert(block), "Variable not defined");
-
-                        calls.push(Call::Finish(block));
-                        for predecessor in &self.predecessors[&block] {
-                            calls.push(Call::Visit(*predecessor));
+        while let Some((block, successor)) = blocks.pop() {
+            let value = match self.values.get_value(block, variable) {
+                Some(value) => {
+                    let value_type = self.func.value(value).type_();
+                    match (value_type, type_) {
+                        (None, _) => {
+                            assert!(values.contains(&value), "Variable defined without type")
                         }
-                    }
-                }
-                Call::Finish(block) => {
-                    let mut type_ = None;
-                    for predecessor in self.predecessors[&block].clone() {
-                        let value = self.values.get_value(predecessor, variable).unwrap();
-                        let value_type = self.func.value(value).type_();
-                        match type_ {
-                            None => {
-                                type_ = Some(value_type);
-                            }
-                            Some(type_) => {
-                                assert!(
-                                    value_type == type_,
-                                    "Variable defined with multiple types '{}' and '{}'",
-                                    type_,
-                                    value_type
-                                )
-                            }
-                        };
+                        (Some(value_type), None) => {
+                            type_ = Some(value_type);
+                        }
+                        (Some(value_type), Some(type_)) => {
+                            assert!(
+                                value_type == type_,
+                                "Variable defined with multiple types '{}' and '{}'",
+                                type_,
+                                value_type
+                            )
+                        }
+                    };
 
-                        let inst = self.func.last_inst(predecessor);
-                        self.push_target_arg(inst, block, value);
+                    value
+                }
+                None => {
+                    let value = self.create_block_param(variable, block, None);
+                    values.insert(value);
+
+                    let predecessors = &self.predecessors[&block];
+                    assert!(!predecessors.is_empty(), "Variable not defined");
+                    for predecessor in predecessors {
+                        blocks.push((*predecessor, Some(block)));
                     }
 
-                    self.create_block_param(variable, block, type_.unwrap());
+                    value
                 }
+            };
+
+            if let Some(successor) = successor {
+                let inst = self.func.last_inst(block);
+                self.push_target_arg(inst, successor, value);
             }
+        }
+
+        let type_ = type_.unwrap();
+        for value in values {
+            self.func.value_mut(value).set_type(type_);
         }
 
         self.values.get_value(block, variable).unwrap()
@@ -611,7 +514,7 @@ impl<'input> IrBuilder<'input> {
         &mut self,
         variable: Variable<'input>,
         block: Block,
-        type_: Type,
+        type_: Option<Type>,
     ) -> Value {
         let value = self.func.create_value(type_);
         self.func.push_block_param(block, value);
@@ -639,9 +542,85 @@ impl<'input> IrBuilder<'input> {
         target.push_arg(value);
     }
 
+    fn set_predicate(&mut self, condition_value: Value) {
+        let current_block = self.current_block();
+        let predicate_value = self.get_value(Variable::Predicate);
+
+        let predicate = Operand::Value(predicate_value);
+        let condition = Operand::Value(condition_value);
+        let predicate_value = self.push_select_inst(predicate_value, condition, predicate);
+        self.values.insert_value(
+            current_block,
+            Variable::Predicate,
+            predicate_value,
+        );
+    }
+
+    fn unset_predicate(&mut self) {
+        let current_block = self.current_block();
+        let count_value = self.get_value(Variable::Count);
+
+        let count = Operand::Value(count_value);
+        let zero = Operand::IntImmediate(IntImmediate::new(0));
+        let predicate_value = self.push_int_comp_inst(Eq, count, zero);
+        self.values.insert_value(
+            current_block,
+            Variable::Predicate,
+            predicate_value,
+        );
+    }
+
+    fn invert_predicate(&mut self) {
+        let current_block = self.current_block();
+        let count_value = self.get_value(Variable::Count);
+        let predicate_value = self.get_value(Variable::Predicate);
+
+        let predicate = Operand::Value(predicate_value);
+        let not_predciate_value = self.push_unary_inst(Not, predicate);
+
+        let count = Operand::Value(count_value);
+        let zero = Operand::IntImmediate(IntImmediate::new(0));
+        let count_zero_value = self.push_int_comp_inst(Eq, count, zero);
+
+        let not_predicate = Operand::Value(not_predciate_value);
+        let count_zero = Operand::Value(count_zero_value);
+        let predicate_value = self.push_binary_inst(And, not_predicate, count_zero);
+        self.values.insert_value(
+            current_block,
+            Variable::Predicate,
+            predicate_value,
+        );
+    }
+
+    fn increment_count(&mut self) {
+        self.update_count(Add);
+    }
+
+    fn decrement_count(&mut self) {
+        self.update_count(Sub);
+    }
+
+    fn update_count(&mut self, op: BinaryOp) {
+        let current_block = self.current_block();
+        let predicate_value = self.get_value(Variable::Predicate);
+        let count_value = self.get_value(Variable::Count);
+
+        let count = Operand::Value(count_value);
+        let one = Operand::IntImmediate(IntImmediate::new(1));
+        let inc_count_value = self.push_binary_inst(op, count, one);
+
+        let inc_count = Operand::Value(inc_count_value);
+        let count_value = self.push_select_inst(predicate_value, count, inc_count);
+        self.values.insert_value(
+            current_block,
+            Variable::Count,
+            count_value,
+        );
+    }
+
     fn push_int_const_inst(&mut self, immediate: IntImmediate) -> Value {
         let type_ = Type::new(Uniform, Int);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::IntConstInst(IntConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
@@ -649,7 +628,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_float_const_inst(&mut self, immediate: FloatImmediate) -> Value {
         let type_ = Type::new(Uniform, Float);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::FloatConstInst(FloatConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
@@ -657,7 +636,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_bool_const_inst(&mut self, immediate: BoolImmediate) -> Value {
         let type_ = Type::new(Uniform, Bool);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::BoolConstInst(BoolConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
@@ -665,7 +644,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_index_inst(&mut self) -> Value {
         let type_ = Type::new(Varying, Int);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::IndexInst(IndexInst::new(dest));
         self.push_inst(inst);
         dest
@@ -673,7 +652,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_count_inst(&mut self) -> Value {
         let type_ = Type::new(Uniform, Int);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::CountInst(CountInst::new(dest));
         self.push_inst(inst);
         dest
@@ -681,7 +660,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_unary_inst(&mut self, op: UnaryOp, src: Operand) -> Value {
         let type_ = self.get_unary_inst_type(src);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::UnaryInst(UnaryInst::new(op, dest, src));
         self.push_inst(inst);
         dest
@@ -689,7 +668,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_binary_inst(&mut self, op: BinaryOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_binary_inst_type(op, left, right);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::BinaryInst(BinaryInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -697,7 +676,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_int_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::IntCompInst(IntCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -705,7 +684,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_float_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::FloatCompInst(FloatCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -713,7 +692,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_select_inst(&mut self, cond: Value, left: Operand, right: Operand) -> Value {
         let type_ = self.get_select_inst_type(left, right);
-        let dest = self.func.create_value(type_);
+        let dest = self.func.create_value(Some(type_));
         let inst = InstData::SelectInst(SelectInst::new(dest, cond, left, right));
         self.push_inst(inst);
         dest
@@ -808,7 +787,7 @@ impl<'input> IrBuilder<'input> {
             Operand::IntImmediate(_) => Type::new(Uniform, Int),
             Operand::FloatImmediate(_) => Type::new(Uniform, Float),
             Operand::BoolImmediate(_) => Type::new(Uniform, Bool),
-            Operand::Value(value) => self.func.value(value).type_(),
+            Operand::Value(value) => self.func.value(value).type_().unwrap(),
         }
     }
 }

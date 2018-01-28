@@ -78,16 +78,20 @@ impl fmt::Display for Value {
 
 #[derive(Debug)]
 pub struct ValueData {
-    type_: Type,
+    type_: Option<Type>,
 }
 
 impl ValueData {
-    pub fn new(type_: Type) -> ValueData {
+    pub fn new(type_: Option<Type>) -> ValueData {
         ValueData { type_ }
     }
 
-    pub fn type_(&self) -> Type {
+    pub fn type_(&self) -> Option<Type> {
         self.type_
+    }
+
+    pub fn set_type(&mut self, type_: Type) {
+        self.type_ = Some(type_);
     }
 }
 
