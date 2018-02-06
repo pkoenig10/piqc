@@ -581,13 +581,15 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn create_target(&mut self, block: Block) -> Target {
-        let mut args = Params::new();
+        let mut args = Args::new();
 
-        for param in &(*self.func.block(block).params()).clone() {
-            let variable = self.values.get_param(block, *param).unwrap();
+        for i in 0..self.func.block(block).params().len() {
+            let param = self.func.block(block).params()[i];
+            let variable = self.values.get_param(block, param).unwrap();
             let value = self.get_value(variable);
             args.push(value);
         }
+
         Target::new(block, args)
     }
 

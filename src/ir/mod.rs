@@ -1,3 +1,4 @@
+mod args;
 mod block;
 mod builder;
 mod func;
@@ -9,6 +10,7 @@ mod target;
 mod type_;
 mod verifier;
 
+pub use self::args::*;
 pub use self::block::*;
 pub use self::func::*;
 pub use self::inst::*;

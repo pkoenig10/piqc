@@ -5,11 +5,11 @@ use ir::*;
 #[derive(Debug)]
 pub struct Target {
     block: Block,
-    args: Params<Value>,
+    args: Args<Value>,
 }
 
 impl Target {
-    pub fn new(block: Block, args: Params<Value>) -> Target {
+    pub fn new(block: Block, args: Args<Value>) -> Target {
         Target { block, args: args }
     }
 
