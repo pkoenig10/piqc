@@ -17,6 +17,10 @@ impl Target {
         self.block
     }
 
+    pub fn args(&self) -> &Args<Value> {
+        &self.args
+    }
+
     pub fn push_arg(&mut self, value: Value) {
         self.args.push(value);
     }

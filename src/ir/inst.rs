@@ -13,6 +13,10 @@ impl IntConstInst {
     pub fn new(dest: Value, immediate: IntImmediate) -> IntConstInst {
         IntConstInst { dest, immediate }
     }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
 }
 
 impl fmt::Display for IntConstInst {
@@ -30,6 +34,10 @@ pub struct FloatConstInst {
 impl FloatConstInst {
     pub fn new(dest: Value, immediate: FloatImmediate) -> FloatConstInst {
         FloatConstInst { dest, immediate }
+    }
+
+    pub fn dest(&self) -> Value {
+        self.dest
     }
 }
 
@@ -49,6 +57,10 @@ impl BoolConstInst {
     pub fn new(dest: Value, immediate: BoolImmediate) -> BoolConstInst {
         BoolConstInst { dest, immediate }
     }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
 }
 
 impl fmt::Display for BoolConstInst {
@@ -66,6 +78,10 @@ impl IndexInst {
     pub fn new(dest: Value) -> IndexInst {
         IndexInst { dest }
     }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
 }
 
 impl fmt::Display for IndexInst {
@@ -82,6 +98,10 @@ pub struct CountInst {
 impl CountInst {
     pub fn new(dest: Value) -> CountInst {
         CountInst { dest }
+    }
+
+    pub fn dest(&self) -> Value {
+        self.dest
     }
 }
 
@@ -115,6 +135,14 @@ pub struct UnaryInst {
 impl UnaryInst {
     pub fn new(op: UnaryOp, dest: Value, src: Operand) -> UnaryInst {
         UnaryInst { op, dest, src }
+    }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
+
+    pub fn src(&self) -> Operand {
+        self.src
     }
 }
 
@@ -181,6 +209,18 @@ impl BinaryInst {
             right,
         }
     }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
+
+    pub fn left(&self) -> Operand {
+        self.left
+    }
+
+    pub fn right(&self) -> Operand {
+        self.right
+    }
 }
 
 impl fmt::Display for BinaryInst {
@@ -237,6 +277,18 @@ impl IntCompInst {
             right,
         }
     }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
+
+    pub fn left(&self) -> Operand {
+        self.left
+    }
+
+    pub fn right(&self) -> Operand {
+        self.right
+    }
 }
 
 impl fmt::Display for IntCompInst {
@@ -269,6 +321,18 @@ impl FloatCompInst {
             right,
         }
     }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
+
+    pub fn left(&self) -> Operand {
+        self.left
+    }
+
+    pub fn right(&self) -> Operand {
+        self.right
+    }
 }
 
 impl fmt::Display for FloatCompInst {
@@ -300,6 +364,22 @@ impl SelectInst {
             left,
             right,
         }
+    }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
+
+    pub fn cond(&self) -> Value {
+        self.cond
+    }
+
+    pub fn left(&self) -> Operand {
+        self.left
+    }
+
+    pub fn right(&self) -> Operand {
+        self.right
     }
 }
 

@@ -15,6 +15,10 @@ impl Prog {
     pub fn func(&self) -> &Func {
         &self.func
     }
+
+    pub fn func_mut(&mut self) -> &mut Func {
+        &mut self.func
+    }
 }
 
 impl fmt::Display for Prog {

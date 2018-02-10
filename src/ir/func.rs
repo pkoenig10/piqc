@@ -51,22 +51,23 @@ impl BlockNode {
         self.first_inst
     }
 
-    pub fn set_first_inst(&mut self, first_inst: Inst) {
-        self.first_inst = Some(first_inst);
+    pub fn set_first_inst(&mut self, first_inst: Option<Inst>) {
+        self.first_inst = first_inst;
     }
 
     pub fn last_inst(&self) -> Option<Inst> {
         self.last_inst
     }
 
-    pub fn set_last_inst(&mut self, last_inst: Inst) {
-        self.last_inst = Some(last_inst);
+    pub fn set_last_inst(&mut self, last_inst: Option<Inst>) {
+        self.last_inst = last_inst;
     }
 }
 
 #[derive(Debug)]
 struct InstNode {
     data: InstData,
+    block: Option<Block>,
     prev_inst: Option<Inst>,
     next_inst: Option<Inst>,
 }
@@ -75,6 +76,7 @@ impl InstNode {
     pub fn new(data: InstData) -> InstNode {
         InstNode {
             data,
+            block: None,
             prev_inst: None,
             next_inst: None,
         }
@@ -88,20 +90,28 @@ impl InstNode {
         &mut self.data
     }
 
+    pub fn block(&self) -> Block {
+        self.block.unwrap()
+    }
+
+    pub fn set_block(&mut self, block: Block) {
+        self.block = Some(block)
+    }
+
     pub fn prev_inst(&self) -> Option<Inst> {
         self.prev_inst
     }
 
-    pub fn set_prev_inst(&mut self, prev_inst: Inst) {
-        self.prev_inst = Some(prev_inst);
+    pub fn set_prev_inst(&mut self, prev_inst: Option<Inst>) {
+        self.prev_inst = prev_inst;
     }
 
     pub fn next_inst(&self) -> Option<Inst> {
         self.next_inst
     }
 
-    pub fn set_next_inst(&mut self, next_inst: Inst) {
-        self.next_inst = Some(next_inst);
+    pub fn set_next_inst(&mut self, next_inst: Option<Inst>) {
+        self.next_inst = next_inst;
     }
 }
 
@@ -193,17 +203,53 @@ impl Func {
     }
 
     pub fn push_inst(&mut self, block: Block, inst: Inst) {
-        let block_data = self.blocks.get_mut(block);
-        match block_data.last_inst() {
+        self.insts.get_mut(inst).set_block(block);
+
+        let block_node = self.blocks.get_mut(block);
+        match block_node.last_inst() {
             Some(last_inst) => {
-                self.insts.get_mut(last_inst).set_next_inst(inst);
-                self.insts.get_mut(inst).set_prev_inst(last_inst);
+                self.insts.get_mut(last_inst).set_next_inst(Some(inst));
+                self.insts.get_mut(inst).set_prev_inst(Some(last_inst));
             }
             None => {
-                block_data.set_first_inst(inst);
+                block_node.set_first_inst(Some(inst));
             }
         }
-        block_data.set_last_inst(inst);
+        block_node.set_last_inst(Some(inst));
+    }
+
+    pub fn remove_inst(&mut self, inst: Inst) {
+        let (block, prev_inst, next_inst) = {
+            let inst_node = self.insts.get(inst);
+            (
+                inst_node.block(),
+                inst_node.prev_inst(),
+                inst_node.next_inst(),
+            )
+        };
+
+        let (first_inst, last_inst) = {
+            let block_node = self.blocks.get(block);
+            (block_node.first_inst(), block_node.last_inst())
+        };
+
+        match prev_inst {
+            Some(prev_inst) => {
+                self.insts.get_mut(prev_inst).set_next_inst(next_inst);
+            }
+            None => {
+                self.blocks.get_mut(block).set_first_inst(next_inst);
+            }
+        }
+
+        match next_inst {
+            Some(next_inst) => {
+                self.insts.get_mut(next_inst).set_prev_inst(prev_inst);
+            }
+            None => {
+                self.blocks.get_mut(block).set_last_inst(prev_inst);
+            }
+        }
     }
 }
 
@@ -211,12 +257,12 @@ impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "func({}):", self.params)?;
         for block in self.blocks() {
-            let block_data = self.block(block);
+            let block_node = self.block(block);
             writeln!(f, "")?;
-            writeln!(f, "{}({}):", block, block_data.params())?;
+            writeln!(f, "{}({}):", block, block_node.params())?;
             for inst in self.insts(block) {
-                let inst_data = self.inst(inst);
-                writeln!(f, "    {}", inst_data)?;
+                let inst_node = self.inst(inst);
+                writeln!(f, "    {}", inst_node)?;
             }
         }
         Ok(())
