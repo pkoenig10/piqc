@@ -15,26 +15,26 @@ impl<'a> Verifier<'a> {
     }
 
     pub fn verify_func(self) {
-        for block in self.func.blocks() {
-            for inst in self.func.insts(block) {
-                self.verify_inst(block, inst);
+        for ebb in self.func.ebbs() {
+            for inst in self.func.insts(ebb) {
+                self.verify_inst(ebb, inst);
             }
         }
     }
 
-    pub fn verify_inst(&self, block: Block, inst: Inst) {
-        let is_last_inst = self.func.last_inst(block) == inst;
+    pub fn verify_inst(&self, ebb: Ebb, inst: Inst) {
+        let is_last_inst = self.func.last_inst(ebb) == inst;
         let is_terminator = self.func.inst(inst).is_terminator();
 
         if !is_last_inst && is_terminator {
             panic!(
-                "Instruction is not the last instruction in block but is a terminator instruction"
+                "Instruction is not the last instruction in ebb but is a terminator instruction"
             );
         }
 
         if is_last_inst && !is_terminator {
             panic!(
-                "Instruction is the last instruction in block but is not a terminator instruction"
+                "Instruction is the last instruction in ebb but is not a terminator instruction"
             );
         }
     }

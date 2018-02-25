@@ -2,19 +2,19 @@ use std::fmt;
 
 use ir::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Target {
-    block: Block,
+    ebb: Ebb,
     args: Args<Value>,
 }
 
 impl Target {
-    pub fn new(block: Block, args: Args<Value>) -> Target {
-        Target { block, args: args }
+    pub fn new(ebb: Ebb, args: Args<Value>) -> Target {
+        Target { ebb, args: args }
     }
 
-    pub fn block(&self) -> Block {
-        self.block
+    pub fn ebb(&self) -> Ebb {
+        self.ebb
     }
 
     pub fn args(&self) -> &Args<Value> {
@@ -31,7 +31,7 @@ impl fmt::Display for Target {
         write!(
             f,
             "{}({})",
-            self.block,
+            self.ebb,
             self.args,
         )
     }

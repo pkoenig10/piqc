@@ -50,13 +50,13 @@ impl DeadCodePass {
     }
 
     fn analyze_func(&mut self, func: &Func) {
-        for block in func.blocks() {
-            self.analyze_block(func, block);
+        for ebb in func.ebbs() {
+            self.analyze_block(func, ebb);
         }
     }
 
-    fn analyze_block(&mut self, func: &Func, block: Block) {
-        for inst in func.insts(block) {
+    fn analyze_block(&mut self, func: &Func, ebb: Ebb) {
+        for inst in func.insts(ebb) {
             self.analyze_inst(func, inst);
         }
     }
@@ -109,10 +109,7 @@ impl DeadCodePass {
                 }
             }
             InstData::BranchInst(ref data) => {
-                for arg in data.true_target().args() {
-                    self.insert_use(inst, *arg)
-                }
-                for arg in data.false_target().args() {
+                for arg in data.target().args() {
                     self.insert_use(inst, *arg)
                 }
             }

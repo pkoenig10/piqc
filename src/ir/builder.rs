@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use ast;
+use collections::*;
 use ir::*;
 
 pub fn generate_ir(prog: &ast::Prog) -> Prog {
@@ -88,11 +88,31 @@ impl<'a> ValueTable<'a> {
     }
 }
 
+struct Position {
+    ebb: Ebb,
+    block: Block,
+}
+
+impl Position {
+    fn new(ebb: Ebb, block: Block) -> Position {
+        Position { ebb, block }
+    }
+
+    fn ebb(&self) -> Ebb {
+        self.ebb
+    }
+
+    fn block(&self) -> Block {
+        self.block
+    }
+}
+
 struct IrBuilder<'input> {
     func: Func,
     values: ValueTable<'input>,
-    predecessors: HashMap<Block, Vec<Block>>,
-    current_block: Option<Block>,
+    blocks: Map<Block, BlockData>,
+    header_blocks: HashMap<Ebb, Block>,
+    position: Option<Position>,
 }
 
 impl<'input> IrBuilder<'input> {
@@ -100,15 +120,15 @@ impl<'input> IrBuilder<'input> {
         IrBuilder {
             func: Func::new(),
             values: ValueTable::new(),
-            predecessors: HashMap::new(),
-            current_block: None,
+            blocks: Map::new(),
+            header_blocks: HashMap::new(),
+            position: None,
         }
     }
 
     fn generate_func(mut self, func: &ast::Func<'input>) -> Func {
-        let entry_block = self.create_block();
-        self.push_block(entry_block);
-        self.set_current_block(entry_block);
+        let entry_ebb = self.create_ebb();
+        self.set_position_ebb(entry_ebb);
 
         for param in func.params() {
             let name = param.identifier().name();
@@ -119,27 +139,19 @@ impl<'input> IrBuilder<'input> {
                 ast::Bool => Type::new(Uniform, Bool),
             };
             self.create_func_param(type_);
-            self.create_block_param(variable, entry_block, Some(type_));
+            self.create_block_param(variable, entry_ebb, Some(type_));
         }
 
         let predicate_value = self.push_bool_const_inst(BoolImmediate::new(true));
-        self.values.insert_value(
-            entry_block,
-            Variable::Predicate,
-            predicate_value,
-        );
+        self.insert_value(Variable::Predicate, predicate_value);
 
         let count_value = self.push_int_const_inst(IntImmediate::new(0));
-        self.values.insert_value(
-            entry_block,
-            Variable::Count,
-            count_value,
-        );
+        self.insert_value(Variable::Count, count_value);
 
         self.generate_stmt(func.stmt());
 
-        let block = self.current_block();
-        let inst = self.func.last_inst(block);
+        let ebb = self.position().ebb();
+        let inst = self.func.last_inst(ebb);
         if !self.func.inst(inst).is_terminator() {
             self.push_return_inst();
         }
@@ -167,17 +179,15 @@ impl<'input> IrBuilder<'input> {
     fn generate_decl_stmt(&mut self, stmt: &ast::DeclStmt<'input>) {
         let expr_value = self.generate_expr(stmt.expr());
 
-        let block = self.current_block();
         let name = stmt.identifier().name();
         let variable = Variable::Variable(name);
 
-        self.values.insert_value(block, variable, expr_value);
+        self.insert_value(variable, expr_value);
     }
 
     fn generate_assign_stmt(&mut self, stmt: &ast::AssignStmt<'input>) {
         let expr_value = self.generate_expr(stmt.expr());
 
-        let block = self.current_block();
         let name = stmt.identifier().name();
         let variable = Variable::Variable(name);
 
@@ -187,7 +197,7 @@ impl<'input> IrBuilder<'input> {
         let prev = Operand::Value(prev_value);
         let value = self.push_select_inst(predicate_value, expr, prev);
 
-        self.values.insert_value(block, variable, value);
+        self.insert_value(variable, value);
     }
 
     fn generate_if_stmt(&mut self, stmt: &ast::IfStmt<'input>) {
@@ -222,18 +232,13 @@ impl<'input> IrBuilder<'input> {
         condition_value: Value,
         if_stmt: &ast::Stmt<'input>,
     ) {
-        let if_block = self.create_block();
-        let merge_block = self.create_block();
+        let merge_ebb = self.create_ebb();
 
-        self.push_branch_inst(All, condition_value, if_block, merge_block);
+        self.push_branch_inst(AllFalse, condition_value, merge_ebb);
 
-        self.push_block(if_block);
-        self.set_current_block(if_block);
         self.generate_stmt(if_stmt);
-        self.push_jump_inst(merge_block);
-
-        self.push_block(merge_block);
-        self.set_current_block(merge_block);
+        self.push_jump_inst(merge_ebb);
+        self.set_position_ebb(merge_ebb);
     }
 
     fn generate_uniform_if_else_statement(
@@ -242,24 +247,18 @@ impl<'input> IrBuilder<'input> {
         if_stmt: &ast::Stmt<'input>,
         else_stmt: &ast::Stmt<'input>,
     ) {
-        let if_block = self.create_block();
-        let else_block = self.create_block();
-        let merge_block = self.create_block();
+        let else_ebb = self.create_ebb();
+        let merge_ebb = self.create_ebb();
 
-        self.push_branch_inst(All, condition_value, if_block, else_block);
+        self.push_branch_inst(AllFalse, condition_value, else_ebb);
 
-        self.push_block(if_block);
-        self.set_current_block(if_block);
         self.generate_stmt(if_stmt);
-        self.push_jump_inst(merge_block);
+        self.push_jump_inst(merge_ebb);
+        self.set_position_ebb(else_ebb);
 
-        self.push_block(else_block);
-        self.set_current_block(else_block);
         self.generate_stmt(else_stmt);
-        self.push_jump_inst(merge_block);
-
-        self.push_block(merge_block);
-        self.set_current_block(merge_block);
+        self.push_jump_inst(merge_ebb);
+        self.set_position_ebb(merge_ebb);
     }
 
     fn generate_varying_if_statement(
@@ -268,11 +267,11 @@ impl<'input> IrBuilder<'input> {
         if_stmt: &ast::Stmt<'input>,
     ) {
         self.increment_count();
-        self.set_predicate(condition_value);
+        self.push_predicate(condition_value);
 
         self.generate_stmt(if_stmt);
 
-        self.unset_predicate();
+        self.pop_predicate();
         self.decrement_count();
     }
 
@@ -283,7 +282,7 @@ impl<'input> IrBuilder<'input> {
         else_stmt: &ast::Stmt<'input>,
     ) {
         self.increment_count();
-        self.set_predicate(condition_value);
+        self.push_predicate(condition_value);
 
         self.generate_stmt(if_stmt);
 
@@ -291,21 +290,18 @@ impl<'input> IrBuilder<'input> {
 
         self.generate_stmt(else_stmt);
 
-        self.unset_predicate();
+        self.pop_predicate();
         self.decrement_count();
     }
 
-
-
     fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
-        let header_block = self.create_block();
+        let header_ebb = self.create_ebb();
 
         self.increment_count();
 
-        self.push_jump_inst(header_block);
+        self.push_jump_inst(header_ebb);
+        self.set_position_ebb(header_ebb);
 
-        self.push_block(header_block);
-        self.set_current_block(header_block);
         let condition_value = self.generate_expr(stmt.expr());
 
         let qualifier = self.func
@@ -328,20 +324,14 @@ impl<'input> IrBuilder<'input> {
         condition_value: Value,
         while_stmt: &ast::Stmt<'input>,
     ) {
-        let header_block = self.current_block();
+        let header_ebb = self.position().ebb();
+        let after_ebb = self.create_ebb();
 
-        let loop_block = self.create_block();
-        let after_block = self.create_block();
+        self.push_branch_inst(AllFalse, condition_value, after_ebb);
 
-        self.push_branch_inst(All, condition_value, loop_block, after_block);
-
-        self.push_block(loop_block);
-        self.set_current_block(loop_block);
         self.generate_stmt(while_stmt);
-        self.push_jump_inst(header_block);
-
-        self.push_block(after_block);
-        self.set_current_block(after_block);
+        self.push_jump_inst(header_ebb);
+        self.set_position_ebb(after_ebb);
     }
 
     fn generate_varying_while_statement(
@@ -349,25 +339,19 @@ impl<'input> IrBuilder<'input> {
         condition_value: Value,
         while_stmt: &ast::Stmt<'input>,
     ) {
-        let header_block = self.current_block();
+        let header_ebb = self.position().ebb();
+        let after_ebb = self.create_ebb();
 
-        let loop_block = self.create_block();
-        let after_block = self.create_block();
-
-        self.set_predicate(condition_value);
+        self.push_predicate(condition_value);
 
         let predicate_value = self.get_value(Variable::Predicate);
-        self.push_branch_inst(Any, predicate_value, loop_block, after_block);
+        self.push_branch_inst(AnyFalse, predicate_value, after_ebb);
 
-        self.push_block(loop_block);
-        self.set_current_block(loop_block);
         self.generate_stmt(while_stmt);
-        self.push_jump_inst(header_block);
+        self.push_jump_inst(header_ebb);
+        self.set_position_ebb(after_ebb);
 
-        self.push_block(after_block);
-        self.set_current_block(after_block);
-
-        self.unset_predicate();
+        self.pop_predicate();
     }
 
     fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
@@ -478,66 +462,53 @@ impl<'input> IrBuilder<'input> {
         )
     }
 
-    fn current_block(&self) -> Block {
-        self.current_block.unwrap()
-    }
-
-    fn set_current_block(&mut self, block: Block) {
-        self.current_block = Some(block);
-    }
-
     fn get_value(&mut self, variable: Variable<'input>) -> Value {
-        let block = self.current_block();
-        if let Some(value) = self.values.get_value(block, variable) {
+        let block = self.position().block();
+        if let Ok(value) = self.get_value_in_ebb(block, variable) {
             return value;
         }
 
-        let mut blocks = Vec::new();
-        blocks.push((block, None));
+        let mut calls = Vec::new();
+        calls.push((block, None));
 
-        let mut values = HashSet::new();
+        let mut values = Vec::new();
         let mut type_ = None;
 
-        while let Some((block, successor)) = blocks.pop() {
-            let value = match self.values.get_value(block, variable) {
-                Some(value) => {
-                    let value_type = self.func.value(value).type_();
-                    match (value_type, type_) {
-                        (None, _) => {
-                            assert!(values.contains(&value), "Variable defined without type")
+        while let Some((block, inst)) = calls.pop() {
+            let value = match self.get_value_in_ebb(block, variable) {
+                Ok(value) => {
+                    let value_type = self.func.value(value).type_().unwrap();
+                    let type_ = type_.get_or_insert(value_type);
+                    assert_eq!(
+                        *type_,
+                        value_type,
+                        "Variable defined with multiple types '{}' and '{}'",
+                        type_,
+                        value_type
+                    );
+
+                    Some(value)
+                }
+                Err(block) => {
+                    let ebb = match *self.blocks.get(block) {
+                        BlockData::Header(ref data) => {
+                            for &(block, inst) in data.predecessors() {
+                                calls.push((block, Some(inst)));
+                            }
+                            data.ebb()
                         }
-                        (Some(value_type), None) => {
-                            type_ = Some(value_type);
-                        }
-                        (Some(value_type), Some(type_)) => {
-                            assert!(
-                                value_type == type_,
-                                "Variable defined with multiple types '{}' and '{}'",
-                                type_,
-                                value_type
-                            )
-                        }
+                        _ => panic!(),
                     };
 
-                    value
-                }
-                None => {
-                    let value = self.create_block_param(variable, block, None);
-                    values.insert(value);
+                    let value = self.create_block_param(variable, ebb, None);
+                    values.push(value);
 
-                    let predecessors = &self.predecessors[&block];
-                    assert!(!predecessors.is_empty(), "Variable not defined");
-                    for predecessor in predecessors {
-                        blocks.push((*predecessor, Some(block)));
-                    }
-
-                    value
+                    Some(value)
                 }
             };
 
-            if let Some(successor) = successor {
-                let inst = self.func.last_inst(block);
-                self.push_target_arg(inst, successor, value);
+            if let (Some(inst), Some(value)) = (inst, value) {
+                self.push_target_arg(inst, value);
             }
         }
 
@@ -546,88 +517,130 @@ impl<'input> IrBuilder<'input> {
             self.func.value_mut(value).set_type(type_);
         }
 
-        self.values.get_value(block, variable).unwrap()
+        self.get_value_in_ebb(block, variable).unwrap()
     }
 
-    fn insert_predecessor(&mut self, block: Block, predecessor: Block) {
-        self.predecessors
-            .entry(block)
-            .or_insert_with(Vec::new)
-            .push(predecessor);
+    fn get_value_in_ebb(
+        &mut self,
+        block: Block,
+        variable: Variable<'input>,
+    ) -> Result<Value, Block> {
+        let mut block = block;
+        loop {
+            match self.values.get_value(block, variable) {
+                Some(value) => return Ok(value),
+                None => {
+                    match *self.blocks.get(block) {
+                        BlockData::Header(_) => return Err(block),
+                        BlockData::Body(ref data) => block = data.predecessor(),
+                    }
+                }
+            }
+        }
+    }
+
+    fn position(&self) -> &Position {
+        self.position.as_ref().unwrap()
+    }
+
+    fn set_position_ebb(&mut self, ebb: Ebb) {
+        self.func.push_ebb(ebb);
+        let block = self.header_blocks[&ebb];
+        self.position = Some(Position::new(ebb, block));
+    }
+
+    fn set_position_block(&mut self, block: Block) {
+        let ebb = self.position().ebb();
+        self.position = Some(Position::new(ebb, block));
+    }
+
+    fn insert_value(&mut self, variable: Variable<'input>, value: Value) {
+        let block = self.position().block();
+        self.values.insert_value(block, variable, value);
+    }
+
+    fn insert_predecessor(&mut self, ebb: Ebb, predecessor: (Block, Inst)) {
+        let block = self.header_blocks[&ebb];
+        match *self.blocks.get_mut(block) {
+            BlockData::Header(ref mut data) => data.insert_predecessor(predecessor),
+            BlockData::Body(_) => panic!(),
+        }
     }
 
     fn create_func_param(&mut self, type_: Type) {
         self.func.push_param(type_);
     }
 
+    fn create_ebb(&mut self) -> Ebb {
+        let ebb = self.func.create_ebb();
+        let block = self.blocks.create(
+            BlockData::Header(HeaderBlockData::new(ebb)),
+        );
+        self.header_blocks.insert(ebb, block);
+        ebb
+    }
+
     fn create_block(&mut self) -> Block {
-        self.func.create_block()
+        let predecessor = self.position().block();
+        self.blocks.create(
+            BlockData::Body(BodyBlockData::new(predecessor)),
+        )
     }
 
     fn create_block_param(
         &mut self,
         variable: Variable<'input>,
-        block: Block,
+        ebb: Ebb,
         type_: Option<Type>,
     ) -> Value {
         let value = self.func.create_value(type_);
-        self.func.push_block_param(block, value);
-        self.values.insert_param(block, variable, value);
+        self.func.push_ebb_param(ebb, value);
+
+        let header_block = self.header_blocks[&ebb];
+        self.values.insert_param(header_block, variable, value);
+
         value
     }
 
-    fn push_block(&mut self, block: Block) {
-        self.func.push_block(block);
-    }
-
-    fn create_target(&mut self, block: Block) -> Target {
+    fn create_target(&mut self, ebb: Ebb) -> Target {
+        let block = self.header_blocks[&ebb];
         let mut args = Args::new();
 
-        for i in 0..self.func.block(block).params().len() {
-            let param = self.func.block(block).params()[i];
+        for i in 0..self.func.ebb(ebb).params().len() {
+            let param = self.func.ebb(ebb).params()[i];
             let variable = self.values.get_param(block, param).unwrap();
             let value = self.get_value(variable);
             args.push(value);
         }
 
-        Target::new(block, args)
+        Target::new(ebb, args)
     }
 
-    fn push_target_arg(&mut self, inst: Inst, block: Block, value: Value) {
-        let target = self.func.inst_mut(inst).get_target_mut(block);
-        target.push_arg(value);
+    fn push_target_arg(&mut self, inst: Inst, value: Value) {
+        if let Some(target) = self.func.inst_mut(inst).target_mut() {
+            target.push_arg(value);
+        }
     }
 
-    fn set_predicate(&mut self, condition_value: Value) {
-        let current_block = self.current_block();
+    fn push_predicate(&mut self, condition_value: Value) {
         let predicate_value = self.get_value(Variable::Predicate);
 
         let predicate = Operand::Value(predicate_value);
         let condition = Operand::Value(condition_value);
         let predicate_value = self.push_select_inst(predicate_value, condition, predicate);
-        self.values.insert_value(
-            current_block,
-            Variable::Predicate,
-            predicate_value,
-        );
+        self.insert_value(Variable::Predicate, predicate_value);
     }
 
-    fn unset_predicate(&mut self) {
-        let current_block = self.current_block();
+    fn pop_predicate(&mut self) {
         let count_value = self.get_value(Variable::Count);
 
         let count = Operand::Value(count_value);
         let zero = Operand::IntImmediate(IntImmediate::new(0));
         let predicate_value = self.push_int_comp_inst(Eq, count, zero);
-        self.values.insert_value(
-            current_block,
-            Variable::Predicate,
-            predicate_value,
-        );
+        self.insert_value(Variable::Predicate, predicate_value);
     }
 
     fn invert_predicate(&mut self) {
-        let current_block = self.current_block();
         let count_value = self.get_value(Variable::Count);
         let predicate_value = self.get_value(Variable::Predicate);
 
@@ -641,11 +654,7 @@ impl<'input> IrBuilder<'input> {
         let not_predicate = Operand::Value(not_predciate_value);
         let count_zero = Operand::Value(count_zero_value);
         let predicate_value = self.push_binary_inst(And, not_predicate, count_zero);
-        self.values.insert_value(
-            current_block,
-            Variable::Predicate,
-            predicate_value,
-        );
+        self.insert_value(Variable::Predicate, predicate_value);
     }
 
     fn increment_count(&mut self) {
@@ -657,7 +666,6 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn update_count(&mut self, op: BinaryOp) {
-        let current_block = self.current_block();
         let predicate_value = self.get_value(Variable::Predicate);
         let count_value = self.get_value(Variable::Count);
 
@@ -667,11 +675,7 @@ impl<'input> IrBuilder<'input> {
 
         let inc_count = Operand::Value(inc_count_value);
         let count_value = self.push_select_inst(predicate_value, count, inc_count);
-        self.values.insert_value(
-            current_block,
-            Variable::Count,
-            count_value,
-        );
+        self.insert_value(Variable::Count, count_value);
     }
 
     fn push_int_const_inst(&mut self, immediate: IntImmediate) -> Value {
@@ -754,30 +758,16 @@ impl<'input> IrBuilder<'input> {
         dest
     }
 
-    fn push_jump_inst(&mut self, block: Block) {
-        let target = self.create_target(block);
+    fn push_jump_inst(&mut self, ebb: Ebb) {
+        let target = self.create_target(ebb);
         let inst = InstData::JumpInst(JumpInst::new(target));
         self.push_inst(inst);
-
-        let current_block = self.current_block();
-        self.insert_predecessor(block, current_block);
     }
 
-    fn push_branch_inst(
-        &mut self,
-        op: BranchOp,
-        cond: Value,
-        true_block: Block,
-        false_block: Block,
-    ) {
-        let true_target = self.create_target(true_block);
-        let false_target = self.create_target(false_block);
-        let inst = InstData::BranchInst(BranchInst::new(op, cond, true_target, false_target));
+    fn push_branch_inst(&mut self, op: BranchOp, cond: Value, ebb: Ebb) {
+        let target = self.create_target(ebb);
+        let inst = InstData::BranchInst(BranchInst::new(op, cond, target));
         self.push_inst(inst);
-
-        let current_block = self.current_block();
-        self.insert_predecessor(true_block, current_block);
-        self.insert_predecessor(false_block, current_block);
     }
 
     fn push_return_inst(&mut self) {
@@ -786,9 +776,17 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn push_inst(&mut self, data: InstData) {
-        let block = self.current_block.unwrap();
-        let inst = self.func.create_inst(data);
-        self.func.push_inst(block, inst);
+        let ebb = self.position().ebb();
+        let inst = self.func.create_inst(data.clone());
+        self.func.push_inst(ebb, inst);
+
+        if let Some(target) = data.target() {
+            let block = self.position().block();
+            self.insert_predecessor(target.ebb(), (block, inst));
+
+            let block = self.create_block();
+            self.set_position_block(block);
+        }
     }
 
     fn get_unary_inst_type(&self, src: Operand) -> Type {

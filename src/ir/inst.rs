@@ -125,7 +125,7 @@ impl fmt::Display for UnaryOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnaryInst {
     op: UnaryOp,
     dest: Value,
@@ -192,7 +192,7 @@ impl fmt::Display for BinaryOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinaryInst {
     op: BinaryOp,
     dest: Value,
@@ -260,7 +260,7 @@ impl fmt::Display for CompOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntCompInst {
     op: CompOp,
     dest: Value,
@@ -304,7 +304,7 @@ impl fmt::Display for IntCompInst {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FloatCompInst {
     op: CompOp,
     dest: Value,
@@ -348,7 +348,7 @@ impl fmt::Display for FloatCompInst {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SelectInst {
     dest: Value,
     cond: Value,
@@ -396,7 +396,7 @@ impl fmt::Display for SelectInst {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JumpInst {
     target: Target,
 }
@@ -427,52 +427,42 @@ impl fmt::Display for JumpInst {
 
 #[derive(Debug, Clone, Copy)]
 pub enum BranchOp {
-    Any,
-    All,
+    AnyFalse,
+    AnyTrue,
+    AllFalse,
+    AllTrue,
 }
 
 impl fmt::Display for BranchOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match *self {
-            Any => "any",
-            All => "all",
+            AnyFalse => "anyf",
+            AnyTrue => "anyt",
+            AllFalse => "allf",
+            AllTrue => "allt",
         };
         write!(f, "{}", op)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BranchInst {
     op: BranchOp,
     cond: Value,
-    true_target: Target,
-    false_target: Target,
+    target: Target,
 }
 
 impl BranchInst {
-    pub fn new(op: BranchOp, cond: Value, true_target: Target, false_target: Target) -> BranchInst {
-        BranchInst {
-            op,
-            cond,
-            true_target,
-            false_target,
-        }
+    pub fn new(op: BranchOp, cond: Value, target: Target) -> BranchInst {
+        BranchInst { op, cond, target }
     }
 
-    pub fn true_target(&self) -> &Target {
-        &self.true_target
+    pub fn target(&self) -> &Target {
+        &self.target
     }
 
-    pub fn true_target_mut(&mut self) -> &mut Target {
-        &mut self.true_target
-    }
-
-    pub fn false_target(&self) -> &Target {
-        &self.false_target
-    }
-
-    pub fn false_target_mut(&mut self) -> &mut Target {
-        &mut self.false_target
+    pub fn target_mut(&mut self) -> &mut Target {
+        &mut self.target
     }
 }
 
@@ -480,16 +470,15 @@ impl fmt::Display for BranchInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "br {} {} {}, {}",
+            "br {} {} {}",
             self.op,
             self.cond,
-            self.true_target,
-            self.false_target
+            self.target,
         )
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ReturnInst {}
 
 impl ReturnInst {
@@ -525,7 +514,7 @@ impl fmt::Display for Inst {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InstData {
     IntConstInst(IntConstInst),
     FloatConstInst(FloatConstInst),
@@ -545,53 +534,26 @@ pub enum InstData {
 impl InstData {
     pub fn is_terminator(&self) -> bool {
         match *self {
-            InstData::IntConstInst(_) |
-            InstData::FloatConstInst(_) |
-            InstData::BoolConstInst(_) |
-            InstData::IndexInst(_) |
-            InstData::CountInst(_) |
-            InstData::UnaryInst(_) |
-            InstData::BinaryInst(_) |
-            InstData::IntCompInst(_) |
-            InstData::FloatCompInst(_) |
-            InstData::SelectInst(_) => false,
             InstData::JumpInst(_) |
-            InstData::BranchInst(_) |
             InstData::ReturnInst(_) => true,
+            _ => false,
         }
     }
 
-    pub fn get_target_mut(&mut self, block: Block) -> &mut Target {
-        let target = match *self {
-            InstData::IntConstInst(_) |
-            InstData::FloatConstInst(_) |
-            InstData::BoolConstInst(_) |
-            InstData::IndexInst(_) |
-            InstData::CountInst(_) |
-            InstData::UnaryInst(_) |
-            InstData::BinaryInst(_) |
-            InstData::IntCompInst(_) |
-            InstData::FloatCompInst(_) |
-            InstData::SelectInst(_) |
-            InstData::ReturnInst(_) => None,
-            InstData::JumpInst(ref mut inst) => {
-                if inst.target().block() == block {
-                    Some(inst.target_mut())
-                } else {
-                    None
-                }
-            }
-            InstData::BranchInst(ref mut inst) => {
-                if inst.true_target().block() == block {
-                    Some(inst.true_target_mut())
-                } else if inst.false_target().block() == block {
-                    Some(inst.false_target_mut())
-                } else {
-                    None
-                }
-            }
-        };
-        target.unwrap()
+    pub fn target(&self) -> Option<&Target> {
+        match *self {
+            InstData::JumpInst(ref inst) => Some(inst.target()),
+            InstData::BranchInst(ref inst) => Some(inst.target()),
+            _ => None,
+        }
+    }
+
+    pub fn target_mut(&mut self) -> Option<&mut Target> {
+        match *self {
+            InstData::JumpInst(ref mut inst) => Some(inst.target_mut()),
+            InstData::BranchInst(ref mut inst) => Some(inst.target_mut()),
+            _ => None,
+        }
     }
 }
 

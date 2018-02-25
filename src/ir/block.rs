@@ -25,20 +25,49 @@ impl fmt::Display for Block {
 }
 
 #[derive(Debug)]
-pub struct BlockData {
-    params: Params<Value>,
+pub struct HeaderBlockData {
+    ebb: Ebb,
+    predecessors: Vec<(Block, Inst)>,
 }
 
-impl BlockData {
-    pub fn new() -> BlockData {
-        BlockData { params: Params::new() }
+impl HeaderBlockData {
+    pub fn new(ebb: Ebb) -> HeaderBlockData {
+        HeaderBlockData {
+            ebb,
+            predecessors: Vec::new(),
+        }
     }
 
-    pub fn push_param(&mut self, value: Value) {
-        self.params.push(value);
+    pub fn ebb(&self) -> Ebb {
+        self.ebb
     }
 
-    pub fn params(&self) -> &Params<Value> {
-        &self.params
+    pub fn predecessors(&self) -> &Vec<(Block, Inst)> {
+        &self.predecessors
     }
+
+    pub fn insert_predecessor(&mut self, predecessor: (Block, Inst)) {
+        self.predecessors.push(predecessor);
+    }
+}
+
+#[derive(Debug)]
+pub struct BodyBlockData {
+    predecessor: Block,
+}
+
+impl BodyBlockData {
+    pub fn new(predecessor: Block) -> BodyBlockData {
+        BodyBlockData { predecessor }
+    }
+
+    pub fn predecessor(&self) -> Block {
+        self.predecessor
+    }
+}
+
+#[derive(Debug)]
+pub enum BlockData {
+    Header(HeaderBlockData),
+    Body(BodyBlockData),
 }
