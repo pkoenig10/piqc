@@ -137,14 +137,6 @@ impl Func {
         }
     }
 
-    pub fn push_param(&mut self, type_: Type) {
-        self.params.push(type_);
-    }
-
-    pub fn push_ebb_param(&mut self, ebb: Ebb, value: Value) {
-        self.ebbs.get_mut(ebb).data_mut().push_param(value);
-    }
-
     pub fn create_ebb(&mut self) -> Ebb {
         self.ebbs.create(EbbNode::new(EbbData::new()))
     }
@@ -153,8 +145,8 @@ impl Func {
         self.insts.create(InstNode::new(data))
     }
 
-    pub fn create_value(&mut self, type_: Option<Type>) -> Value {
-        self.values.create(ValueData::new(type_))
+    pub fn create_value(&mut self, data: ValueData) -> Value {
+        self.values.create(data)
     }
 
     pub fn ebb(&self, ebb: Ebb) -> &EbbData {
@@ -187,6 +179,18 @@ impl Func {
 
     pub fn value_mut(&mut self, value: Value) -> &mut ValueData {
         self.values.get_mut(value)
+    }
+
+    pub fn insert_value(&mut self, value: Value, data: ValueData) {
+        self.values.insert(value, data);
+    }
+
+    pub fn push_param(&mut self, type_: Type) {
+        self.params.push(type_);
+    }
+
+    pub fn push_ebb_param(&mut self, ebb: Ebb, value: Value) {
+        self.ebbs.get_mut(ebb).data_mut().push_param(value);
     }
 
     pub fn push_ebb(&mut self, ebb: Ebb) {

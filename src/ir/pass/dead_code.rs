@@ -51,11 +51,11 @@ impl DeadCodePass {
 
     fn analyze_func(&mut self, func: &Func) {
         for ebb in func.ebbs() {
-            self.analyze_block(func, ebb);
+            self.analyze_ebb(func, ebb);
         }
     }
 
-    fn analyze_block(&mut self, func: &Func, ebb: Ebb) {
+    fn analyze_ebb(&mut self, func: &Func, ebb: Ebb) {
         for inst in func.insts(ebb) {
             self.analyze_inst(func, inst);
         }
@@ -113,7 +113,7 @@ impl DeadCodePass {
                     self.insert_use(inst, *arg)
                 }
             }
-            InstData::ReturnInst(_) => {}
+            _ => {}
         }
     }
 

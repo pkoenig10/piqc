@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::Index;
+use std::ops::Deref;
 use std::slice::Iter;
 
 #[derive(Debug, Clone)]
@@ -19,13 +19,17 @@ impl<T> Args<T> {
     pub fn push(&mut self, arg: T) {
         self.args.push(arg);
     }
+
+    pub fn iter(&self) -> Iter<T> {
+        self.into_iter()
+    }
 }
 
-impl<T> Index<usize> for Args<T> {
-    type Output = T;
+impl<T> Deref for Args<T> {
+    type Target = Vec<T>;
 
-    fn index(&self, index: usize) -> &T {
-        self.args.index(index)
+    fn deref(&self) -> &Self::Target {
+        &self.args
     }
 }
 

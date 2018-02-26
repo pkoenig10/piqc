@@ -8,8 +8,10 @@ pub fn compile(s: &str) {
     ast::type_check(&prog);
     // println!("{:#?}", prog);
 
-    let prog = ir::generate_ir(&prog);
+    let mut prog = ir::generate_ir(&prog);
     println!("{}", prog);
 
     ir::verify_ir(&prog);
+
+    ir::run_ebb_params(&mut prog);
 }

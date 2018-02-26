@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::Index;
+use std::ops::Deref;
 use std::slice::Iter;
 
 
@@ -22,11 +22,11 @@ impl<T> Params<T> {
     }
 }
 
-impl<T> Index<usize> for Params<T> {
-    type Output = T;
+impl<T> Deref for Params<T> {
+    type Target = Vec<T>;
 
-    fn index(&self, index: usize) -> &T {
-        self.params.index(index)
+    fn deref(&self) -> &Self::Target {
+        &self.params
     }
 }
 
