@@ -29,7 +29,7 @@ impl DeadCodePass {
         loop {
             for (inst, value) in &self.defs {
                 if !self.has_uses(*value) {
-                    insts.push(*inst);
+                    // insts.push(*inst);
                 }
             }
 

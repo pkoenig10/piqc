@@ -232,11 +232,6 @@ impl Func {
             )
         };
 
-        let (first_inst, last_inst) = {
-            let ebb_node = self.ebbs.get(ebb);
-            (ebb_node.first_inst(), ebb_node.last_inst())
-        };
-
         match prev_inst {
             Some(prev_inst) => {
                 self.insts.get_mut(prev_inst).set_next_inst(next_inst);
