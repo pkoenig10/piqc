@@ -139,7 +139,7 @@ impl<'input> IrBuilder<'input> {
                 ast::Bool => Type::new(Uniform, Bool),
             };
             self.create_func_param(type_);
-            self.create_block_param(variable, entry_ebb, Some(type_));
+            self.create_block_param(variable, entry_ebb, type_);
         }
 
         let predicate_value = self.push_bool_const_inst(BoolImmediate::new(true));
@@ -461,54 +461,53 @@ impl<'input> IrBuilder<'input> {
         }
 
         let mut calls = Vec::new();
-        calls.push((block, None));
+        calls.push(block);
 
-        let mut values = Vec::new();
+        let mut ebbs = HashMap::new();
         let mut type_ = None;
 
-        while let Some((block, inst)) = calls.pop() {
-            let value = match self.get_value_in_ebb(block, variable) {
+        while let Some(block) = calls.pop() {
+            match self.get_value_in_ebb(block, variable) {
                 Ok(value) => {
                     let value_type = self.get_value_type(value);
-                    let type_ = type_.get_or_insert(value_type);
+                    let type_ = *type_.get_or_insert(value_type);
                     assert_eq!(
-                        *type_,
+                        type_,
                         value_type,
                         "Variable defined with multiple types '{}' and '{}'",
                         type_,
                         value_type
                     );
-
-                    Some(value)
                 }
                 Err(block) => {
-                    let ebb = match *self.blocks.get(block) {
+                    match *self.blocks.get(block) {
                         BlockData::Header(ref data) => {
-                            for &(block, inst) in data.predecessors() {
-                                calls.push((block, Some(inst)));
+                            let ebb = data.ebb();
+                            if ebbs.contains_key(&ebb) {
+                                continue;
                             }
-                            data.ebb()
+
+                            let predecessors = data.predecessors();
+                            for &(block, _) in predecessors {
+                                calls.push(block);
+                            }
+                            ebbs.insert(ebb, predecessors.clone());
                         }
                         _ => panic!(),
-                    };
-
-                    let value = self.create_block_param(variable, ebb, None);
-                    values.push(value);
-
-                    Some(value)
+                    }
                 }
             };
-
-            if let (Some(inst), Some(value)) = (inst, value) {
-                self.push_target_arg(inst, value);
-            }
         }
 
         let type_ = type_.unwrap();
-        for value in values {
-            match *self.func.value_mut(value) {
-                ValueData::Value(ref mut data) => data.set_type(type_),
-                _ => panic!(),
+
+        for &ebb in ebbs.keys() {
+            self.create_block_param(variable, ebb, type_);
+        }
+        for predecessors in ebbs.values() {
+            for &(block, inst) in predecessors {
+                let value = self.get_value_in_ebb(block, variable).unwrap();
+                self.push_target_arg(inst, value);
             }
         }
 
@@ -538,7 +537,7 @@ impl<'input> IrBuilder<'input> {
         let mut value = value;
         loop {
             match *self.func.value(value) {
-                ValueData::Value(ref data) => return data.type_().unwrap(),
+                ValueData::Value(ref data) => return data.type_(),
                 ValueData::Alias(ref data) => value = data.value().unwrap(),
             }
         }
@@ -568,7 +567,7 @@ impl<'input> IrBuilder<'input> {
         let block = self.header_blocks[&ebb];
         match *self.blocks.get_mut(block) {
             BlockData::Header(ref mut data) => data.insert_predecessor(predecessor),
-            BlockData::Body(_) => panic!(),
+            _ => panic!(),
         }
     }
 
@@ -592,12 +591,7 @@ impl<'input> IrBuilder<'input> {
         )
     }
 
-    fn create_block_param(
-        &mut self,
-        variable: Variable<'input>,
-        ebb: Ebb,
-        type_: Option<Type>,
-    ) -> Value {
+    fn create_block_param(&mut self, variable: Variable<'input>, ebb: Ebb, type_: Type) -> Value {
         let value = self.create_value(type_);
         self.func.push_ebb_param(ebb, value);
 
@@ -621,7 +615,7 @@ impl<'input> IrBuilder<'input> {
         Target::new(ebb, args)
     }
 
-    fn create_value(&mut self, type_: Option<Type>) -> Value {
+    fn create_value(&mut self, type_: Type) -> Value {
         self.func.create_value(
             ValueData::Value(ValueValueData::new(type_)),
         )
@@ -691,7 +685,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_int_const_inst(&mut self, immediate: IntImmediate) -> Value {
         let type_ = Type::new(Uniform, Int);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::IntConstInst(IntConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
@@ -699,7 +693,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_float_const_inst(&mut self, immediate: FloatImmediate) -> Value {
         let type_ = Type::new(Uniform, Float);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::FloatConstInst(FloatConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
@@ -707,7 +701,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_bool_const_inst(&mut self, immediate: BoolImmediate) -> Value {
         let type_ = Type::new(Uniform, Bool);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::BoolConstInst(BoolConstInst::new(dest, immediate));
         self.push_inst(inst);
         dest
@@ -715,7 +709,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_index_inst(&mut self) -> Value {
         let type_ = Type::new(Varying, Int);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::IndexInst(IndexInst::new(dest));
         self.push_inst(inst);
         dest
@@ -723,7 +717,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_count_inst(&mut self) -> Value {
         let type_ = Type::new(Uniform, Int);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::CountInst(CountInst::new(dest));
         self.push_inst(inst);
         dest
@@ -731,7 +725,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_unary_inst(&mut self, op: UnaryOp, src: Operand) -> Value {
         let type_ = self.get_unary_inst_type(src);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::UnaryInst(UnaryInst::new(op, dest, src));
         self.push_inst(inst);
         dest
@@ -739,7 +733,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_binary_inst(&mut self, op: BinaryOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_binary_inst_type(op, left, right);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::BinaryInst(BinaryInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -747,7 +741,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_int_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::IntCompInst(IntCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -755,7 +749,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_float_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::FloatCompInst(FloatCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -763,7 +757,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_select_inst(&mut self, cond: Value, left: Operand, right: Operand) -> Value {
         let type_ = self.get_select_inst_type(left, right);
-        let dest = self.create_value(Some(type_));
+        let dest = self.create_value(type_);
         let inst = InstData::SelectInst(SelectInst::new(dest, cond, left, right));
         self.push_inst(inst);
         dest

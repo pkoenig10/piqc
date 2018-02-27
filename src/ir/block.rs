@@ -24,7 +24,7 @@ impl fmt::Display for Block {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HeaderBlockData {
     ebb: Ebb,
     predecessors: Vec<(Block, Inst)>,
@@ -51,7 +51,7 @@ impl HeaderBlockData {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BodyBlockData {
     predecessor: Block,
 }
