@@ -4,7 +4,7 @@ mod ir;
 mod parser;
 
 pub fn compile(s: &str) {
-    let prog = parser::parse(s).unwrap();
+    let prog = parser::parse(s);
     ast::type_check(&prog);
     // println!("{:#?}", prog);
 
