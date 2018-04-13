@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use ast;
 use collections::*;
@@ -457,7 +458,8 @@ impl<'input> IrBuilder<'input> {
         let mut calls = Vec::new();
         calls.push(block);
 
-        let mut ebbs = HashMap::new();
+        let mut ebbs = Vec::new();
+        let mut predecessors = HashSet::new();
         let mut type_ = None;
 
         while let Some(block) = calls.pop() {
@@ -474,15 +476,16 @@ impl<'input> IrBuilder<'input> {
                 Err(block) => match *self.blocks.get(block) {
                     BlockData::Header(ref data) => {
                         let ebb = data.ebb();
-                        if ebbs.contains_key(&ebb) {
+                        if ebbs.contains(&ebb) {
                             continue;
                         }
 
-                        let predecessors = data.predecessors();
-                        for predecessor in predecessors {
+                        ebbs.push(ebb);
+
+                        for &predecessor in data.predecessors() {
+                            predecessors.insert(predecessor);
                             calls.push(predecessor.block());
                         }
-                        ebbs.insert(ebb, predecessors.clone());
                     }
                     _ => panic!(),
                 },
@@ -491,16 +494,14 @@ impl<'input> IrBuilder<'input> {
 
         let type_ = type_.unwrap();
 
-        for &ebb in ebbs.keys() {
+        for ebb in ebbs {
             self.create_block_param(variable, ebb, type_);
         }
-        for predecessors in ebbs.values() {
-            for predecessor in predecessors {
-                let block = predecessor.block();
-                let inst = predecessor.inst();
-                let value = self.get_value_in_ebb(block, variable).unwrap();
-                self.push_target_arg(inst, value);
-            }
+        for predecessor in predecessors {
+            let block = predecessor.block();
+            let inst = predecessor.inst();
+            let value = self.get_value_in_ebb(block, variable).unwrap();
+            self.push_target_arg(inst, value);
         }
 
         self.get_value_in_ebb(block, variable).unwrap()
