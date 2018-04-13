@@ -1,0 +1,26 @@
+func(bool):
+
+ebb0(%0):
+    %1 = bconst true
+    %2 = iconst 0
+    %3 = iconst 0
+    %4 = index
+    %5 = iconst 42
+    %6 = icmp lt %4, %5
+    %7 = add %2, 1
+    %8 = select %1, %2, %7
+    %9 = select %1, %6, %1
+    %10 = iconst 1
+    %11 = select %9, %10, %3
+    %12 = not %9
+    %13 = icmp eq %8, 0
+    %14 = and %12, %13
+    %15 = iconst 2
+    %16 = select %14, %15, %11
+    %17 = icmp eq %8, 0
+    %18 = sub %8, 1
+    %19 = select %17, %8, %18
+    %20 = iconst 1
+    %21 = add %16, %20
+    %22 = select %17, %21, %16
+    ret

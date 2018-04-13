@@ -1,0 +1,13 @@
+func(int, float):
+
+ebb0(%0, %1):
+    %2 = bconst true
+    %3 = iconst 0
+    %4 = sub 0, %0
+    %5 = iconst 1
+    %6 = add %4, %5
+    %7 = fconst 42
+    %8 = fmin %1, %7
+    %9 = bconst true
+    %10 = not %9
+    ret

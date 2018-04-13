@@ -11,5 +11,5 @@ fn main() {
     file.read_to_string(&mut input)
         .expect("unable to read file");
 
-    piqc::compile(&input);
+    println!("{}", piqc::compile(&input));
 }
