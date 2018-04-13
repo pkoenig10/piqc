@@ -28,11 +28,6 @@ impl Target {
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}({})",
-            self.ebb,
-            self.args,
-        )
+        write!(f, "{}({})", self.ebb, self.args,)
     }
 }

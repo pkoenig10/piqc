@@ -24,12 +24,12 @@ pub use self::prog::*;
 pub use self::target::*;
 pub use self::type_::*;
 
-pub use self::UnaryOp::*;
-pub use self::BinaryOp::*;
-pub use self::CompOp::*;
-pub use self::BranchOp::*;
-pub use self::TypeQualifier::*;
 pub use self::BaseType::*;
+pub use self::BinaryOp::*;
+pub use self::BranchOp::*;
+pub use self::CompOp::*;
+pub use self::TypeQualifier::*;
+pub use self::UnaryOp::*;
 
 pub use self::builder::generate_ir;
 pub use self::verifier::verify_ir;

@@ -1,7 +1,7 @@
 use std::slice::Iter;
 
-use ast::*;
 use ast::loc::*;
+use ast::*;
 
 #[derive(Debug)]
 pub struct Param<'input> {

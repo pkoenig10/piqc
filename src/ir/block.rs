@@ -24,10 +24,30 @@ impl fmt::Display for Block {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Predecessor {
+    block: Block,
+    inst: Inst,
+}
+
+impl Predecessor {
+    pub fn new(block: Block, inst: Inst) -> Predecessor {
+        Predecessor { block, inst }
+    }
+
+    pub fn block(&self) -> Block {
+        self.block
+    }
+
+    pub fn inst(&self) -> Inst {
+        self.inst
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HeaderBlockData {
     ebb: Ebb,
-    predecessors: Vec<(Block, Inst)>,
+    predecessors: Vec<Predecessor>,
 }
 
 impl HeaderBlockData {
@@ -42,11 +62,11 @@ impl HeaderBlockData {
         self.ebb
     }
 
-    pub fn predecessors(&self) -> &Vec<(Block, Inst)> {
+    pub fn predecessors(&self) -> &Vec<Predecessor> {
         &self.predecessors
     }
 
-    pub fn insert_predecessor(&mut self, predecessor: (Block, Inst)) {
+    pub fn insert_predecessor(&mut self, predecessor: Predecessor) {
         self.predecessors.push(predecessor);
     }
 }

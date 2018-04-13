@@ -37,7 +37,9 @@ struct EbbParamsPass {
 
 impl EbbParamsPass {
     fn new() -> EbbParamsPass {
-        EbbParamsPass { args: HashMap::new() }
+        EbbParamsPass {
+            args: HashMap::new(),
+        }
     }
 
     pub fn run(mut self, func: &mut Func) {
@@ -62,7 +64,6 @@ impl EbbParamsPass {
             }
 
             for (param, value) in values.drain(..) {
-                println!("{} -> {:#?}", param, value);
                 func.insert_value(param, ValueData::Alias(AliasValueData::new(value)));
 
                 self.args.remove(&param);
@@ -97,9 +98,9 @@ impl EbbParamsPass {
     }
 
     fn insert_arg(&mut self, param: Value, arg: Value) {
-        let args = self.args.entry(param).or_insert_with(
-            || Cell::new(ParamArgs::Zero),
-        );
+        let args = self.args
+            .entry(param)
+            .or_insert_with(|| Cell::new(ParamArgs::Zero));
         if arg != param {
             args.set(args.get().insert(arg));
         }

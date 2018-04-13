@@ -122,9 +122,10 @@ impl DeadCodePass {
     }
 
     fn insert_use(&mut self, inst: Inst, value: Value) {
-        self.uses.entry(value).or_insert_with(HashSet::new).insert(
-            inst,
-        );
+        self.uses
+            .entry(value)
+            .or_insert_with(HashSet::new)
+            .insert(inst);
     }
 
     fn insert_use_operand(&mut self, inst: Inst, operand: Operand) {

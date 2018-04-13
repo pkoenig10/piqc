@@ -25,7 +25,6 @@ pub struct FloatImmediate {
     value: f32,
 }
 
-
 impl FloatImmediate {
     pub fn new(value: f32) -> FloatImmediate {
         FloatImmediate { value }

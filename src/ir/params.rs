@@ -2,7 +2,6 @@ use std::fmt;
 use std::ops::Deref;
 use std::slice::Iter;
 
-
 #[derive(Debug, Clone)]
 pub struct Params<T> {
     params: Vec<T>,

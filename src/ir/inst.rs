@@ -228,10 +228,7 @@ impl fmt::Display for BinaryInst {
         write!(
             f,
             "{} = {} {}, {}",
-            self.dest,
-            self.op,
-            self.left,
-            self.right
+            self.dest, self.op, self.left, self.right
         )
     }
 }
@@ -296,10 +293,7 @@ impl fmt::Display for IntCompInst {
         write!(
             f,
             "{} = icmp {} {}, {}",
-            self.dest,
-            self.op,
-            self.left,
-            self.right
+            self.dest, self.op, self.left, self.right
         )
     }
 }
@@ -340,10 +334,7 @@ impl fmt::Display for FloatCompInst {
         write!(
             f,
             "{} = fcmp {} {}, {}",
-            self.dest,
-            self.op,
-            self.left,
-            self.right
+            self.dest, self.op, self.left, self.right
         )
     }
 }
@@ -388,10 +379,7 @@ impl fmt::Display for SelectInst {
         write!(
             f,
             "{} = select {}, {}, {}",
-            self.dest,
-            self.cond,
-            self.left,
-            self.right,
+            self.dest, self.cond, self.left, self.right,
         )
     }
 }
@@ -417,11 +405,7 @@ impl JumpInst {
 
 impl fmt::Display for JumpInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "jmp {}",
-            self.target,
-        )
+        write!(f, "jmp {}", self.target,)
     }
 }
 
@@ -468,13 +452,7 @@ impl BranchInst {
 
 impl fmt::Display for BranchInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "br {} {} {}",
-            self.op,
-            self.cond,
-            self.target,
-        )
+        write!(f, "br {} {} {}", self.op, self.cond, self.target,)
     }
 }
 
@@ -534,8 +512,7 @@ pub enum InstData {
 impl InstData {
     pub fn is_terminator(&self) -> bool {
         match *self {
-            InstData::JumpInst(_) |
-            InstData::ReturnInst(_) => true,
+            InstData::JumpInst(_) | InstData::ReturnInst(_) => true,
             _ => false,
         }
     }

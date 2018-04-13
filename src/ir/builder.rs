@@ -56,7 +56,9 @@ struct ValueTable<'a> {
 
 impl<'a> ValueTable<'a> {
     fn new() -> ValueTable<'a> {
-        ValueTable { values: HashMap::new() }
+        ValueTable {
+            values: HashMap::new(),
+        }
     }
 
     fn insert_param(&mut self, block: Block, variable: Variable<'a>, value: Value) {
@@ -64,9 +66,8 @@ impl<'a> ValueTable<'a> {
     }
 
     fn get_param(&self, block: Block, value: Value) -> Option<Variable<'a>> {
-        self.get_values(block).and_then(
-            |values| values.get_param(value),
-        )
+        self.get_values(block)
+            .and_then(|values| values.get_param(value))
     }
 
     fn insert_value(&mut self, block: Block, variable: Variable<'a>, value: Value) {
@@ -74,9 +75,8 @@ impl<'a> ValueTable<'a> {
     }
 
     fn get_value(&self, block: Block, variable: Variable<'a>) -> Option<Value> {
-        self.get_values(block).and_then(
-            |values| values.get_value(variable),
-        )
+        self.get_values(block)
+            .and_then(|values| values.get_value(variable))
     }
 
     fn get_values(&self, block: Block) -> Option<&BlockValues<'a>> {
@@ -411,15 +411,11 @@ impl<'input> IrBuilder<'input> {
                 let zero = Operand::FloatImmediate(FloatImmediate::new(0.));
                 self.push_binary_inst(Fsub, zero, src)
             }
-            (ast::BitNot, Int) |
-            (ast::LogicalNot, Bool) => self.push_unary_inst(Not, src),
-            _ => {
-                panic!(
-                    "Invalid unary expression '{}' with operand type '{}'",
-                    op,
-                    src_type
-                )
-            }
+            (ast::BitNot, Int) | (ast::LogicalNot, Bool) => self.push_unary_inst(Not, src),
+            _ => panic!(
+                "Invalid unary expression '{}' with operand type '{}'",
+                op, src_type
+            ),
         }
     }
 
@@ -448,9 +444,7 @@ impl<'input> IrBuilder<'input> {
 
         panic!(
             "Invalid binary expression '{}' with operand types '{}' and '{}'",
-            op,
-            left_type,
-            right_type
+            op, left_type, right_type
         )
     }
 
@@ -472,30 +466,26 @@ impl<'input> IrBuilder<'input> {
                     let value_type = self.get_value_type(value);
                     let type_ = *type_.get_or_insert(value_type);
                     assert_eq!(
-                        type_,
-                        value_type,
+                        type_, value_type,
                         "Variable defined with multiple types '{}' and '{}'",
-                        type_,
-                        value_type
+                        type_, value_type
                     );
                 }
-                Err(block) => {
-                    match *self.blocks.get(block) {
-                        BlockData::Header(ref data) => {
-                            let ebb = data.ebb();
-                            if ebbs.contains_key(&ebb) {
-                                continue;
-                            }
-
-                            let predecessors = data.predecessors();
-                            for &(block, _) in predecessors {
-                                calls.push(block);
-                            }
-                            ebbs.insert(ebb, predecessors.clone());
+                Err(block) => match *self.blocks.get(block) {
+                    BlockData::Header(ref data) => {
+                        let ebb = data.ebb();
+                        if ebbs.contains_key(&ebb) {
+                            continue;
                         }
-                        _ => panic!(),
+
+                        let predecessors = data.predecessors();
+                        for predecessor in predecessors {
+                            calls.push(predecessor.block());
+                        }
+                        ebbs.insert(ebb, predecessors.clone());
                     }
-                }
+                    _ => panic!(),
+                },
             };
         }
 
@@ -505,7 +495,9 @@ impl<'input> IrBuilder<'input> {
             self.create_block_param(variable, ebb, type_);
         }
         for predecessors in ebbs.values() {
-            for &(block, inst) in predecessors {
+            for predecessor in predecessors {
+                let block = predecessor.block();
+                let inst = predecessor.inst();
                 let value = self.get_value_in_ebb(block, variable).unwrap();
                 self.push_target_arg(inst, value);
             }
@@ -523,12 +515,10 @@ impl<'input> IrBuilder<'input> {
         loop {
             match self.values.get_value(block, variable) {
                 Some(value) => return Ok(value),
-                None => {
-                    match *self.blocks.get(block) {
-                        BlockData::Header(_) => return Err(block),
-                        BlockData::Body(ref data) => block = data.predecessor(),
-                    }
-                }
+                None => match *self.blocks.get(block) {
+                    BlockData::Header(_) => return Err(block),
+                    BlockData::Body(ref data) => block = data.predecessor(),
+                },
             }
         }
     }
@@ -563,7 +553,7 @@ impl<'input> IrBuilder<'input> {
         self.values.insert_value(block, variable, value);
     }
 
-    fn insert_predecessor(&mut self, ebb: Ebb, predecessor: (Block, Inst)) {
+    fn insert_predecessor(&mut self, ebb: Ebb, predecessor: Predecessor) {
         let block = self.header_blocks[&ebb];
         match *self.blocks.get_mut(block) {
             BlockData::Header(ref mut data) => data.insert_predecessor(predecessor),
@@ -577,18 +567,16 @@ impl<'input> IrBuilder<'input> {
 
     fn create_ebb(&mut self) -> Ebb {
         let ebb = self.func.create_ebb();
-        let block = self.blocks.create(
-            BlockData::Header(HeaderBlockData::new(ebb)),
-        );
+        let block = self.blocks
+            .create(BlockData::Header(HeaderBlockData::new(ebb)));
         self.header_blocks.insert(ebb, block);
         ebb
     }
 
     fn create_block(&mut self) -> Block {
         let predecessor = self.position().block();
-        self.blocks.create(
-            BlockData::Body(BodyBlockData::new(predecessor)),
-        )
+        self.blocks
+            .create(BlockData::Body(BodyBlockData::new(predecessor)))
     }
 
     fn create_block_param(&mut self, variable: Variable<'input>, ebb: Ebb, type_: Type) -> Value {
@@ -616,9 +604,8 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn create_value(&mut self, type_: Type) -> Value {
-        self.func.create_value(
-            ValueData::Value(ValueValueData::new(type_)),
-        )
+        self.func
+            .create_value(ValueData::Value(ValueValueData::new(type_)))
     }
 
     fn push_target_arg(&mut self, inst: Inst, value: Value) {
@@ -787,7 +774,8 @@ impl<'input> IrBuilder<'input> {
 
         if let Some(target) = data.target() {
             let block = self.position().block();
-            self.insert_predecessor(target.ebb(), (block, inst));
+            let predecessor = Predecessor::new(block, inst);
+            self.insert_predecessor(target.ebb(), predecessor);
 
             let block = self.create_block();
             self.set_position_block(block);
@@ -870,10 +858,8 @@ fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option
         (ast::Min, Float, Float) => Some(Fmin),
         (ast::Max, Int, Int) => Some(Max),
         (ast::Max, Float, Float) => Some(Fmax),
-        (ast::BitAnd, Int, Int) |
-        (ast::LogicalAnd, Bool, Bool) => Some(And),
-        (ast::BitOr, Int, Int) |
-        (ast::LogicalOr, Bool, Bool) => Some(Or),
+        (ast::BitAnd, Int, Int) | (ast::LogicalAnd, Bool, Bool) => Some(And),
+        (ast::BitOr, Int, Int) | (ast::LogicalOr, Bool, Bool) => Some(Or),
         (ast::BitXor, Int, Int) => Some(Xor),
         _ => None,
     }

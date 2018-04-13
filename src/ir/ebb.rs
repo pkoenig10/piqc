@@ -31,7 +31,9 @@ pub struct EbbData {
 
 impl EbbData {
     pub fn new() -> EbbData {
-        EbbData { params: Params::new() }
+        EbbData {
+            params: Params::new(),
+        }
     }
 
     pub fn push_param(&mut self, value: Value) {

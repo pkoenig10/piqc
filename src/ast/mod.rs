@@ -12,8 +12,8 @@ pub use self::prog::*;
 pub use self::stmt::*;
 pub use self::type_::*;
 
-pub use self::UnaryOp::*;
 pub use self::BinaryOp::*;
 pub use self::Type::*;
+pub use self::UnaryOp::*;
 
 pub use self::type_checker::type_check;

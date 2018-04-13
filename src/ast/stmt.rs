@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
-use ast::*;
 use ast::loc::*;
+use ast::*;
 
 #[derive(Debug)]
 pub struct BlockStmt<'input> {
@@ -96,7 +96,9 @@ pub struct ReturnStmt {
 
 impl ReturnStmt {
     pub fn new(l: usize, r: usize) -> ReturnStmt {
-        ReturnStmt { location: Location::new(l, r) }
+        ReturnStmt {
+            location: Location::new(l, r),
+        }
     }
 }
 
