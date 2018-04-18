@@ -26,21 +26,19 @@ impl fmt::Display for Ebb {
 
 #[derive(Debug)]
 pub struct EbbData {
-    params: Params<Value>,
+    params: Vec<Value>,
 }
 
 impl EbbData {
     pub fn new() -> EbbData {
-        EbbData {
-            params: Params::new(),
-        }
+        EbbData { params: Vec::new() }
     }
 
     pub fn push_param(&mut self, value: Value) {
         self.params.push(value);
     }
 
-    pub fn params(&self) -> &Params<Value> {
+    pub fn params(&self) -> &[Value] {
         &self.params
     }
 }

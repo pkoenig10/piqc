@@ -5,19 +5,22 @@ use ir::*;
 #[derive(Debug, Clone)]
 pub struct Target {
     ebb: Ebb,
-    args: Args<Value>,
+    args: Vec<Value>,
 }
 
 impl Target {
-    pub fn new(ebb: Ebb, args: Args<Value>) -> Target {
-        Target { ebb, args: args }
+    pub fn new(ebb: Ebb) -> Target {
+        Target {
+            ebb,
+            args: Vec::new(),
+        }
     }
 
     pub fn ebb(&self) -> Ebb {
         self.ebb
     }
 
-    pub fn args(&self) -> &Args<Value> {
+    pub fn args(&self) -> &[Value] {
         &self.args
     }
 
@@ -28,6 +31,6 @@ impl Target {
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({})", self.ebb, self.args,)
+        write!(f, "{}({})", self.ebb, DisplayList::new(&self.args))
     }
 }

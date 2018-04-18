@@ -64,8 +64,6 @@ impl EbbParamsPass {
             }
 
             for (param, value) in values.drain(..) {
-                func.insert_value(param, ValueData::Alias(AliasValueData::new(value)));
-
                 self.args.remove(&param);
             }
         }

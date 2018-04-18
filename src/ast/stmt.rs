@@ -17,7 +17,7 @@ impl<'input> BlockStmt<'input> {
         }
     }
 
-    pub fn stmts(&self) -> &Vec<Stmt<'input>> {
+    pub fn stmts(&self) -> &[Stmt<'input>] {
         &self.stmts
     }
 }

@@ -29,10 +29,6 @@ where
         key
     }
 
-    pub fn insert(&mut self, key: K, value: V) {
-        self.values[key.get()] = value;
-    }
-
     pub fn get(&self, key: K) -> &V {
         &self.values[key.get()]
     }

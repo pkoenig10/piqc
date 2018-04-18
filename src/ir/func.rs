@@ -117,7 +117,7 @@ impl InstNode {
 
 #[derive(Debug)]
 pub struct Func {
-    params: Params<Type>,
+    params: Vec<Type>,
     ebbs: Map<Ebb, EbbNode>,
     insts: Map<Inst, InstNode>,
     values: Map<Value, ValueData>,
@@ -128,7 +128,7 @@ pub struct Func {
 impl Func {
     pub fn new() -> Func {
         Func {
-            params: Params::new(),
+            params: Vec::new(),
             values: Map::new(),
             ebbs: Map::new(),
             insts: Map::new(),
@@ -175,14 +175,6 @@ impl Func {
 
     pub fn value(&self, value: Value) -> &ValueData {
         self.values.get(value)
-    }
-
-    pub fn value_mut(&mut self, value: Value) -> &mut ValueData {
-        self.values.get_mut(value)
-    }
-
-    pub fn insert_value(&mut self, value: Value, data: ValueData) {
-        self.values.insert(value, data);
     }
 
     pub fn push_param(&mut self, type_: Type) {
@@ -254,11 +246,11 @@ impl Func {
 
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "func({}):", self.params)?;
+        writeln!(f, "func({}):", DisplayList::new(&self.params))?;
         for ebb in self.ebbs() {
             let ebb_node = self.ebb(ebb);
             writeln!(f, "")?;
-            writeln!(f, "{}({}):", ebb, ebb_node.params())?;
+            writeln!(f, "{}({}):", ebb, DisplayList::new(ebb_node.params()))?;
             for inst in self.insts(ebb) {
                 let inst_node = self.inst(inst);
                 writeln!(f, "    {}", inst_node)?;

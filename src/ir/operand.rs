@@ -76,13 +76,13 @@ impl fmt::Display for Value {
 }
 
 #[derive(Debug)]
-pub struct ValueValueData {
+pub struct InstValue {
     type_: Type,
 }
 
-impl ValueValueData {
-    pub fn new(type_: Type) -> ValueValueData {
-        ValueValueData { type_ }
+impl InstValue {
+    pub fn new(type_: Type) -> InstValue {
+        InstValue { type_ }
     }
 
     pub fn type_(&self) -> Type {
@@ -91,24 +91,24 @@ impl ValueValueData {
 }
 
 #[derive(Debug)]
-pub struct AliasValueData {
-    value: Option<Value>,
+pub struct ParamValue {
+    type_: Type,
 }
 
-impl AliasValueData {
-    pub fn new(value: Option<Value>) -> AliasValueData {
-        AliasValueData { value }
+impl ParamValue {
+    pub fn new(type_: Type) -> ParamValue {
+        ParamValue { type_ }
     }
 
-    pub fn value(&self) -> Option<Value> {
-        self.value
+    pub fn type_(&self) -> Type {
+        self.type_
     }
 }
 
 #[derive(Debug)]
 pub enum ValueData {
-    Value(ValueValueData),
-    Alias(AliasValueData),
+    Inst(InstValue),
+    Param(ParamValue),
 }
 
 #[derive(Debug, Clone, Copy)]

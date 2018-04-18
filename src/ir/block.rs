@@ -45,14 +45,14 @@ impl Predecessor {
 }
 
 #[derive(Debug, Clone)]
-pub struct HeaderBlockData {
+pub struct HeaderBlock {
     ebb: Ebb,
     predecessors: Vec<Predecessor>,
 }
 
-impl HeaderBlockData {
-    pub fn new(ebb: Ebb) -> HeaderBlockData {
-        HeaderBlockData {
+impl HeaderBlock {
+    pub fn new(ebb: Ebb) -> HeaderBlock {
+        HeaderBlock {
             ebb,
             predecessors: Vec::new(),
         }
@@ -62,7 +62,7 @@ impl HeaderBlockData {
         self.ebb
     }
 
-    pub fn predecessors(&self) -> &Vec<Predecessor> {
+    pub fn predecessors(&self) -> &[Predecessor] {
         &self.predecessors
     }
 
@@ -72,13 +72,13 @@ impl HeaderBlockData {
 }
 
 #[derive(Debug, Clone)]
-pub struct BodyBlockData {
+pub struct BodyBlock {
     predecessor: Block,
 }
 
-impl BodyBlockData {
-    pub fn new(predecessor: Block) -> BodyBlockData {
-        BodyBlockData { predecessor }
+impl BodyBlock {
+    pub fn new(predecessor: Block) -> BodyBlock {
+        BodyBlock { predecessor }
     }
 
     pub fn predecessor(&self) -> Block {
@@ -88,6 +88,6 @@ impl BodyBlockData {
 
 #[derive(Debug)]
 pub enum BlockData {
-    Header(HeaderBlockData),
-    Body(BodyBlockData),
+    Header(HeaderBlock),
+    Body(BodyBlock),
 }
