@@ -3,6 +3,49 @@ use std::fmt;
 use collections::*;
 use ir::*;
 
+#[derive(Debug, Clone)]
+pub struct Target {
+    ebb: Ebb,
+    args: Vec<Value>,
+}
+
+impl Target {
+    pub fn new(ebb: Ebb) -> Target {
+        Target {
+            ebb,
+            args: Vec::new(),
+        }
+    }
+
+    pub fn ebb(&self) -> Ebb {
+        self.ebb
+    }
+
+    pub fn args(&self) -> &[Value] {
+        &self.args
+    }
+
+    pub fn push_arg(&mut self, value: Value) {
+        self.args.push(value);
+    }
+
+    pub fn swap_remove_arg(&mut self, index: usize) -> Value {
+        self.args.swap_remove(index)
+    }
+
+    pub fn replace_arg(&mut self, old: Value, new: Value) {
+        for arg in self.args.iter_mut() {
+            replace_value(arg, old, new);
+        }
+    }
+}
+
+impl fmt::Display for Target {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}({})", self.ebb, DisplayList::new(&self.args))
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct IntConstInst {
     dest: Value,
@@ -144,6 +187,11 @@ impl UnaryInst {
     pub fn src(&self) -> Operand {
         self.src
     }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+        replace_operand_value(&mut self.src, old, new);
+    }
 }
 
 impl fmt::Display for UnaryInst {
@@ -221,6 +269,12 @@ impl BinaryInst {
     pub fn right(&self) -> Operand {
         self.right
     }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+        replace_operand_value(&mut self.left, old, new);
+        replace_operand_value(&mut self.right, old, new);
+    }
 }
 
 impl fmt::Display for BinaryInst {
@@ -228,7 +282,10 @@ impl fmt::Display for BinaryInst {
         write!(
             f,
             "{} = {} {}, {}",
-            self.dest, self.op, self.left, self.right
+            self.dest,
+            self.op,
+            self.left,
+            self.right
         )
     }
 }
@@ -286,6 +343,12 @@ impl IntCompInst {
     pub fn right(&self) -> Operand {
         self.right
     }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+        replace_operand_value(&mut self.left, old, new);
+        replace_operand_value(&mut self.right, old, new);
+    }
 }
 
 impl fmt::Display for IntCompInst {
@@ -293,7 +356,10 @@ impl fmt::Display for IntCompInst {
         write!(
             f,
             "{} = icmp {} {}, {}",
-            self.dest, self.op, self.left, self.right
+            self.dest,
+            self.op,
+            self.left,
+            self.right
         )
     }
 }
@@ -327,6 +393,12 @@ impl FloatCompInst {
     pub fn right(&self) -> Operand {
         self.right
     }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+        replace_operand_value(&mut self.left, old, new);
+        replace_operand_value(&mut self.right, old, new);
+    }
 }
 
 impl fmt::Display for FloatCompInst {
@@ -334,7 +406,10 @@ impl fmt::Display for FloatCompInst {
         write!(
             f,
             "{} = fcmp {} {}, {}",
-            self.dest, self.op, self.left, self.right
+            self.dest,
+            self.op,
+            self.left,
+            self.right
         )
     }
 }
@@ -372,6 +447,13 @@ impl SelectInst {
     pub fn right(&self) -> Operand {
         self.right
     }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+        replace_value(&mut self.cond, old, new);
+        replace_operand_value(&mut self.left, old, new);
+        replace_operand_value(&mut self.right, old, new);
+    }
 }
 
 impl fmt::Display for SelectInst {
@@ -400,6 +482,10 @@ impl JumpInst {
 
     pub fn target_mut(&mut self) -> &mut Target {
         &mut self.target
+    }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        self.target.replace_arg(old, new);
     }
 }
 
@@ -447,6 +533,10 @@ impl BranchInst {
 
     pub fn target_mut(&mut self) -> &mut Target {
         &mut self.target
+    }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        self.target.replace_arg(old, new);
     }
 }
 
@@ -512,7 +602,8 @@ pub enum InstData {
 impl InstData {
     pub fn is_terminator(&self) -> bool {
         match *self {
-            InstData::JumpInst(_) | InstData::ReturnInst(_) => true,
+            InstData::JumpInst(_) |
+            InstData::ReturnInst(_) => true,
             _ => false,
         }
     }
@@ -530,6 +621,19 @@ impl InstData {
             InstData::JumpInst(ref mut inst) => Some(inst.target_mut()),
             InstData::BranchInst(ref mut inst) => Some(inst.target_mut()),
             _ => None,
+        }
+    }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        match *self {
+            InstData::UnaryInst(ref mut inst) => inst.replace_value(old, new),
+            InstData::BinaryInst(ref mut inst) => inst.replace_value(old, new),
+            InstData::IntCompInst(ref mut inst) => inst.replace_value(old, new),
+            InstData::FloatCompInst(ref mut inst) => inst.replace_value(old, new),
+            InstData::SelectInst(ref mut inst) => inst.replace_value(old, new),
+            InstData::JumpInst(ref mut inst) => inst.replace_value(old, new),
+            InstData::BranchInst(ref mut inst) => inst.replace_value(old, new),
+            _ => {}
         }
     }
 }
@@ -551,5 +655,17 @@ impl fmt::Display for InstData {
             InstData::BranchInst(ref inst) => write!(f, "{}", inst),
             InstData::ReturnInst(ref inst) => write!(f, "{}", inst),
         }
+    }
+}
+
+fn replace_value(value: &mut Value, old: Value, new: Value) {
+    if *value == old {
+        *value = new;
+    }
+}
+
+fn replace_operand_value(operand: &mut Operand, old: Value, new: Value) {
+    if let Operand::Value(ref mut value) = operand {
+        replace_value(value, old, new);
     }
 }

@@ -6,7 +6,6 @@ mod inst;
 mod operand;
 mod pass;
 mod prog;
-mod target;
 mod type_;
 mod util;
 mod verifier;
@@ -18,7 +17,6 @@ pub use self::inst::*;
 pub use self::operand::*;
 pub use self::pass::*;
 pub use self::prog::*;
-pub use self::target::*;
 pub use self::type_::*;
 pub use self::util::*;
 

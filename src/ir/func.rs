@@ -153,6 +153,10 @@ impl Func {
         self.ebbs.get(ebb).data()
     }
 
+    pub fn ebb_mut(&mut self, ebb: Ebb) -> &mut EbbData {
+        self.ebbs.get_mut(ebb).data_mut()
+    }
+
     pub fn last_inst(&self, ebb: Ebb) -> Inst {
         self.ebbs.get(ebb).last_inst().unwrap()
     }

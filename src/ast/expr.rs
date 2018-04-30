@@ -67,9 +67,7 @@ pub struct Index {
 
 impl Index {
     pub fn new(l: usize, r: usize) -> Index {
-        Index {
-            location: Location::new(l, r),
-        }
+        Index { location: Location::new(l, r) }
     }
 }
 
@@ -80,9 +78,7 @@ pub struct Count {
 
 impl Count {
     pub fn new(l: usize, r: usize) -> Count {
-        Count {
-            location: Location::new(l, r),
-        }
+        Count { location: Location::new(l, r) }
     }
 }
 

@@ -8,22 +8,22 @@ ebb0():
     %4 = index
     %5 = add %1, 1
     %6 = select %0, %1, %5
-    jmp ebb1(%3, %4, %0, %6, %2)
+    jmp ebb1(%3, %0)
 
-ebb1(%7, %8, %10, %16, %21):
-    %9 = icmp lt %7, %8
+ebb1(%7, %10):
+    %9 = icmp lt %7, %4
     %11 = select %10, %9, %10
-    br anyf %11 ebb2(%16, %21)
+    br anyf %11 ebb2()
     %12 = iconst 1
     %13 = add %7, %12
     %14 = select %11, %13, %7
-    jmp ebb1(%14, %8, %11, %16, %21)
+    jmp ebb1(%14, %11)
 
-ebb2(%15, %20):
-    %17 = icmp eq %15, 0
-    %18 = sub %15, 1
-    %19 = select %17, %15, %18
+ebb2():
+    %17 = icmp eq %6, 0
+    %18 = sub %6, 1
+    %19 = select %17, %6, %18
     %22 = iconst 1
-    %23 = add %20, %22
-    %24 = select %17, %23, %20
+    %23 = add %2, %22
+    %24 = select %17, %23, %2
     ret

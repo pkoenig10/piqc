@@ -7,21 +7,21 @@ ebb0():
     %3 = iconst 0
     %4 = add %1, 1
     %5 = select %0, %1, %4
-    jmp ebb1(%3, %0, %5, %2)
+    jmp ebb1(%3)
 
-ebb1(%6, %11, %15, %19):
+ebb1(%6):
     %7 = iconst 42
     %8 = icmp lt %6, %7
-    br allf %8 ebb2(%11, %15, %19)
+    br allf %8 ebb2()
     %9 = iconst 1
     %10 = add %6, %9
-    %12 = select %11, %10, %6
-    jmp ebb1(%12, %11, %15, %19)
+    %12 = select %0, %10, %6
+    jmp ebb1(%12)
 
-ebb2(%13, %14, %18):
-    %16 = sub %14, 1
-    %17 = select %13, %14, %16
+ebb2():
+    %16 = sub %5, 1
+    %17 = select %0, %5, %16
     %20 = iconst 1
-    %21 = add %18, %20
-    %22 = select %13, %21, %18
+    %21 = add %2, %20
+    %22 = select %0, %21, %2
     ret

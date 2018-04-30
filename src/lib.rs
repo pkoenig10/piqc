@@ -12,7 +12,6 @@ pub fn compile(s: &str) -> String {
     ir::verify_ir(&prog);
 
     ir::run_dead_code(&mut prog);
-    ir::run_ebb_params(&mut prog);
 
     format!("{}", prog)
 }

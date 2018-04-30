@@ -4,18 +4,18 @@ ebb0(%0):
     %1 = bconst true
     %2 = iconst 0
     %3 = iconst 0
-    br allf %0 ebb1(%1, %3)
+    br allf %0 ebb1()
     %4 = iconst 1
     %5 = select %1, %4, %3
-    jmp ebb2(%5, %1)
+    jmp ebb2(%5)
 
-ebb1(%7, %8):
+ebb1():
     %6 = iconst 2
-    %9 = select %7, %6, %8
-    jmp ebb2(%9, %7)
+    %9 = select %1, %6, %3
+    jmp ebb2(%9)
 
-ebb2(%10, %13):
+ebb2(%10):
     %11 = iconst 1
     %12 = add %10, %11
-    %14 = select %13, %12, %10
+    %14 = select %1, %12, %10
     ret

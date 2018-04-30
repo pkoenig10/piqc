@@ -62,9 +62,7 @@ struct TypeChecker<'input> {
 
 impl<'input> TypeChecker<'input> {
     fn new() -> TypeChecker<'input> {
-        TypeChecker {
-            symbols: SymbolTable::new(),
-        }
+        TypeChecker { symbols: SymbolTable::new() }
     }
 
     fn check_func(&mut self, func: &Func<'input>) {
@@ -154,7 +152,9 @@ impl<'input> TypeChecker<'input> {
 
     fn check_expr(&mut self, expr: &Expr) -> Type {
         match *expr {
-            Expr::IntLiteral(_) | Expr::Index(_) | Expr::Count(_) => Int,
+            Expr::IntLiteral(_) |
+            Expr::Index(_) |
+            Expr::Count(_) => Int,
             Expr::FloatLiteral(_) => Float,
             Expr::BoolLiteral(_) => Bool,
             Expr::Identifier(ref identifier) => self.check_identifier(identifier),
@@ -176,10 +176,13 @@ impl<'input> TypeChecker<'input> {
             (Negate, Int) | (BitNot, Int) => Int,
             (Negate, Float) => Float,
             (LogicalNot, Bool) => Bool,
-            _ => panic!(
-                "Cannot apply unary operator '{}' to type '{}'",
-                op, expr_type
-            ),
+            _ => {
+                panic!(
+                    "Cannot apply unary operator '{}' to type '{}'",
+                    op,
+                    expr_type
+                )
+            }
         }
     }
 
@@ -190,40 +193,44 @@ impl<'input> TypeChecker<'input> {
         let op = expr.op();
 
         match (op, left_type, right_type) {
-            (Add, Int, Int)
-            | (Sub, Int, Int)
-            | (Shl, Int, Int)
-            | (Shr, Int, Int)
-            | (BitAnd, Int, Int)
-            | (BitXor, Int, Int)
-            | (BitOr, Int, Int)
-            | (Min, Int, Int)
-            | (Max, Int, Int) => Int,
-            (Mul, Float, Float)
-            | (Add, Float, Float)
-            | (Sub, Float, Float)
-            | (Min, Float, Float)
-            | (Max, Float, Float) => Float,
-            (Eq, Int, Int)
-            | (Eq, Float, Float)
-            | (Eq, Bool, Bool)
-            | (Ne, Int, Int)
-            | (Ne, Float, Float)
-            | (Ne, Bool, Bool)
-            | (Lt, Int, Int)
-            | (Lt, Float, Float)
-            | (Gt, Int, Int)
-            | (Gt, Float, Float)
-            | (Le, Int, Int)
-            | (Le, Float, Float)
-            | (Ge, Int, Int)
-            | (Ge, Float, Float)
-            | (LogicalAnd, Bool, Bool)
-            | (LogicalOr, Bool, Bool) => Bool,
-            _ => panic!(
-                "Cannot apply binary operator '{}' to types '{}' and '{}'",
-                op, left_type, right_type
-            ),
+            (Add, Int, Int) |
+            (Sub, Int, Int) |
+            (Shl, Int, Int) |
+            (Shr, Int, Int) |
+            (BitAnd, Int, Int) |
+            (BitXor, Int, Int) |
+            (BitOr, Int, Int) |
+            (Min, Int, Int) |
+            (Max, Int, Int) => Int,
+            (Mul, Float, Float) |
+            (Add, Float, Float) |
+            (Sub, Float, Float) |
+            (Min, Float, Float) |
+            (Max, Float, Float) => Float,
+            (Eq, Int, Int) |
+            (Eq, Float, Float) |
+            (Eq, Bool, Bool) |
+            (Ne, Int, Int) |
+            (Ne, Float, Float) |
+            (Ne, Bool, Bool) |
+            (Lt, Int, Int) |
+            (Lt, Float, Float) |
+            (Gt, Int, Int) |
+            (Gt, Float, Float) |
+            (Le, Int, Int) |
+            (Le, Float, Float) |
+            (Ge, Int, Int) |
+            (Ge, Float, Float) |
+            (LogicalAnd, Bool, Bool) |
+            (LogicalOr, Bool, Bool) => Bool,
+            _ => {
+                panic!(
+                    "Cannot apply binary operator '{}' to types '{}' and '{}'",
+                    op,
+                    left_type,
+                    right_type
+                )
+            }
         }
     }
 
