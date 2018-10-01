@@ -1,7 +1,25 @@
 use std::fmt;
 
-use collections::*;
 use ir::*;
+
+#[derive(Debug, Clone, Copy)]
+pub enum Operand {
+    Int(i32),
+    Float(f32),
+    Bool(bool),
+    Value(Value),
+}
+
+impl fmt::Display for Operand {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Operand::Int(ref value) => write!(f, "{}", value),
+            Operand::Float(ref value) => write!(f, "{}", value),
+            Operand::Bool(ref value) => write!(f, "{}", value),
+            Operand::Value(ref value) => write!(f, "{}", value),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Target {
@@ -46,15 +64,17 @@ impl fmt::Display for Target {
     }
 }
 
+id!(Inst, "i");
+
 #[derive(Debug, Clone, Copy)]
 pub struct IntConstInst {
     dest: Value,
-    immediate: IntImmediate,
+    value: i32,
 }
 
 impl IntConstInst {
-    pub fn new(dest: Value, immediate: IntImmediate) -> IntConstInst {
-        IntConstInst { dest, immediate }
+    pub fn new(dest: Value, value: i32) -> IntConstInst {
+        IntConstInst { dest, value }
     }
 
     pub fn dest(&self) -> Value {
@@ -64,19 +84,19 @@ impl IntConstInst {
 
 impl fmt::Display for IntConstInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} = iconst {}", self.dest, self.immediate)
+        write!(f, "{} = iconst {}", self.dest, self.value)
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct FloatConstInst {
     dest: Value,
-    immediate: FloatImmediate,
+    value: f32,
 }
 
 impl FloatConstInst {
-    pub fn new(dest: Value, immediate: FloatImmediate) -> FloatConstInst {
-        FloatConstInst { dest, immediate }
+    pub fn new(dest: Value, value: f32) -> FloatConstInst {
+        FloatConstInst { dest, value }
     }
 
     pub fn dest(&self) -> Value {
@@ -86,19 +106,19 @@ impl FloatConstInst {
 
 impl fmt::Display for FloatConstInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} = fconst {}", self.dest, self.immediate)
+        write!(f, "{} = fconst {}", self.dest, self.value)
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct BoolConstInst {
     dest: Value,
-    immediate: BoolImmediate,
+    value: bool,
 }
 
 impl BoolConstInst {
-    pub fn new(dest: Value, immediate: BoolImmediate) -> BoolConstInst {
-        BoolConstInst { dest, immediate }
+    pub fn new(dest: Value, value: bool) -> BoolConstInst {
+        BoolConstInst { dest, value }
     }
 
     pub fn dest(&self) -> Value {
@@ -108,7 +128,7 @@ impl BoolConstInst {
 
 impl fmt::Display for BoolConstInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} = bconst {}", self.dest, self.immediate)
+        write!(f, "{} = bconst {}", self.dest, self.value)
     }
 }
 
@@ -162,7 +182,7 @@ pub enum UnaryOp {
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match *self {
-            Not => "not",
+            UnaryOp::Not => "not",
         };
         write!(f, "{}", op)
     }
@@ -221,20 +241,20 @@ pub enum BinaryOp {
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match *self {
-            Add => "add",
-            Sub => "sub",
-            Asr => "asr",
-            Shl => "shl",
-            Min => "min",
-            Max => "max",
-            And => "and",
-            Or => "or",
-            Xor => "xor",
-            Fadd => "fadd",
-            Fsub => "fsub",
-            Fmul => "fmul",
-            Fmin => "fmin",
-            Fmax => "fmax",
+            BinaryOp::Add => "add",
+            BinaryOp::Sub => "sub",
+            BinaryOp::Asr => "asr",
+            BinaryOp::Shl => "shl",
+            BinaryOp::Min => "min",
+            BinaryOp::Max => "max",
+            BinaryOp::And => "and",
+            BinaryOp::Or => "or",
+            BinaryOp::Xor => "xor",
+            BinaryOp::Fadd => "fadd",
+            BinaryOp::Fsub => "fsub",
+            BinaryOp::Fmul => "fmul",
+            BinaryOp::Fmin => "fmin",
+            BinaryOp::Fmax => "fmax",
         };
         write!(f, "{}", op)
     }
@@ -300,12 +320,12 @@ pub enum CompOp {
 impl fmt::Display for CompOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match *self {
-            Eq => "eq",
-            Ne => "ne",
-            Lt => "lt",
-            Gt => "gt",
-            Le => "le",
-            Ge => "ge",
+            CompOp::Eq => "eq",
+            CompOp::Ne => "ne",
+            CompOp::Lt => "lt",
+            CompOp::Gt => "gt",
+            CompOp::Le => "le",
+            CompOp::Ge => "ge",
         };
         write!(f, "{}", op)
     }
@@ -497,10 +517,10 @@ pub enum BranchOp {
 impl fmt::Display for BranchOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match *self {
-            AnyFalse => "anyf",
-            AnyTrue => "anyt",
-            AllFalse => "allf",
-            AllTrue => "allt",
+            BranchOp::AnyFalse => "anyf",
+            BranchOp::AnyTrue => "anyt",
+            BranchOp::AllFalse => "allf",
+            BranchOp::AllTrue => "allt",
         };
         write!(f, "{}", op)
     }
@@ -552,77 +572,56 @@ impl fmt::Display for ReturnInst {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Inst {
-    id: usize,
-}
-
-impl Key for Inst {
-    fn new(id: usize) -> Self {
-        Inst { id }
-    }
-
-    fn get(&self) -> usize {
-        self.id
-    }
-}
-
-impl fmt::Display for Inst {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.id)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum InstData {
-    IntConstInst(IntConstInst),
-    FloatConstInst(FloatConstInst),
-    BoolConstInst(BoolConstInst),
-    IndexInst(IndexInst),
-    CountInst(CountInst),
-    UnaryInst(UnaryInst),
-    BinaryInst(BinaryInst),
-    IntCompInst(IntCompInst),
-    FloatCompInst(FloatCompInst),
-    SelectInst(SelectInst),
-    JumpInst(JumpInst),
-    BranchInst(BranchInst),
-    ReturnInst(ReturnInst),
+    IntConst(IntConstInst),
+    FloatConst(FloatConstInst),
+    BoolConst(BoolConstInst),
+    Index(IndexInst),
+    Count(CountInst),
+    Unary(UnaryInst),
+    Binary(BinaryInst),
+    IntComp(IntCompInst),
+    FloatComp(FloatCompInst),
+    Select(SelectInst),
+    Jump(JumpInst),
+    Branch(BranchInst),
+    Return(ReturnInst),
 }
 
 impl InstData {
     pub fn is_terminator(&self) -> bool {
         match *self {
-            InstData::JumpInst(_) | InstData::ReturnInst(_) => true,
+            InstData::Jump(_) | InstData::Return(_) => true,
             _ => false,
         }
     }
 
     pub fn target(&self) -> Option<&Target> {
         match *self {
-            InstData::JumpInst(ref inst) => Some(inst.target()),
-            InstData::BranchInst(ref inst) => Some(inst.target()),
+            InstData::Jump(ref inst) => Some(inst.target()),
+            InstData::Branch(ref inst) => Some(inst.target()),
             _ => None,
         }
     }
 
     pub fn target_mut(&mut self) -> Option<&mut Target> {
         match *self {
-            InstData::JumpInst(ref mut inst) => Some(inst.target_mut()),
-            InstData::BranchInst(ref mut inst) => Some(inst.target_mut()),
+            InstData::Jump(ref mut inst) => Some(inst.target_mut()),
+            InstData::Branch(ref mut inst) => Some(inst.target_mut()),
             _ => None,
         }
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
         match *self {
-            InstData::UnaryInst(ref mut inst) => inst.replace_value(old, new),
-            InstData::BinaryInst(ref mut inst) => inst.replace_value(old, new),
-            InstData::IntCompInst(ref mut inst) => inst.replace_value(old, new),
-            InstData::FloatCompInst(ref mut inst) => inst.replace_value(old, new),
-            InstData::SelectInst(ref mut inst) => inst.replace_value(old, new),
-            InstData::JumpInst(ref mut inst) => inst.replace_value(old, new),
-            InstData::BranchInst(ref mut inst) => inst.replace_value(old, new),
+            InstData::Unary(ref mut inst) => inst.replace_value(old, new),
+            InstData::Binary(ref mut inst) => inst.replace_value(old, new),
+            InstData::IntComp(ref mut inst) => inst.replace_value(old, new),
+            InstData::FloatComp(ref mut inst) => inst.replace_value(old, new),
+            InstData::Select(ref mut inst) => inst.replace_value(old, new),
+            InstData::Jump(ref mut inst) => inst.replace_value(old, new),
+            InstData::Branch(ref mut inst) => inst.replace_value(old, new),
             _ => {}
         }
     }
@@ -631,19 +630,19 @@ impl InstData {
 impl fmt::Display for InstData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            InstData::IntConstInst(ref inst) => write!(f, "{}", inst),
-            InstData::FloatConstInst(ref inst) => write!(f, "{}", inst),
-            InstData::BoolConstInst(ref inst) => write!(f, "{}", inst),
-            InstData::IndexInst(ref inst) => write!(f, "{}", inst),
-            InstData::CountInst(ref inst) => write!(f, "{}", inst),
-            InstData::UnaryInst(ref inst) => write!(f, "{}", inst),
-            InstData::BinaryInst(ref inst) => write!(f, "{}", inst),
-            InstData::IntCompInst(ref inst) => write!(f, "{}", inst),
-            InstData::FloatCompInst(ref inst) => write!(f, "{}", inst),
-            InstData::SelectInst(ref inst) => write!(f, "{}", inst),
-            InstData::JumpInst(ref inst) => write!(f, "{}", inst),
-            InstData::BranchInst(ref inst) => write!(f, "{}", inst),
-            InstData::ReturnInst(ref inst) => write!(f, "{}", inst),
+            InstData::IntConst(ref inst) => write!(f, "{}", inst),
+            InstData::FloatConst(ref inst) => write!(f, "{}", inst),
+            InstData::BoolConst(ref inst) => write!(f, "{}", inst),
+            InstData::Index(ref inst) => write!(f, "{}", inst),
+            InstData::Count(ref inst) => write!(f, "{}", inst),
+            InstData::Unary(ref inst) => write!(f, "{}", inst),
+            InstData::Binary(ref inst) => write!(f, "{}", inst),
+            InstData::IntComp(ref inst) => write!(f, "{}", inst),
+            InstData::FloatComp(ref inst) => write!(f, "{}", inst),
+            InstData::Select(ref inst) => write!(f, "{}", inst),
+            InstData::Jump(ref inst) => write!(f, "{}", inst),
+            InstData::Branch(ref inst) => write!(f, "{}", inst),
+            InstData::Return(ref inst) => write!(f, "{}", inst),
         }
     }
 }

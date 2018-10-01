@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use ast;
-use collections::*;
 use ir::*;
 
 pub fn generate_ir(prog: &ast::Prog) -> Prog {
@@ -135,18 +134,18 @@ impl<'input> IrBuilder<'input> {
             let name = param.identifier().name();
             let variable = Variable::Variable(name);
             let type_ = match param.type_() {
-                ast::Int => Type::new(Uniform, Int),
-                ast::Float => Type::new(Uniform, Float),
-                ast::Bool => Type::new(Uniform, Bool),
+                ast::Type::Int => Type::new(Uniform, Int),
+                ast::Type::Float => Type::new(Uniform, Float),
+                ast::Type::Bool => Type::new(Uniform, Bool),
             };
             self.create_func_param(type_);
             self.create_block_param(variable, entry_ebb, type_);
         }
 
-        let predicate_value = self.push_bool_const_inst(BoolImmediate::new(true));
+        let predicate_value = self.push_bool_const_inst(true);
         self.insert_value(Variable::Predicate, predicate_value);
 
-        let count_value = self.push_int_const_inst(IntImmediate::new(0));
+        let count_value = self.push_int_const_inst(0);
         self.insert_value(Variable::Count, count_value);
 
         self.generate_stmt(func.stmt());
@@ -162,12 +161,12 @@ impl<'input> IrBuilder<'input> {
 
     fn generate_stmt(&mut self, stmt: &ast::Stmt<'input>) {
         match *stmt {
-            ast::Stmt::BlockStmt(ref stmt) => self.generate_block_stmt(stmt),
-            ast::Stmt::DeclStmt(ref stmt) => self.generate_decl_stmt(stmt),
-            ast::Stmt::AssignStmt(ref stmt) => self.generate_assign_stmt(stmt),
-            ast::Stmt::IfStmt(ref stmt) => self.generate_if_stmt(stmt),
-            ast::Stmt::WhileStmt(ref stmt) => self.generate_while_stmt(stmt),
-            ast::Stmt::ReturnStmt(ref stmt) => self.generate_return_stmt(stmt),
+            ast::Stmt::Block(ref stmt) => self.generate_block_stmt(stmt),
+            ast::Stmt::Decl(ref stmt) => self.generate_decl_stmt(stmt),
+            ast::Stmt::Assign(ref stmt) => self.generate_assign_stmt(stmt),
+            ast::Stmt::If(ref stmt) => self.generate_if_stmt(stmt),
+            ast::Stmt::While(ref stmt) => self.generate_while_stmt(stmt),
+            ast::Stmt::Return(ref stmt) => self.generate_return_stmt(stmt),
         }
     }
 
@@ -231,7 +230,7 @@ impl<'input> IrBuilder<'input> {
     ) {
         let merge_ebb = self.create_ebb();
 
-        self.push_branch_inst(AllFalse, condition_value, merge_ebb);
+        self.push_branch_inst(BranchOp::AllFalse, condition_value, merge_ebb);
 
         self.generate_stmt(if_stmt);
         self.push_jump_inst(merge_ebb);
@@ -247,7 +246,7 @@ impl<'input> IrBuilder<'input> {
         let else_ebb = self.create_ebb();
         let merge_ebb = self.create_ebb();
 
-        self.push_branch_inst(AllFalse, condition_value, else_ebb);
+        self.push_branch_inst(BranchOp::AllFalse, condition_value, else_ebb);
 
         self.generate_stmt(if_stmt);
         self.push_jump_inst(merge_ebb);
@@ -320,7 +319,7 @@ impl<'input> IrBuilder<'input> {
         let header_ebb = self.position().ebb();
         let after_ebb = self.create_ebb();
 
-        self.push_branch_inst(AllFalse, condition_value, after_ebb);
+        self.push_branch_inst(BranchOp::AllFalse, condition_value, after_ebb);
 
         self.generate_stmt(while_stmt);
         self.push_jump_inst(header_ebb);
@@ -338,7 +337,7 @@ impl<'input> IrBuilder<'input> {
         self.push_predicate(condition_value);
 
         let predicate_value = self.get_value(Variable::Predicate);
-        self.push_branch_inst(AnyFalse, predicate_value, after_ebb);
+        self.push_branch_inst(BranchOp::AnyFalse, predicate_value, after_ebb);
 
         self.generate_stmt(while_stmt);
         self.push_jump_inst(header_ebb);
@@ -361,24 +360,21 @@ impl<'input> IrBuilder<'input> {
             ast::Expr::Index(_) => self.generate_index(),
             ast::Expr::Count(_) => self.generate_count(),
             ast::Expr::Identifier(ref identifier) => self.generate_identifier(identifier),
-            ast::Expr::UnaryExpr(ref expr) => self.generate_unary_expr(expr),
-            ast::Expr::BinaryExpr(ref expr) => self.generate_binary_expr(expr),
+            ast::Expr::Unary(ref expr) => self.generate_unary_expr(expr),
+            ast::Expr::Binary(ref expr) => self.generate_binary_expr(expr),
         }
     }
 
     fn generate_int_literal(&mut self, int_literal: &ast::IntLiteral) -> Value {
-        let immediate = IntImmediate::new(int_literal.value());
-        self.push_int_const_inst(immediate)
+        self.push_int_const_inst(int_literal.value())
     }
 
     fn generate_float_literal(&mut self, float_literal: &ast::FloatLiteral) -> Value {
-        let immediate = FloatImmediate::new(float_literal.value());
-        self.push_float_const_inst(immediate)
+        self.push_float_const_inst(float_literal.value())
     }
 
     fn generate_bool_literal(&mut self, bool_literal: &ast::BoolLiteral) -> Value {
-        let immediate = BoolImmediate::new(bool_literal.value());
-        self.push_bool_const_inst(immediate)
+        self.push_bool_const_inst(bool_literal.value())
     }
 
     fn generate_index(&mut self) -> Value {
@@ -404,15 +400,15 @@ impl<'input> IrBuilder<'input> {
         let src = Operand::Value(src_value);
 
         match (op, src_type.type_()) {
-            (ast::Negate, Int) => {
-                let zero = Operand::IntImmediate(IntImmediate::new(0));
-                self.push_binary_inst(Sub, zero, src)
+            (ast::UnaryOp::Negate, Int) => {
+                self.push_binary_inst(BinaryOp::Sub, Operand::Int(0), src)
             }
-            (ast::Negate, Float) => {
-                let zero = Operand::FloatImmediate(FloatImmediate::new(0.));
-                self.push_binary_inst(Fsub, zero, src)
+            (ast::UnaryOp::Negate, Float) => {
+                self.push_binary_inst(BinaryOp::Fsub, Operand::Float(0.), src)
             }
-            (ast::BitNot, Int) | (ast::LogicalNot, Bool) => self.push_unary_inst(Not, src),
+            (ast::UnaryOp::BitNot, Int) | (ast::UnaryOp::LogicalNot, Bool) => {
+                self.push_unary_inst(UnaryOp::Not, src)
+            }
             _ => panic!(
                 "Invalid unary expression '{}' with operand type '{}'",
                 op, src_type
@@ -626,8 +622,8 @@ impl<'input> IrBuilder<'input> {
         let count_value = self.get_value(Variable::Count);
 
         let count = Operand::Value(count_value);
-        let zero = Operand::IntImmediate(IntImmediate::new(0));
-        let predicate_value = self.push_int_comp_inst(Eq, count, zero);
+        let zero = Operand::Int(0);
+        let predicate_value = self.push_int_comp_inst(CompOp::Eq, count, zero);
         self.insert_value(Variable::Predicate, predicate_value);
     }
 
@@ -636,24 +632,24 @@ impl<'input> IrBuilder<'input> {
         let predicate_value = self.get_value(Variable::Predicate);
 
         let predicate = Operand::Value(predicate_value);
-        let not_predciate_value = self.push_unary_inst(Not, predicate);
+        let not_predciate_value = self.push_unary_inst(UnaryOp::Not, predicate);
 
         let count = Operand::Value(count_value);
-        let zero = Operand::IntImmediate(IntImmediate::new(0));
-        let count_zero_value = self.push_int_comp_inst(Eq, count, zero);
+        let zero = Operand::Int(0);
+        let count_zero_value = self.push_int_comp_inst(CompOp::Eq, count, zero);
 
         let not_predicate = Operand::Value(not_predciate_value);
         let count_zero = Operand::Value(count_zero_value);
-        let predicate_value = self.push_binary_inst(And, not_predicate, count_zero);
+        let predicate_value = self.push_binary_inst(BinaryOp::And, not_predicate, count_zero);
         self.insert_value(Variable::Predicate, predicate_value);
     }
 
     fn increment_count(&mut self) {
-        self.update_count(Add);
+        self.update_count(BinaryOp::Add);
     }
 
     fn decrement_count(&mut self) {
-        self.update_count(Sub);
+        self.update_count(BinaryOp::Sub);
     }
 
     fn update_count(&mut self, op: BinaryOp) {
@@ -661,7 +657,7 @@ impl<'input> IrBuilder<'input> {
         let count_value = self.get_value(Variable::Count);
 
         let count = Operand::Value(count_value);
-        let one = Operand::IntImmediate(IntImmediate::new(1));
+        let one = Operand::Int(1);
         let inc_count_value = self.push_binary_inst(op, count, one);
 
         let inc_count = Operand::Value(inc_count_value);
@@ -669,26 +665,26 @@ impl<'input> IrBuilder<'input> {
         self.insert_value(Variable::Count, count_value);
     }
 
-    fn push_int_const_inst(&mut self, immediate: IntImmediate) -> Value {
+    fn push_int_const_inst(&mut self, value: i32) -> Value {
         let type_ = Type::new(Uniform, Int);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::IntConstInst(IntConstInst::new(dest, immediate));
+        let inst = InstData::IntConst(IntConstInst::new(dest, value));
         self.push_inst(inst);
         dest
     }
 
-    fn push_float_const_inst(&mut self, immediate: FloatImmediate) -> Value {
+    fn push_float_const_inst(&mut self, value: f32) -> Value {
         let type_ = Type::new(Uniform, Float);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::FloatConstInst(FloatConstInst::new(dest, immediate));
+        let inst = InstData::FloatConst(FloatConstInst::new(dest, value));
         self.push_inst(inst);
         dest
     }
 
-    fn push_bool_const_inst(&mut self, immediate: BoolImmediate) -> Value {
+    fn push_bool_const_inst(&mut self, value: bool) -> Value {
         let type_ = Type::new(Uniform, Bool);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::BoolConstInst(BoolConstInst::new(dest, immediate));
+        let inst = InstData::BoolConst(BoolConstInst::new(dest, value));
         self.push_inst(inst);
         dest
     }
@@ -696,7 +692,7 @@ impl<'input> IrBuilder<'input> {
     fn push_index_inst(&mut self) -> Value {
         let type_ = Type::new(Varying, Int);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::IndexInst(IndexInst::new(dest));
+        let inst = InstData::Index(IndexInst::new(dest));
         self.push_inst(inst);
         dest
     }
@@ -704,7 +700,7 @@ impl<'input> IrBuilder<'input> {
     fn push_count_inst(&mut self) -> Value {
         let type_ = Type::new(Uniform, Int);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::CountInst(CountInst::new(dest));
+        let inst = InstData::Count(CountInst::new(dest));
         self.push_inst(inst);
         dest
     }
@@ -712,7 +708,7 @@ impl<'input> IrBuilder<'input> {
     fn push_unary_inst(&mut self, op: UnaryOp, src: Operand) -> Value {
         let type_ = self.get_unary_inst_type(src);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::UnaryInst(UnaryInst::new(op, dest, src));
+        let inst = InstData::Unary(UnaryInst::new(op, dest, src));
         self.push_inst(inst);
         dest
     }
@@ -720,7 +716,7 @@ impl<'input> IrBuilder<'input> {
     fn push_binary_inst(&mut self, op: BinaryOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_binary_inst_type(op, left, right);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::BinaryInst(BinaryInst::new(op, dest, left, right));
+        let inst = InstData::Binary(BinaryInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
@@ -728,7 +724,7 @@ impl<'input> IrBuilder<'input> {
     fn push_int_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::IntCompInst(IntCompInst::new(op, dest, left, right));
+        let inst = InstData::IntComp(IntCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
@@ -736,7 +732,7 @@ impl<'input> IrBuilder<'input> {
     fn push_float_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::FloatCompInst(FloatCompInst::new(op, dest, left, right));
+        let inst = InstData::FloatComp(FloatCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
@@ -744,25 +740,25 @@ impl<'input> IrBuilder<'input> {
     fn push_select_inst(&mut self, cond: Value, left: Operand, right: Operand) -> Value {
         let type_ = self.get_select_inst_type(left, right);
         let dest = self.create_inst_value(type_);
-        let inst = InstData::SelectInst(SelectInst::new(dest, cond, left, right));
+        let inst = InstData::Select(SelectInst::new(dest, cond, left, right));
         self.push_inst(inst);
         dest
     }
 
     fn push_jump_inst(&mut self, ebb: Ebb) {
         let target = self.create_target(ebb);
-        let inst = InstData::JumpInst(JumpInst::new(target));
+        let inst = InstData::Jump(JumpInst::new(target));
         self.push_inst(inst);
     }
 
     fn push_branch_inst(&mut self, op: BranchOp, cond: Value, ebb: Ebb) {
         let target = self.create_target(ebb);
-        let inst = InstData::BranchInst(BranchInst::new(op, cond, target));
+        let inst = InstData::Branch(BranchInst::new(op, cond, target));
         self.push_inst(inst);
     }
 
     fn push_return_inst(&mut self) {
-        let inst = InstData::ReturnInst(ReturnInst::new());
+        let inst = InstData::Return(ReturnInst::new());
         self.push_inst(inst);
     }
 
@@ -788,8 +784,9 @@ impl<'input> IrBuilder<'input> {
     fn get_binary_inst_type(&self, op: BinaryOp, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
-        assert!(
-            left_type.type_() == right_type.type_(),
+        assert_eq!(
+            left_type.type_(),
+            right_type.type_(),
             "Invalid binary instruction '{}' with operand types '{}' and '{}'",
             op,
             left_type,
@@ -805,8 +802,9 @@ impl<'input> IrBuilder<'input> {
     fn get_comp_inst_type(&self, op: CompOp, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
-        assert!(
-            left_type.type_() == right_type.type_(),
+        assert_eq!(
+            left_type.type_(),
+            right_type.type_(),
             "Invalid comparison instruction '{}' with operand types '{}' and '{}'",
             op,
             left_type,
@@ -821,8 +819,9 @@ impl<'input> IrBuilder<'input> {
     fn get_select_inst_type(&self, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
-        assert!(
-            left_type.type_() == right_type.type_(),
+        assert_eq!(
+            left_type.type_(),
+            right_type.type_(),
             "Invalid select instruction with operand types '{}' and '{}'",
             left_type,
             right_type
@@ -836,9 +835,9 @@ impl<'input> IrBuilder<'input> {
 
     fn get_operand_type(&self, operand: Operand) -> Type {
         match operand {
-            Operand::IntImmediate(_) => Type::new(Uniform, Int),
-            Operand::FloatImmediate(_) => Type::new(Uniform, Float),
-            Operand::BoolImmediate(_) => Type::new(Uniform, Bool),
+            Operand::Int(_) => Type::new(Uniform, Int),
+            Operand::Float(_) => Type::new(Uniform, Float),
+            Operand::Bool(_) => Type::new(Uniform, Bool),
             Operand::Value(value) => self.get_value_type(value),
         }
     }
@@ -846,20 +845,24 @@ impl<'input> IrBuilder<'input> {
 
 fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<BinaryOp> {
     match (op, left_type.type_(), right_type.type_()) {
-        (ast::Mul, Float, Float) => Some(Fmul),
-        (ast::Add, Int, Int) => Some(Add),
-        (ast::Add, Float, Float) => Some(Fadd),
-        (ast::Sub, Int, Int) => Some(Sub),
-        (ast::Sub, Float, Float) => Some(Fsub),
-        (ast::Shl, Int, Int) => Some(Shl),
-        (ast::Shr, Int, Int) => Some(Asr),
-        (ast::Min, Int, Int) => Some(Min),
-        (ast::Min, Float, Float) => Some(Fmin),
-        (ast::Max, Int, Int) => Some(Max),
-        (ast::Max, Float, Float) => Some(Fmax),
-        (ast::BitAnd, Int, Int) | (ast::LogicalAnd, Bool, Bool) => Some(And),
-        (ast::BitOr, Int, Int) | (ast::LogicalOr, Bool, Bool) => Some(Or),
-        (ast::BitXor, Int, Int) => Some(Xor),
+        (ast::BinaryOp::Mul, Float, Float) => Some(BinaryOp::Fmul),
+        (ast::BinaryOp::Add, Int, Int) => Some(BinaryOp::Add),
+        (ast::BinaryOp::Add, Float, Float) => Some(BinaryOp::Fadd),
+        (ast::BinaryOp::Sub, Int, Int) => Some(BinaryOp::Sub),
+        (ast::BinaryOp::Sub, Float, Float) => Some(BinaryOp::Fsub),
+        (ast::BinaryOp::Shl, Int, Int) => Some(BinaryOp::Shl),
+        (ast::BinaryOp::Shr, Int, Int) => Some(BinaryOp::Asr),
+        (ast::BinaryOp::Min, Int, Int) => Some(BinaryOp::Min),
+        (ast::BinaryOp::Min, Float, Float) => Some(BinaryOp::Fmin),
+        (ast::BinaryOp::Max, Int, Int) => Some(BinaryOp::Max),
+        (ast::BinaryOp::Max, Float, Float) => Some(BinaryOp::Fmax),
+        (ast::BinaryOp::BitAnd, Int, Int) | (ast::BinaryOp::LogicalAnd, Bool, Bool) => {
+            Some(BinaryOp::And)
+        }
+        (ast::BinaryOp::BitOr, Int, Int) | (ast::BinaryOp::LogicalOr, Bool, Bool) => {
+            Some(BinaryOp::Or)
+        }
+        (ast::BinaryOp::BitXor, Int, Int) => Some(BinaryOp::Xor),
         _ => None,
     }
 }
@@ -880,12 +883,12 @@ fn get_float_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Op
 
 fn get_comp_op(op: ast::BinaryOp) -> Option<CompOp> {
     match op {
-        ast::Eq => Some(Eq),
-        ast::Ne => Some(Ne),
-        ast::Lt => Some(Lt),
-        ast::Gt => Some(Gt),
-        ast::Le => Some(Le),
-        ast::Ge => Some(Ge),
+        ast::BinaryOp::Eq => Some(CompOp::Eq),
+        ast::BinaryOp::Ne => Some(CompOp::Ne),
+        ast::BinaryOp::Lt => Some(CompOp::Lt),
+        ast::BinaryOp::Gt => Some(CompOp::Gt),
+        ast::BinaryOp::Le => Some(CompOp::Le),
+        ast::BinaryOp::Ge => Some(CompOp::Ge),
         _ => None,
     }
 }

@@ -1,18 +1,17 @@
 use std::fmt;
 
-use ast::loc::*;
 use ast::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct IntLiteral {
-    location: Location,
+    span: Span,
     value: i32,
 }
 
 impl IntLiteral {
     pub fn new(l: usize, value: i32, r: usize) -> IntLiteral {
         IntLiteral {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             value,
         }
     }
@@ -24,14 +23,14 @@ impl IntLiteral {
 
 #[derive(Debug, Clone, Copy)]
 pub struct FloatLiteral {
-    location: Location,
+    span: Span,
     value: f32,
 }
 
 impl FloatLiteral {
     pub fn new(l: usize, value: f32, r: usize) -> FloatLiteral {
         FloatLiteral {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             value,
         }
     }
@@ -43,14 +42,14 @@ impl FloatLiteral {
 
 #[derive(Debug, Clone, Copy)]
 pub struct BoolLiteral {
-    location: Location,
+    span: Span,
     value: bool,
 }
 
 impl BoolLiteral {
     pub fn new(l: usize, value: bool, r: usize) -> BoolLiteral {
         BoolLiteral {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             value,
         }
     }
@@ -62,40 +61,40 @@ impl BoolLiteral {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Index {
-    location: Location,
+    span: Span,
 }
 
 impl Index {
     pub fn new(l: usize, r: usize) -> Index {
         Index {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Count {
-    location: Location,
+    span: Span,
 }
 
 impl Count {
     pub fn new(l: usize, r: usize) -> Count {
         Count {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Identifier<'input> {
-    location: Location,
+    span: Span,
     name: &'input str,
 }
 
 impl<'input> Identifier<'input> {
     pub fn new(l: usize, name: &'input str, r: usize) -> Identifier<'input> {
         Identifier {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             name,
         }
     }
@@ -115,9 +114,9 @@ pub enum UnaryOp {
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match *self {
-            Negate => "-",
-            BitNot => "~",
-            LogicalNot => "!",
+            UnaryOp::Negate => "-",
+            UnaryOp::BitNot => "~",
+            UnaryOp::LogicalNot => "!",
         };
         write!(f, "{}", op)
     }
@@ -125,7 +124,7 @@ impl fmt::Display for UnaryOp {
 
 #[derive(Debug)]
 pub struct UnaryExpr<'input> {
-    location: Location,
+    span: Span,
     op: UnaryOp,
     expr: Box<Expr<'input>>,
 }
@@ -133,7 +132,7 @@ pub struct UnaryExpr<'input> {
 impl<'input> UnaryExpr<'input> {
     pub fn new(l: usize, op: UnaryOp, expr: Expr<'input>, r: usize) -> UnaryExpr<'input> {
         UnaryExpr {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             op,
             expr: Box::new(expr),
         }
@@ -173,24 +172,24 @@ pub enum BinaryOp {
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match *self {
-            Mul => "*",
-            Add => "+",
-            Sub => "-",
-            Shl => "<<",
-            Shr => ">>",
-            BitAnd => "&",
-            BitXor => "^",
-            BitOr => "|",
-            Min => "<?",
-            Max => ">?",
-            Eq => "==",
-            Ne => "!=",
-            Lt => "<",
-            Gt => ">",
-            Le => "<=",
-            Ge => ">=",
-            LogicalAnd => "&&",
-            LogicalOr => "||",
+            BinaryOp::Mul => "*",
+            BinaryOp::Add => "+",
+            BinaryOp::Sub => "-",
+            BinaryOp::Shl => "<<",
+            BinaryOp::Shr => ">>",
+            BinaryOp::BitAnd => "&",
+            BinaryOp::BitXor => "^",
+            BinaryOp::BitOr => "|",
+            BinaryOp::Min => "<?",
+            BinaryOp::Max => ">?",
+            BinaryOp::Eq => "==",
+            BinaryOp::Ne => "!=",
+            BinaryOp::Lt => "<",
+            BinaryOp::Gt => ">",
+            BinaryOp::Le => "<=",
+            BinaryOp::Ge => ">=",
+            BinaryOp::LogicalAnd => "&&",
+            BinaryOp::LogicalOr => "||",
         };
         write!(f, "{}", op)
     }
@@ -198,7 +197,7 @@ impl fmt::Display for BinaryOp {
 
 #[derive(Debug)]
 pub struct BinaryExpr<'input> {
-    location: Location,
+    span: Span,
     op: BinaryOp,
     left: Box<Expr<'input>>,
     right: Box<Expr<'input>>,
@@ -213,7 +212,7 @@ impl<'input> BinaryExpr<'input> {
         r: usize,
     ) -> BinaryExpr<'input> {
         BinaryExpr {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             op,
             left: Box::new(left),
             right: Box::new(right),
@@ -241,6 +240,6 @@ pub enum Expr<'input> {
     Index(Index),
     Count(Count),
     Identifier(Identifier<'input>),
-    UnaryExpr(UnaryExpr<'input>),
-    BinaryExpr(BinaryExpr<'input>),
+    Unary(UnaryExpr<'input>),
+    Binary(BinaryExpr<'input>),
 }

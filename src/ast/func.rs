@@ -1,11 +1,8 @@
-use std::slice::Iter;
-
-use ast::loc::*;
 use ast::*;
 
 #[derive(Debug)]
 pub struct Param<'input> {
-    location: Location,
+    span: Span,
     type_: Type,
     identifier: Identifier<'input>,
 }
@@ -13,7 +10,7 @@ pub struct Param<'input> {
 impl<'input> Param<'input> {
     pub fn new(l: usize, type_: Type, identifier: Identifier<'input>, r: usize) -> Param<'input> {
         Param {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             type_,
             identifier,
         }
@@ -28,35 +25,11 @@ impl<'input> Param<'input> {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Params<'input> {
-    params: Vec<Param<'input>>,
-}
-
-impl<'input> Params<'input> {
-    pub fn new() -> Params<'input> {
-        Params { params: Vec::new() }
-    }
-
-    pub fn push(&mut self, param: Param<'input>) {
-        self.params.push(param);
-    }
-}
-
-impl<'input, 'a> IntoIterator for &'a Params<'input> {
-    type Item = &'a Param<'input>;
-    type IntoIter = Iter<'a, Param<'input>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.params.iter()
-    }
-}
-
 #[derive(Debug)]
 pub struct Func<'input> {
-    location: Location,
+    span: Span,
     identifier: Identifier<'input>,
-    params: Params<'input>,
+    params: Vec<Param<'input>>,
     stmt: Box<Stmt<'input>>,
 }
 
@@ -64,19 +37,19 @@ impl<'input> Func<'input> {
     pub fn new(
         l: usize,
         identifier: Identifier<'input>,
-        params: Option<Params<'input>>,
+        params: Option<Vec<Param<'input>>>,
         stmt: Stmt<'input>,
         r: usize,
     ) -> Func<'input> {
         Func {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             identifier,
-            params: params.unwrap_or_else(Params::new),
+            params: params.unwrap_or_else(Vec::new),
             stmt: Box::new(stmt),
         }
     }
 
-    pub fn params(&self) -> &Params<'input> {
+    pub fn params(&self) -> &[Param<'input>] {
         &self.params
     }
 

@@ -1,18 +1,17 @@
 use std::ops::Deref;
 
-use ast::loc::*;
 use ast::*;
 
 #[derive(Debug)]
 pub struct BlockStmt<'input> {
-    location: Location,
+    span: Span,
     stmts: Vec<Stmt<'input>>,
 }
 
 impl<'input> BlockStmt<'input> {
     pub fn new(l: usize, stmts: Vec<Stmt<'input>>, r: usize) -> BlockStmt<'input> {
         BlockStmt {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             stmts,
         }
     }
@@ -24,7 +23,7 @@ impl<'input> BlockStmt<'input> {
 
 #[derive(Debug)]
 pub struct DeclStmt<'input> {
-    location: Location,
+    span: Span,
     type_: Type,
     identifier: Identifier<'input>,
     expr: Expr<'input>,
@@ -39,7 +38,7 @@ impl<'input> DeclStmt<'input> {
         r: usize,
     ) -> DeclStmt<'input> {
         DeclStmt {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             type_,
             identifier,
             expr,
@@ -61,7 +60,7 @@ impl<'input> DeclStmt<'input> {
 
 #[derive(Debug)]
 pub struct AssignStmt<'input> {
-    location: Location,
+    span: Span,
     identifier: Identifier<'input>,
     expr: Expr<'input>,
 }
@@ -74,7 +73,7 @@ impl<'input> AssignStmt<'input> {
         r: usize,
     ) -> AssignStmt<'input> {
         AssignStmt {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             identifier,
             expr,
         }
@@ -91,20 +90,20 @@ impl<'input> AssignStmt<'input> {
 
 #[derive(Debug)]
 pub struct ReturnStmt {
-    location: Location,
+    span: Span,
 }
 
 impl ReturnStmt {
     pub fn new(l: usize, r: usize) -> ReturnStmt {
         ReturnStmt {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
         }
     }
 }
 
 #[derive(Debug)]
 pub struct IfStmt<'input> {
-    location: Location,
+    span: Span,
     expr: Expr<'input>,
     if_stmt: Box<Stmt<'input>>,
     else_stmt: Option<Box<Stmt<'input>>>,
@@ -119,7 +118,7 @@ impl<'input> IfStmt<'input> {
         r: usize,
     ) -> IfStmt<'input> {
         IfStmt {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             expr,
             if_stmt: Box::new(if_stmt),
             else_stmt: else_stmt.map(Box::new),
@@ -141,7 +140,7 @@ impl<'input> IfStmt<'input> {
 
 #[derive(Debug)]
 pub struct WhileStmt<'input> {
-    location: Location,
+    span: Span,
     expr: Expr<'input>,
     stmt: Box<Stmt<'input>>,
 }
@@ -149,7 +148,7 @@ pub struct WhileStmt<'input> {
 impl<'input> WhileStmt<'input> {
     pub fn new(l: usize, expr: Expr<'input>, stmt: Stmt<'input>, r: usize) -> WhileStmt<'input> {
         WhileStmt {
-            location: Location::new(l, r),
+            span: Span::new(l, r),
             expr,
             stmt: Box::new(stmt),
         }
@@ -166,10 +165,10 @@ impl<'input> WhileStmt<'input> {
 
 #[derive(Debug)]
 pub enum Stmt<'input> {
-    BlockStmt(BlockStmt<'input>),
-    DeclStmt(DeclStmt<'input>),
-    AssignStmt(AssignStmt<'input>),
-    IfStmt(IfStmt<'input>),
-    WhileStmt(WhileStmt<'input>),
-    ReturnStmt(ReturnStmt),
+    Block(BlockStmt<'input>),
+    Decl(DeclStmt<'input>),
+    Assign(AssignStmt<'input>),
+    If(IfStmt<'input>),
+    While(WhileStmt<'input>),
+    Return(ReturnStmt),
 }

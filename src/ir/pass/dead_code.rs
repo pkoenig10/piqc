@@ -205,50 +205,50 @@ impl<'a> DeadCodePass<'a> {
         let inst_data = self.func.inst(inst);
 
         match *inst_data {
-            InstData::IntConstInst(ref data) => {
+            InstData::IntConst(ref data) => {
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::FloatConstInst(ref data) => {
+            InstData::FloatConst(ref data) => {
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::BoolConstInst(ref data) => {
+            InstData::BoolConst(ref data) => {
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::IndexInst(ref data) => {
+            InstData::Index(ref data) => {
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::CountInst(ref data) => {
+            InstData::Count(ref data) => {
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::UnaryInst(ref data) => {
+            InstData::Unary(ref data) => {
                 analysis.insert_use_operand(data.src(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::BinaryInst(ref data) => {
+            InstData::Binary(ref data) => {
                 analysis.insert_use_operand(data.left(), inst);
                 analysis.insert_use_operand(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::IntCompInst(ref data) => {
+            InstData::IntComp(ref data) => {
                 analysis.insert_use_operand(data.left(), inst);
                 analysis.insert_use_operand(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::FloatCompInst(ref data) => {
+            InstData::FloatComp(ref data) => {
                 analysis.insert_use_operand(data.left(), inst);
                 analysis.insert_use_operand(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::SelectInst(ref data) => {
+            InstData::Select(ref data) => {
                 analysis.insert_use(data.cond(), inst);
                 analysis.insert_use_operand(data.left(), inst);
                 analysis.insert_use_operand(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::JumpInst(ref data) => {
+            InstData::Jump(ref data) => {
                 analysis.insert_predecessor(data.target(), inst);
             }
-            InstData::BranchInst(ref data) => {
+            InstData::Branch(ref data) => {
                 analysis.insert_predecessor(data.target(), inst);
             }
             _ => {}

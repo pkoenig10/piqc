@@ -1,13 +1,12 @@
 #[macro_use]
 extern crate lalrpop_util;
 
+use piqc::ProgParser;
+
 mod ast;
-mod collections;
 mod ir;
 
 lalrpop_mod!(#[allow(clippy)] pub piqc);
-
-use piqc::ProgParser;
 
 pub fn compile(s: &str) -> String {
     let prog = parse(s);
@@ -22,6 +21,6 @@ pub fn compile(s: &str) -> String {
     format!("{}", prog)
 }
 
-pub fn parse<'input>(input: &'input str) -> ast::Prog<'input> {
+pub fn parse(input: &str) -> ast::Prog {
     ProgParser::new().parse(input).unwrap()
 }

@@ -1,6 +1,5 @@
 use std::fmt;
 
-use collections::*;
 use ir::*;
 
 #[derive(Debug)]
@@ -15,7 +14,7 @@ struct EbbNode {
 impl EbbNode {
     pub fn new(data: EbbData) -> EbbNode {
         EbbNode {
-            data: data,
+            data,
             prev_ebb: None,
             next_ebb: None,
             first_inst: None,
@@ -253,7 +252,7 @@ impl fmt::Display for Func {
         writeln!(f, "func({}):", DisplayList::new(&self.params))?;
         for ebb in self.ebbs() {
             let ebb_node = self.ebb(ebb);
-            writeln!(f, "")?;
+            writeln!(f)?;
             writeln!(f, "{}({}):", ebb, DisplayList::new(ebb_node.params()))?;
             for inst in self.insts(ebb) {
                 let inst_node = self.inst(inst);

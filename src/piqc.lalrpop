@@ -3,9 +3,9 @@ use ast::*;
 grammar;
 
 Type: Type = {
-    "int" => Int,
-    "float" => Float,
-    "bool" => Bool,
+    "int" => Type::Int,
+    "float" => Type::Float,
+    "bool" => Type::Bool,
 };
 
 Int: i32 = {
@@ -22,57 +22,57 @@ Bool: bool = {
 };
 
 UnaryOp: UnaryOp = {
-    "-" => Negate,
-    "~" => BitNot,
-    "!" => LogicalNot,
+    "-" => UnaryOp::Negate,
+    "~" => UnaryOp::BitNot,
+    "!" => UnaryOp::LogicalNot,
 };
 
 MultiplicativeOp: BinaryOp = {
-    "*" => Mul,
+    "*" => BinaryOp::Mul,
 };
 
 AdditiveOp: BinaryOp = {
-    "+" => Add,
-    "-" => Sub,
+    "+" => BinaryOp::Add,
+    "-" => BinaryOp::Sub,
 };
 
 ShiftOp: BinaryOp = {
-    "<<" => Shl,
-    ">>" => Shr,
+    "<<" => BinaryOp::Shl,
+    ">>" => BinaryOp::Shr,
 };
 
 BitAndOp: BinaryOp = {
-    "&" => BitAnd,
+    "&" => BinaryOp::BitAnd,
 };
 
 BitXorOp: BinaryOp = {
-    "^" => BitXor,
+    "^" => BinaryOp::BitXor,
 };
 
 BitOrOp: BinaryOp = {
-    "|" => BitOr,
+    "|" => BinaryOp::BitOr,
 };
 
 OrderOp: BinaryOp = {
-    "<?" => Min,
-    ">?" => Max,
+    "<?" => BinaryOp::Min,
+    ">?" => BinaryOp::Max,
 };
 
 ComparisonOp: BinaryOp = {
-    "==" => Eq,
-    "!=" => Ne,
-    "<" => Lt,
-    ">" => Gt,
-    "<=" => Le,
-    ">=" => Ge,
+    "==" => BinaryOp::Eq,
+    "!=" => BinaryOp::Ne,
+    "<" => BinaryOp::Lt,
+    ">" => BinaryOp::Gt,
+    "<=" => BinaryOp::Le,
+    ">=" => BinaryOp::Ge,
 };
 
 LogicalAndOp: BinaryOp = {
-    "&&" => LogicalAnd,
+    "&&" => BinaryOp::LogicalAnd,
 };
 
 LogicalOrOp: BinaryOp = {
-    "||" => LogicalOr,
+    "||" => BinaryOp::LogicalOr,
 };
 
 IntLiteral: IntLiteral = {
@@ -111,12 +111,12 @@ PrimaryExpr: Expr<'input> = {
 
 UnaryExpr: Expr<'input> = {
     PrimaryExpr,
-    @L UnaryOp UnaryExpr @R => Expr::UnaryExpr(UnaryExpr::new(<>)),
+    @L UnaryOp UnaryExpr @R => Expr::Unary(UnaryExpr::new(<>)),
 };
 
 BinaryExpr<Op, PrevExpr>: Expr<'input> = {
     PrevExpr,
-    @L BinaryExpr<Op, PrevExpr> Op PrevExpr @R => Expr::BinaryExpr(BinaryExpr::new(<>)),
+    @L BinaryExpr<Op, PrevExpr> Op PrevExpr @R => Expr::Binary(BinaryExpr::new(<>)),
 };
 
 MultiplicativeExpr = BinaryExpr<MultiplicativeOp, UnaryExpr>;
@@ -156,12 +156,12 @@ AssignStmt: AssignStmt<'input> = {
 };
 
 IfBlock: Stmt<'input> = {
-    BlockStmt => Stmt::BlockStmt(<>),
+    BlockStmt => Stmt::Block(<>),
 };
 
 ElseBlock: Stmt<'input> = {
-    BlockStmt => Stmt::BlockStmt(<>),
-    IfStmt => Stmt::IfStmt(<>),
+    BlockStmt => Stmt::Block(<>),
+    IfStmt => Stmt::If(<>),
 };
 
 IfStmt: IfStmt<'input> = {
@@ -169,7 +169,7 @@ IfStmt: IfStmt<'input> = {
 };
 
 WhileBlock: Stmt<'input> = {
-    BlockStmt => Stmt::BlockStmt(<>),
+    BlockStmt => Stmt::Block(<>),
 };
 
 WhileStmt: WhileStmt<'input> = {
@@ -181,28 +181,28 @@ ReturnStmt: ReturnStmt = {
 };
 
 Stmt: Stmt<'input> = {
-    BlockStmt => Stmt::BlockStmt(<>),
-    DeclStmt => Stmt::DeclStmt(<>),
-    AssignStmt => Stmt::AssignStmt(<>),
-    IfStmt => Stmt::IfStmt(<>),
-    WhileStmt => Stmt::WhileStmt(<>),
-    ReturnStmt => Stmt::ReturnStmt(<>),
+    BlockStmt => Stmt::Block(<>),
+    DeclStmt => Stmt::Decl(<>),
+    AssignStmt => Stmt::Assign(<>),
+    IfStmt => Stmt::If(<>),
+    WhileStmt => Stmt::While(<>),
+    ReturnStmt => Stmt::Return(<>),
 };
 
 Param: Param<'input> = {
     @L Type Identifier @R => Param::new(<>),
 };
 
-Params: Params<'input> = {
+Params: Vec<Param<'input>> = {
     <params: (<Params> ",")?> <param: Param> => {
-        let mut params = params.unwrap_or_else(Params::new);
+        let mut params = params.unwrap_or_else(Vec::new);
         params.push(param);
         params
     },
 };
 
 FuncBlock: Stmt<'input> = {
-    BlockStmt => Stmt::BlockStmt(<>),
+    BlockStmt => Stmt::Block(<>),
 };
 
 Func: Func<'input> = {
@@ -210,5 +210,5 @@ Func: Func<'input> = {
 };
 
 pub Prog: Prog<'input> = {
-    Func => Prog::new(<>),
+    @L Func @R => Prog::new(<>),
 };
