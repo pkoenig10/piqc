@@ -57,7 +57,9 @@ struct ValueTable<'a> {
 
 impl<'a> ValueTable<'a> {
     fn new() -> ValueTable<'a> {
-        ValueTable { values: HashMap::new() }
+        ValueTable {
+            values: HashMap::new(),
+        }
     }
 
     fn insert_param(&mut self, block: Block, variable: Variable<'a>, value: Value) {
@@ -65,9 +67,8 @@ impl<'a> ValueTable<'a> {
     }
 
     fn get_param(&self, block: Block, value: Value) -> Option<Variable<'a>> {
-        self.get_values(block).and_then(
-            |values| values.get_param(value),
-        )
+        self.get_values(block)
+            .and_then(|values| values.get_param(value))
     }
 
     fn insert_value(&mut self, block: Block, variable: Variable<'a>, value: Value) {
@@ -75,9 +76,8 @@ impl<'a> ValueTable<'a> {
     }
 
     fn get_value(&self, block: Block, variable: Variable<'a>) -> Option<Value> {
-        self.get_values(block).and_then(
-            |values| values.get_value(variable),
-        )
+        self.get_values(block)
+            .and_then(|values| values.get_value(variable))
     }
 
     fn get_values(&self, block: Block) -> Option<&BlockValues<'a>> {
@@ -412,15 +412,11 @@ impl<'input> IrBuilder<'input> {
                 let zero = Operand::FloatImmediate(FloatImmediate::new(0.));
                 self.push_binary_inst(Fsub, zero, src)
             }
-            (ast::BitNot, Int) |
-            (ast::LogicalNot, Bool) => self.push_unary_inst(Not, src),
-            _ => {
-                panic!(
-                    "Invalid unary expression '{}' with operand type '{}'",
-                    op,
-                    src_type
-                )
-            }
+            (ast::BitNot, Int) | (ast::LogicalNot, Bool) => self.push_unary_inst(Not, src),
+            _ => panic!(
+                "Invalid unary expression '{}' with operand type '{}'",
+                op, src_type
+            ),
         }
     }
 
@@ -449,9 +445,7 @@ impl<'input> IrBuilder<'input> {
 
         panic!(
             "Invalid binary expression '{}' with operand types '{}' and '{}'",
-            op,
-            left_type,
-            right_type
+            op, left_type, right_type
         )
     }
 
@@ -474,11 +468,9 @@ impl<'input> IrBuilder<'input> {
                     let value_type = self.get_value_type(value);
                     let type_ = *type_.get_or_insert(value_type);
                     assert_eq!(
-                        type_,
-                        value_type,
+                        type_, value_type,
                         "Variable defined with multiple types '{}' and '{}'",
-                        type_,
-                        value_type
+                        type_, value_type
                     );
                 }
                 Err(data) => {
@@ -521,12 +513,10 @@ impl<'input> IrBuilder<'input> {
         loop {
             match self.values.get_value(block, variable) {
                 Some(value) => return Ok(value),
-                None => {
-                    match *self.blocks.get(block) {
-                        BlockData::Header(ref data) => return Err(data),
-                        BlockData::Body(ref data) => block = data.predecessor(),
-                    }
-                }
+                None => match *self.blocks.get(block) {
+                    BlockData::Header(ref data) => return Err(data),
+                    BlockData::Body(ref data) => block = data.predecessor(),
+                },
             }
         }
     }
@@ -579,9 +569,8 @@ impl<'input> IrBuilder<'input> {
 
     fn create_block(&mut self) -> Block {
         let predecessor = self.position().block();
-        self.blocks.create(
-            BlockData::Body(BodyBlock::new(predecessor)),
-        )
+        self.blocks
+            .create(BlockData::Body(BodyBlock::new(predecessor)))
     }
 
     fn create_block_param(&mut self, variable: Variable<'input>, ebb: Ebb, type_: Type) -> Value {
@@ -609,15 +598,13 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn create_inst_value(&mut self, type_: Type) -> Value {
-        self.func.create_value(
-            ValueData::Inst(InstValue::new(type_)),
-        )
+        self.func
+            .create_value(ValueData::Inst(InstValue::new(type_)))
     }
 
     fn create_param_value(&mut self, type_: Type) -> Value {
-        self.func.create_value(
-            ValueData::Param(ParamValue::new(type_)),
-        )
+        self.func
+            .create_value(ValueData::Param(ParamValue::new(type_)))
     }
 
     fn push_target_arg(&mut self, inst: Inst, value: Value) {
@@ -870,10 +857,8 @@ fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option
         (ast::Min, Float, Float) => Some(Fmin),
         (ast::Max, Int, Int) => Some(Max),
         (ast::Max, Float, Float) => Some(Fmax),
-        (ast::BitAnd, Int, Int) |
-        (ast::LogicalAnd, Bool, Bool) => Some(And),
-        (ast::BitOr, Int, Int) |
-        (ast::LogicalOr, Bool, Bool) => Some(Or),
+        (ast::BitAnd, Int, Int) | (ast::LogicalAnd, Bool, Bool) => Some(And),
+        (ast::BitOr, Int, Int) | (ast::LogicalOr, Bool, Bool) => Some(Or),
         (ast::BitXor, Int, Int) => Some(Xor),
         _ => None,
     }

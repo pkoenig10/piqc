@@ -282,10 +282,7 @@ impl fmt::Display for BinaryInst {
         write!(
             f,
             "{} = {} {}, {}",
-            self.dest,
-            self.op,
-            self.left,
-            self.right
+            self.dest, self.op, self.left, self.right
         )
     }
 }
@@ -356,10 +353,7 @@ impl fmt::Display for IntCompInst {
         write!(
             f,
             "{} = icmp {} {}, {}",
-            self.dest,
-            self.op,
-            self.left,
-            self.right
+            self.dest, self.op, self.left, self.right
         )
     }
 }
@@ -406,10 +400,7 @@ impl fmt::Display for FloatCompInst {
         write!(
             f,
             "{} = fcmp {} {}, {}",
-            self.dest,
-            self.op,
-            self.left,
-            self.right
+            self.dest, self.op, self.left, self.right
         )
     }
 }
@@ -602,8 +593,7 @@ pub enum InstData {
 impl InstData {
     pub fn is_terminator(&self) -> bool {
         match *self {
-            InstData::JumpInst(_) |
-            InstData::ReturnInst(_) => true,
+            InstData::JumpInst(_) | InstData::ReturnInst(_) => true,
             _ => false,
         }
     }

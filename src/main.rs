@@ -8,9 +8,8 @@ fn main() {
     let filename = env::args().nth(1).expect("filename not given");
     let mut file = File::open(filename).expect("file not found");
     let mut input = String::new();
-    file.read_to_string(&mut input).expect(
-        "unable to read file",
-    );
+    file.read_to_string(&mut input)
+        .expect("unable to read file");
 
     println!("{}", piqc::compile(&input));
 }

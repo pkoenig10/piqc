@@ -43,7 +43,8 @@ impl EbbData {
     }
 
     pub fn swap_remove_param(&mut self, value: Value) -> usize {
-        let index = self.params
+        let index = self
+            .params
             .iter()
             .position(|&param| param == value)
             .unwrap();

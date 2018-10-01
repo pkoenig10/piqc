@@ -64,9 +64,10 @@ impl Analysis {
     }
 
     fn insert_use(&mut self, value: Value, inst: Inst) {
-        self.uses.entry(value).or_insert_with(HashSet::new).insert(
-            inst,
-        );
+        self.uses
+            .entry(value)
+            .or_insert_with(HashSet::new)
+            .insert(inst);
     }
 
     fn insert_use_operand(&mut self, operand: Operand, inst: Inst) {

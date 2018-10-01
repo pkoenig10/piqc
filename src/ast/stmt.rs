@@ -96,7 +96,9 @@ pub struct ReturnStmt {
 
 impl ReturnStmt {
     pub fn new(l: usize, r: usize) -> ReturnStmt {
-        ReturnStmt { location: Location::new(l, r) }
+        ReturnStmt {
+            location: Location::new(l, r),
+        }
     }
 }
 
