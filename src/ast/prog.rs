@@ -3,7 +3,7 @@ use ast::*;
 #[derive(Debug)]
 pub struct Prog<'input> {
     span: Span,
-    func: Func<'input>,
+    pub func: Func<'input>,
 }
 
 impl<'input> Prog<'input> {
@@ -12,9 +12,5 @@ impl<'input> Prog<'input> {
             span: Span::new(l, r),
             func,
         }
-    }
-
-    pub fn func(&self) -> &Func<'input> {
-        &self.func
     }
 }

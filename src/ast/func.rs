@@ -3,8 +3,8 @@ use ast::*;
 #[derive(Debug)]
 pub struct Param<'input> {
     span: Span,
-    type_: Type,
-    identifier: Identifier<'input>,
+    pub type_: Type,
+    pub identifier: Identifier<'input>,
 }
 
 impl<'input> Param<'input> {
@@ -15,22 +15,14 @@ impl<'input> Param<'input> {
             identifier,
         }
     }
-
-    pub fn type_(&self) -> Type {
-        self.type_
-    }
-
-    pub fn identifier(&self) -> &Identifier<'input> {
-        &self.identifier
-    }
 }
 
 #[derive(Debug)]
 pub struct Func<'input> {
     span: Span,
-    identifier: Identifier<'input>,
-    params: Vec<Param<'input>>,
-    stmt: Box<Stmt<'input>>,
+    pub identifier: Identifier<'input>,
+    pub params: Vec<Param<'input>>,
+    pub stmt: Box<Stmt<'input>>,
 }
 
 impl<'input> Func<'input> {
@@ -47,13 +39,5 @@ impl<'input> Func<'input> {
             params: params.unwrap_or_else(Vec::new),
             stmt: Box::new(stmt),
         }
-    }
-
-    pub fn params(&self) -> &[Param<'input>] {
-        &self.params
-    }
-
-    pub fn stmt(&self) -> &Stmt<'input> {
-        &self.stmt
     }
 }

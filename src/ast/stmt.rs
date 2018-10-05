@@ -1,11 +1,9 @@
-use std::ops::Deref;
-
 use ast::*;
 
 #[derive(Debug)]
 pub struct BlockStmt<'input> {
     span: Span,
-    stmts: Vec<Stmt<'input>>,
+    pub stmts: Vec<Stmt<'input>>,
 }
 
 impl<'input> BlockStmt<'input> {
@@ -15,18 +13,14 @@ impl<'input> BlockStmt<'input> {
             stmts,
         }
     }
-
-    pub fn stmts(&self) -> &[Stmt<'input>] {
-        &self.stmts
-    }
 }
 
 #[derive(Debug)]
 pub struct DeclStmt<'input> {
     span: Span,
-    type_: Type,
-    identifier: Identifier<'input>,
-    expr: Expr<'input>,
+    pub type_: Type,
+    pub identifier: Identifier<'input>,
+    pub expr: Expr<'input>,
 }
 
 impl<'input> DeclStmt<'input> {
@@ -44,25 +38,13 @@ impl<'input> DeclStmt<'input> {
             expr,
         }
     }
-
-    pub fn type_(&self) -> Type {
-        self.type_
-    }
-
-    pub fn identifier(&self) -> &Identifier<'input> {
-        &self.identifier
-    }
-
-    pub fn expr(&self) -> &Expr<'input> {
-        &self.expr
-    }
 }
 
 #[derive(Debug)]
 pub struct AssignStmt<'input> {
     span: Span,
-    identifier: Identifier<'input>,
-    expr: Expr<'input>,
+    pub identifier: Identifier<'input>,
+    pub expr: Expr<'input>,
 }
 
 impl<'input> AssignStmt<'input> {
@@ -77,14 +59,6 @@ impl<'input> AssignStmt<'input> {
             identifier,
             expr,
         }
-    }
-
-    pub fn identifier(&self) -> &Identifier<'input> {
-        &self.identifier
-    }
-
-    pub fn expr(&self) -> &Expr<'input> {
-        &self.expr
     }
 }
 
@@ -104,9 +78,9 @@ impl ReturnStmt {
 #[derive(Debug)]
 pub struct IfStmt<'input> {
     span: Span,
-    expr: Expr<'input>,
-    if_stmt: Box<Stmt<'input>>,
-    else_stmt: Option<Box<Stmt<'input>>>,
+    pub expr: Expr<'input>,
+    pub if_stmt: Box<Stmt<'input>>,
+    pub else_stmt: Option<Box<Stmt<'input>>>,
 }
 
 impl<'input> IfStmt<'input> {
@@ -124,25 +98,13 @@ impl<'input> IfStmt<'input> {
             else_stmt: else_stmt.map(Box::new),
         }
     }
-
-    pub fn expr(&self) -> &Expr<'input> {
-        &self.expr
-    }
-
-    pub fn if_stmt(&self) -> &Stmt<'input> {
-        &self.if_stmt
-    }
-
-    pub fn else_stmt(&self) -> Option<&Stmt<'input>> {
-        self.else_stmt.as_ref().map(Box::deref)
-    }
 }
 
 #[derive(Debug)]
 pub struct WhileStmt<'input> {
     span: Span,
-    expr: Expr<'input>,
-    stmt: Box<Stmt<'input>>,
+    pub expr: Expr<'input>,
+    pub stmt: Box<Stmt<'input>>,
 }
 
 impl<'input> WhileStmt<'input> {
@@ -152,14 +114,6 @@ impl<'input> WhileStmt<'input> {
             expr,
             stmt: Box::new(stmt),
         }
-    }
-
-    pub fn expr(&self) -> &Expr<'input> {
-        &self.expr
-    }
-
-    pub fn stmt(&self) -> &Stmt<'input> {
-        &self.stmt
     }
 }
 

@@ -5,7 +5,7 @@ use ast::*;
 #[derive(Debug, Clone, Copy)]
 pub struct IntLiteral {
     span: Span,
-    value: i32,
+    pub value: i32,
 }
 
 impl IntLiteral {
@@ -15,16 +15,12 @@ impl IntLiteral {
             value,
         }
     }
-
-    pub fn value(&self) -> i32 {
-        self.value
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct FloatLiteral {
     span: Span,
-    value: f32,
+    pub value: f32,
 }
 
 impl FloatLiteral {
@@ -34,16 +30,12 @@ impl FloatLiteral {
             value,
         }
     }
-
-    pub fn value(&self) -> f32 {
-        self.value
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct BoolLiteral {
     span: Span,
-    value: bool,
+    pub value: bool,
 }
 
 impl BoolLiteral {
@@ -52,10 +44,6 @@ impl BoolLiteral {
             span: Span::new(l, r),
             value,
         }
-    }
-
-    pub fn value(&self) -> bool {
-        self.value
     }
 }
 
@@ -88,7 +76,7 @@ impl Count {
 #[derive(Debug, Clone, Copy)]
 pub struct Identifier<'input> {
     span: Span,
-    name: &'input str,
+    pub name: &'input str,
 }
 
 impl<'input> Identifier<'input> {
@@ -97,10 +85,6 @@ impl<'input> Identifier<'input> {
             span: Span::new(l, r),
             name,
         }
-    }
-
-    pub fn name(&self) -> &'input str {
-        self.name
     }
 }
 
@@ -125,8 +109,8 @@ impl fmt::Display for UnaryOp {
 #[derive(Debug)]
 pub struct UnaryExpr<'input> {
     span: Span,
-    op: UnaryOp,
-    expr: Box<Expr<'input>>,
+    pub op: UnaryOp,
+    pub expr: Box<Expr<'input>>,
 }
 
 impl<'input> UnaryExpr<'input> {
@@ -136,14 +120,6 @@ impl<'input> UnaryExpr<'input> {
             op,
             expr: Box::new(expr),
         }
-    }
-
-    pub fn op(&self) -> UnaryOp {
-        self.op
-    }
-
-    pub fn expr(&self) -> &Expr<'input> {
-        &self.expr
     }
 }
 
@@ -198,9 +174,9 @@ impl fmt::Display for BinaryOp {
 #[derive(Debug)]
 pub struct BinaryExpr<'input> {
     span: Span,
-    op: BinaryOp,
-    left: Box<Expr<'input>>,
-    right: Box<Expr<'input>>,
+    pub op: BinaryOp,
+    pub left: Box<Expr<'input>>,
+    pub right: Box<Expr<'input>>,
 }
 
 impl<'input> BinaryExpr<'input> {
@@ -217,18 +193,6 @@ impl<'input> BinaryExpr<'input> {
             left: Box::new(left),
             right: Box::new(right),
         }
-    }
-
-    pub fn op(&self) -> BinaryOp {
-        self.op
-    }
-
-    pub fn left(&self) -> &Expr<'input> {
-        &self.left
-    }
-
-    pub fn right(&self) -> &Expr<'input> {
-        &self.right
     }
 }
 

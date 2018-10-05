@@ -6,7 +6,7 @@ use ir::*;
 
 pub fn generate_ir(prog: &ast::Prog) -> Prog {
     let builder = IrBuilder::new();
-    let func = builder.generate_func(prog.func());
+    let func = builder.generate_func(&prog.func);
     Prog::new(func)
 }
 
@@ -130,10 +130,10 @@ impl<'input> IrBuilder<'input> {
         let entry_ebb = self.create_ebb();
         self.set_position_ebb(entry_ebb);
 
-        for param in func.params() {
-            let name = param.identifier().name();
+        for param in &func.params {
+            let name = param.identifier.name;
             let variable = Variable::Variable(name);
-            let type_ = match param.type_() {
+            let type_ = match param.type_ {
                 ast::Type::Int => Type::new(Uniform, Int),
                 ast::Type::Float => Type::new(Uniform, Float),
                 ast::Type::Bool => Type::new(Uniform, Bool),
@@ -148,7 +148,7 @@ impl<'input> IrBuilder<'input> {
         let count_value = self.push_int_const_inst(0);
         self.insert_value(Variable::Count, count_value);
 
-        self.generate_stmt(func.stmt());
+        self.generate_stmt(&func.stmt);
 
         let ebb = self.position().ebb();
         let inst = self.func.last_inst(ebb);
@@ -171,24 +171,24 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn generate_block_stmt(&mut self, stmt: &ast::BlockStmt<'input>) {
-        for stmt in stmt.stmts() {
+        for stmt in &stmt.stmts {
             self.generate_stmt(stmt);
         }
     }
 
     fn generate_decl_stmt(&mut self, stmt: &ast::DeclStmt<'input>) {
-        let expr_value = self.generate_expr(stmt.expr());
+        let expr_value = self.generate_expr(&stmt.expr);
 
-        let name = stmt.identifier().name();
+        let name = stmt.identifier.name;
         let variable = Variable::Variable(name);
 
         self.insert_value(variable, expr_value);
     }
 
     fn generate_assign_stmt(&mut self, stmt: &ast::AssignStmt<'input>) {
-        let expr_value = self.generate_expr(stmt.expr());
+        let expr_value = self.generate_expr(&stmt.expr);
 
-        let name = stmt.identifier().name();
+        let name = stmt.identifier.name;
         let variable = Variable::Variable(name);
 
         let predicate_value = self.get_value(Variable::Predicate);
@@ -201,11 +201,11 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn generate_if_stmt(&mut self, stmt: &ast::IfStmt<'input>) {
-        let condition_value = self.generate_expr(stmt.expr());
+        let condition_value = self.generate_expr(&stmt.expr);
 
         let qualifier = self.get_value_type(condition_value).qualifier();
-        let if_stmt = stmt.if_stmt();
-        let else_stmt = stmt.else_stmt();
+        let if_stmt = &stmt.if_stmt;
+        let else_stmt = &stmt.else_stmt;
 
         match (qualifier, else_stmt) {
             (Uniform, None) => {
@@ -298,10 +298,10 @@ impl<'input> IrBuilder<'input> {
         self.push_jump_inst(header_ebb);
         self.set_position_ebb(header_ebb);
 
-        let condition_value = self.generate_expr(stmt.expr());
+        let condition_value = self.generate_expr(&stmt.expr);
 
         let qualifier = self.get_value_type(condition_value).qualifier();
-        let while_stmt = stmt.stmt();
+        let while_stmt = &stmt.stmt;
 
         match qualifier {
             Uniform => self.generate_uniform_while_statement(condition_value, while_stmt),
@@ -366,15 +366,15 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn generate_int_literal(&mut self, int_literal: &ast::IntLiteral) -> Value {
-        self.push_int_const_inst(int_literal.value())
+        self.push_int_const_inst(int_literal.value)
     }
 
     fn generate_float_literal(&mut self, float_literal: &ast::FloatLiteral) -> Value {
-        self.push_float_const_inst(float_literal.value())
+        self.push_float_const_inst(float_literal.value)
     }
 
     fn generate_bool_literal(&mut self, bool_literal: &ast::BoolLiteral) -> Value {
-        self.push_bool_const_inst(bool_literal.value())
+        self.push_bool_const_inst(bool_literal.value)
     }
 
     fn generate_index(&mut self) -> Value {
@@ -386,15 +386,15 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn generate_identifier(&mut self, identifier: &ast::Identifier<'input>) -> Value {
-        let name = identifier.name();
+        let name = identifier.name;
         let variable = Variable::Variable(name);
         self.get_value(variable)
     }
 
     fn generate_unary_expr(&mut self, expr: &ast::UnaryExpr<'input>) -> Value {
-        let src_value = self.generate_expr(expr.expr());
+        let src_value = self.generate_expr(&expr.expr);
 
-        let op = expr.op();
+        let op = expr.op;
         let src_type = self.get_value_type(src_value);
 
         let src = Operand::Value(src_value);
@@ -417,10 +417,10 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn generate_binary_expr(&mut self, expr: &ast::BinaryExpr<'input>) -> Value {
-        let left_value = self.generate_expr(expr.left());
-        let right_value = self.generate_expr(expr.right());
+        let left_value = self.generate_expr(&expr.left);
+        let right_value = self.generate_expr(&expr.right);
 
-        let op = expr.op();
+        let op = expr.op;
         let left_type = self.get_value_type(left_value);
         let right_type = self.get_value_type(right_value);
 

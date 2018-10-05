@@ -4,7 +4,7 @@ use ast::*;
 
 pub fn type_check(prog: &Prog) {
     let mut type_checker = TypeChecker::new();
-    type_checker.check_func(prog.func());
+    type_checker.check_func(&prog.func);
 }
 
 #[derive(Debug)]
@@ -70,11 +70,11 @@ impl<'input> TypeChecker<'input> {
     fn check_func(&mut self, func: &Func<'input>) {
         self.symbols.push_scope();
 
-        for param in func.params() {
-            self.insert_symbol(param.identifier(), param.type_());
+        for param in &func.params {
+            self.insert_symbol(&param.identifier, param.type_);
         }
 
-        self.check_stmt(func.stmt());
+        self.check_stmt(&func.stmt);
 
         self.symbols.pop_scope();
     }
@@ -93,7 +93,7 @@ impl<'input> TypeChecker<'input> {
     fn check_block_stmt(&mut self, stmt: &BlockStmt<'input>) {
         self.symbols.push_scope();
 
-        for stmt in stmt.stmts() {
+        for stmt in &stmt.stmts {
             self.check_stmt(stmt);
         }
 
@@ -101,22 +101,22 @@ impl<'input> TypeChecker<'input> {
     }
 
     fn check_decl_stmt(&mut self, stmt: &DeclStmt<'input>) {
-        let expr_type = self.check_expr(stmt.expr());
+        let expr_type = self.check_expr(&stmt.expr);
 
-        let type_ = stmt.type_();
+        let type_ = stmt.type_;
         assert_eq!(
             type_, expr_type,
             "Mismatched types '{}' and '{}'",
             type_, expr_type
         );
 
-        self.insert_symbol(stmt.identifier(), type_);
+        self.insert_symbol(&stmt.identifier, type_);
     }
 
     fn check_assign_stmt(&mut self, stmt: &AssignStmt<'input>) {
-        let expr_type = self.check_expr(stmt.expr());
+        let expr_type = self.check_expr(&stmt.expr);
 
-        let type_ = self.check_identifier(stmt.identifier());
+        let type_ = self.check_identifier(&stmt.identifier);
         assert_eq!(
             type_, expr_type,
             "Mismatched types '{}' and '{}'",
@@ -125,7 +125,7 @@ impl<'input> TypeChecker<'input> {
     }
 
     fn check_if_stmt(&mut self, stmt: &IfStmt<'input>) {
-        let expr_type = self.check_expr(stmt.expr());
+        let expr_type = self.check_expr(&stmt.expr);
         assert_eq!(
             expr_type,
             Type::Bool,
@@ -133,15 +133,15 @@ impl<'input> TypeChecker<'input> {
             expr_type
         );
 
-        self.check_stmt(stmt.if_stmt());
+        self.check_stmt(&stmt.if_stmt);
 
-        if let Some(else_stmt) = stmt.else_stmt() {
+        if let Some(else_stmt) = &stmt.else_stmt {
             self.check_stmt(else_stmt);
         }
     }
 
     fn check_while_stmt(&mut self, stmt: &WhileStmt<'input>) {
-        let expr_type = self.check_expr(stmt.expr());
+        let expr_type = self.check_expr(&stmt.expr);
         assert_eq!(
             expr_type,
             Type::Bool,
@@ -149,7 +149,7 @@ impl<'input> TypeChecker<'input> {
             expr_type
         );
 
-        self.check_stmt(stmt.stmt());
+        self.check_stmt(&stmt.stmt);
     }
 
     fn check_expr(&mut self, expr: &Expr) -> Type {
@@ -168,9 +168,9 @@ impl<'input> TypeChecker<'input> {
     }
 
     fn check_unary_expr(&mut self, expr: &UnaryExpr) -> Type {
-        let expr_type = self.check_expr(expr.expr());
+        let expr_type = self.check_expr(&expr.expr);
 
-        let op = expr.op();
+        let op = expr.op;
 
         match (op, expr_type) {
             (UnaryOp::Negate, Type::Int) | (UnaryOp::BitNot, Type::Int) => Type::Int,
@@ -184,10 +184,10 @@ impl<'input> TypeChecker<'input> {
     }
 
     fn check_binary_expr(&mut self, expr: &BinaryExpr) -> Type {
-        let left_type = self.check_expr(expr.left());
-        let right_type = self.check_expr(expr.right());
+        let left_type = self.check_expr(&expr.left);
+        let right_type = self.check_expr(&expr.right);
 
-        let op = expr.op();
+        let op = expr.op;
 
         match (op, left_type, right_type) {
             (BinaryOp::Add, Type::Int, Type::Int)
@@ -229,10 +229,10 @@ impl<'input> TypeChecker<'input> {
 
     fn insert_symbol(&mut self, identifier: &Identifier<'input>, type_: Type) {
         let symbol = Symbol::new(*identifier, type_);
-        self.symbols.insert(identifier.name(), symbol);
+        self.symbols.insert(identifier.name, symbol);
     }
 
     fn get_symbol(&self, identifier: &Identifier) -> &Symbol<'input> {
-        self.symbols.get(identifier.name()).unwrap()
+        self.symbols.get(identifier.name).unwrap()
     }
 }
