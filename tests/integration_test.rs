@@ -1,10 +1,14 @@
+#[macro_use(assert_diff)]
+extern crate difference;
 extern crate piqc;
 
 macro_rules! test_compile {
     ($piq_file:expr, $ir_file:expr) => {
-        assert_eq!(
-            piqc::compile(include_str!($piq_file)),
-            include_str!($ir_file)
+        assert_diff!(
+            include_str!($ir_file),
+            &piqc::compile(include_str!($piq_file)),
+            "\n",
+            0
         );
     };
 }

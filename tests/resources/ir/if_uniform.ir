@@ -1,16 +1,12 @@
 func(bool):
 
 ebb0(%0):
-    %1 = bconst true
-    %2 = iconst 0
-    %3 = iconst 0
-    br allf %0 ebb1(%3)
-    %4 = iconst 1
-    %5 = select %1, %4, %3
-    jmp ebb1(%5)
+    %1 = iconst 0
+    br allf %0 ebb1(%1)
+    %2 = iconst 1
+    jmp ebb1(%2)
 
-ebb1(%6):
-    %7 = iconst 1
-    %8 = add %6, %7
-    %10 = select %1, %8, %6
+ebb1(%3):
+    %4 = iconst 1
+    %5 = add %3, %4
     ret

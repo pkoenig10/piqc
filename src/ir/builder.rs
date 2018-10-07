@@ -10,12 +10,7 @@ pub fn generate_ir(prog: &ast::Prog) -> Prog {
     Prog::new(func)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum Variable<'a> {
-    Variable(&'a str),
-    Predicate,
-    Count,
-}
+type Variable<'a> = &'a str;
 
 #[derive(Debug)]
 struct BlockValues<'a> {
@@ -113,6 +108,7 @@ struct IrBuilder<'input> {
     blocks: Map<Block, BlockData>,
     header_blocks: HashMap<Ebb, Block>,
     position: Option<Position>,
+    predicate: Option<Value>,
 }
 
 impl<'input> IrBuilder<'input> {
@@ -123,6 +119,7 @@ impl<'input> IrBuilder<'input> {
             blocks: Map::new(),
             header_blocks: HashMap::new(),
             position: None,
+            predicate: None,
         }
     }
 
@@ -131,8 +128,7 @@ impl<'input> IrBuilder<'input> {
         self.set_position_ebb(entry_ebb);
 
         for param in &func.params {
-            let name = param.identifier.name;
-            let variable = Variable::Variable(name);
+            let variable = param.identifier.name;
             let type_ = match param.type_ {
                 ast::Type::Int => Type::new(Uniform, Int),
                 ast::Type::Float => Type::new(Uniform, Float),
@@ -141,12 +137,6 @@ impl<'input> IrBuilder<'input> {
             self.create_func_param(type_);
             self.create_block_param(variable, entry_ebb, type_);
         }
-
-        let predicate_value = self.push_bool_const_inst(true);
-        self.insert_value(Variable::Predicate, predicate_value);
-
-        let count_value = self.push_int_const_inst(0);
-        self.insert_value(Variable::Count, count_value);
 
         self.generate_stmt(&func.stmt);
 
@@ -179,23 +169,27 @@ impl<'input> IrBuilder<'input> {
     fn generate_decl_stmt(&mut self, stmt: &ast::DeclStmt<'input>) {
         let expr_value = self.generate_expr(&stmt.expr);
 
-        let name = stmt.identifier.name;
-        let variable = Variable::Variable(name);
+        let variable = stmt.identifier.name;
 
         self.insert_value(variable, expr_value);
     }
 
     fn generate_assign_stmt(&mut self, stmt: &ast::AssignStmt<'input>) {
+        let variable = stmt.identifier.name;
+
         let expr_value = self.generate_expr(&stmt.expr);
 
-        let name = stmt.identifier.name;
-        let variable = Variable::Variable(name);
-
-        let predicate_value = self.get_value(Variable::Predicate);
-        let prev_value = self.get_value(variable);
-        let expr = Operand::Value(expr_value);
-        let prev = Operand::Value(prev_value);
-        let value = self.push_select_inst(predicate_value, expr, prev);
+        let value = match self.predicate {
+            Some(predicate) => {
+                let prev_value = self.get_value(variable);
+                self.push_select_inst(
+                    predicate,
+                    Operand::Value(expr_value),
+                    Operand::Value(prev_value),
+                )
+            }
+            None => expr_value,
+        };
 
         self.insert_value(variable, value);
     }
@@ -204,96 +198,47 @@ impl<'input> IrBuilder<'input> {
         let condition_value = self.generate_expr(&stmt.expr);
 
         let qualifier = self.get_value_type(condition_value).qualifier();
-        let if_stmt = &stmt.if_stmt;
-        let else_stmt = &stmt.else_stmt;
+        match qualifier {
+            Uniform => {
+                let else_ebb = self.create_ebb();
+                let merge_ebb = match stmt.else_stmt {
+                    Some(_) => self.create_ebb(),
+                    None => else_ebb,
+                };
 
-        match (qualifier, else_stmt) {
-            (Uniform, None) => {
-                self.generate_uniform_if_statement(condition_value, if_stmt);
+                self.push_branch_inst(BranchOp::AllFalse, condition_value, else_ebb);
+
+                self.generate_stmt(&stmt.if_stmt);
+                self.push_jump_inst(merge_ebb);
+
+                if let Some(ref else_stmt) = stmt.else_stmt {
+                    self.set_position_ebb(else_ebb);
+
+                    self.generate_stmt(else_stmt);
+                    self.push_jump_inst(merge_ebb);
+                }
+
+                self.set_position_ebb(merge_ebb);
             }
-            (Uniform, Some(else_stmt)) => {
-                self.generate_uniform_if_else_statement(condition_value, if_stmt, else_stmt);
+            Varying => {
+                let prev_predicate = self.set_predicate_and(condition_value);
+
+                self.generate_stmt(&stmt.if_stmt);
+                self.reset_predicate(prev_predicate);
+
+                if let Some(ref else_stmt) = stmt.else_stmt {
+                    self.set_predicate_and_not(condition_value);
+
+                    self.generate_stmt(else_stmt);
+                    self.reset_predicate(prev_predicate);
+                }
             }
-            (Varying, None) => {
-                self.generate_varying_if_statement(condition_value, if_stmt);
-            }
-            (Varying, Some(else_stmt)) => {
-                self.generate_varying_if_else_statement(condition_value, if_stmt, else_stmt);
-            }
-        };
-    }
-
-    fn generate_uniform_if_statement(
-        &mut self,
-        condition_value: Value,
-        if_stmt: &ast::Stmt<'input>,
-    ) {
-        let merge_ebb = self.create_ebb();
-
-        self.push_branch_inst(BranchOp::AllFalse, condition_value, merge_ebb);
-
-        self.generate_stmt(if_stmt);
-        self.push_jump_inst(merge_ebb);
-        self.set_position_ebb(merge_ebb);
-    }
-
-    fn generate_uniform_if_else_statement(
-        &mut self,
-        condition_value: Value,
-        if_stmt: &ast::Stmt<'input>,
-        else_stmt: &ast::Stmt<'input>,
-    ) {
-        let else_ebb = self.create_ebb();
-        let merge_ebb = self.create_ebb();
-
-        self.push_branch_inst(BranchOp::AllFalse, condition_value, else_ebb);
-
-        self.generate_stmt(if_stmt);
-        self.push_jump_inst(merge_ebb);
-        self.set_position_ebb(else_ebb);
-
-        self.generate_stmt(else_stmt);
-        self.push_jump_inst(merge_ebb);
-        self.set_position_ebb(merge_ebb);
-    }
-
-    fn generate_varying_if_statement(
-        &mut self,
-        condition_value: Value,
-        if_stmt: &ast::Stmt<'input>,
-    ) {
-        self.increment_count();
-        self.push_predicate(condition_value);
-
-        self.generate_stmt(if_stmt);
-
-        self.pop_predicate();
-        self.decrement_count();
-    }
-
-    fn generate_varying_if_else_statement(
-        &mut self,
-        condition_value: Value,
-        if_stmt: &ast::Stmt<'input>,
-        else_stmt: &ast::Stmt<'input>,
-    ) {
-        self.increment_count();
-        self.push_predicate(condition_value);
-
-        self.generate_stmt(if_stmt);
-
-        self.invert_predicate();
-
-        self.generate_stmt(else_stmt);
-
-        self.pop_predicate();
-        self.decrement_count();
+        }
     }
 
     fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
         let header_ebb = self.create_ebb();
-
-        self.increment_count();
+        let after_ebb = self.create_ebb();
 
         self.push_jump_inst(header_ebb);
         self.set_position_ebb(header_ebb);
@@ -301,49 +246,29 @@ impl<'input> IrBuilder<'input> {
         let condition_value = self.generate_expr(&stmt.expr);
 
         let qualifier = self.get_value_type(condition_value).qualifier();
-        let while_stmt = &stmt.stmt;
-
         match qualifier {
-            Uniform => self.generate_uniform_while_statement(condition_value, while_stmt),
-            Varying => self.generate_varying_while_statement(condition_value, while_stmt),
-        }
+            Uniform => {
+                self.push_branch_inst(BranchOp::AllFalse, condition_value, after_ebb);
 
-        self.decrement_count();
-    }
+                self.generate_stmt(&stmt.stmt);
+                self.push_jump_inst(header_ebb);
 
-    fn generate_uniform_while_statement(
-        &mut self,
-        condition_value: Value,
-        while_stmt: &ast::Stmt<'input>,
-    ) {
-        let header_ebb = self.position().ebb();
-        let after_ebb = self.create_ebb();
+                self.set_position_ebb(after_ebb);
+            }
+            Varying => {
+                let prev_predicate = self.set_predicate_and(condition_value);
 
-        self.push_branch_inst(BranchOp::AllFalse, condition_value, after_ebb);
+                if let Some(predicate) = self.predicate {
+                    self.push_branch_inst(BranchOp::AnyFalse, predicate, after_ebb);
+                }
 
-        self.generate_stmt(while_stmt);
-        self.push_jump_inst(header_ebb);
-        self.set_position_ebb(after_ebb);
-    }
+                self.generate_stmt(&stmt.stmt);
+                self.push_jump_inst(header_ebb);
+                self.set_position_ebb(after_ebb);
 
-    fn generate_varying_while_statement(
-        &mut self,
-        condition_value: Value,
-        while_stmt: &ast::Stmt<'input>,
-    ) {
-        let header_ebb = self.position().ebb();
-        let after_ebb = self.create_ebb();
-
-        self.push_predicate(condition_value);
-
-        let predicate_value = self.get_value(Variable::Predicate);
-        self.push_branch_inst(BranchOp::AnyFalse, predicate_value, after_ebb);
-
-        self.generate_stmt(while_stmt);
-        self.push_jump_inst(header_ebb);
-        self.set_position_ebb(after_ebb);
-
-        self.pop_predicate();
+                self.reset_predicate(prev_predicate);
+            }
+        };
     }
 
     fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
@@ -386,9 +311,7 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn generate_identifier(&mut self, identifier: &ast::Identifier<'input>) -> Value {
-        let name = identifier.name;
-        let variable = Variable::Variable(name);
-        self.get_value(variable)
+        self.get_value(identifier.name)
     }
 
     fn generate_unary_expr(&mut self, expr: &ast::UnaryExpr<'input>) -> Value {
@@ -539,6 +462,42 @@ impl<'input> IrBuilder<'input> {
         self.position = Some(Position::new(ebb, block));
     }
 
+    fn set_predicate_and(&mut self, value: Value) -> Option<Value> {
+        let predicate = match self.predicate {
+            Some(predicate) => self.push_binary_inst(
+                BinaryOp::And,
+                Operand::Value(predicate),
+                Operand::Value(value),
+            ),
+            None => value,
+        };
+        self.set_predicate(predicate)
+    }
+
+    fn set_predicate_and_not(&mut self, value: Value) -> Option<Value> {
+        let not_value = self.push_unary_inst(UnaryOp::Not, Operand::Value(value));
+
+        let predicate = match self.predicate {
+            Some(predicate) => self.push_binary_inst(
+                BinaryOp::Add,
+                Operand::Value(predicate),
+                Operand::Value(not_value),
+            ),
+            None => not_value,
+        };
+        self.set_predicate(predicate)
+    }
+
+    fn set_predicate(&mut self, predicate: Value) -> Option<Value> {
+        let prev_predicate = self.predicate;
+        self.predicate = Some(predicate);
+        prev_predicate
+    }
+
+    fn reset_predicate(&mut self, predicate: Option<Value>) {
+        self.predicate = predicate;
+    }
+
     fn insert_value(&mut self, variable: Variable<'input>, value: Value) {
         let block = self.position().block();
         self.values.insert_value(block, variable, value);
@@ -607,62 +566,6 @@ impl<'input> IrBuilder<'input> {
         if let Some(target) = self.func.inst_mut(inst).target_mut() {
             target.push_arg(value);
         }
-    }
-
-    fn push_predicate(&mut self, condition_value: Value) {
-        let predicate_value = self.get_value(Variable::Predicate);
-
-        let predicate = Operand::Value(predicate_value);
-        let condition = Operand::Value(condition_value);
-        let predicate_value = self.push_select_inst(predicate_value, condition, predicate);
-        self.insert_value(Variable::Predicate, predicate_value);
-    }
-
-    fn pop_predicate(&mut self) {
-        let count_value = self.get_value(Variable::Count);
-
-        let count = Operand::Value(count_value);
-        let zero = Operand::Int(0);
-        let predicate_value = self.push_int_comp_inst(CompOp::Eq, count, zero);
-        self.insert_value(Variable::Predicate, predicate_value);
-    }
-
-    fn invert_predicate(&mut self) {
-        let count_value = self.get_value(Variable::Count);
-        let predicate_value = self.get_value(Variable::Predicate);
-
-        let predicate = Operand::Value(predicate_value);
-        let not_predciate_value = self.push_unary_inst(UnaryOp::Not, predicate);
-
-        let count = Operand::Value(count_value);
-        let zero = Operand::Int(0);
-        let count_zero_value = self.push_int_comp_inst(CompOp::Eq, count, zero);
-
-        let not_predicate = Operand::Value(not_predciate_value);
-        let count_zero = Operand::Value(count_zero_value);
-        let predicate_value = self.push_binary_inst(BinaryOp::And, not_predicate, count_zero);
-        self.insert_value(Variable::Predicate, predicate_value);
-    }
-
-    fn increment_count(&mut self) {
-        self.update_count(BinaryOp::Add);
-    }
-
-    fn decrement_count(&mut self) {
-        self.update_count(BinaryOp::Sub);
-    }
-
-    fn update_count(&mut self, op: BinaryOp) {
-        let predicate_value = self.get_value(Variable::Predicate);
-        let count_value = self.get_value(Variable::Count);
-
-        let count = Operand::Value(count_value);
-        let one = Operand::Int(1);
-        let inc_count_value = self.push_binary_inst(op, count, one);
-
-        let inc_count = Operand::Value(inc_count_value);
-        let count_value = self.push_select_inst(predicate_value, count, inc_count);
-        self.insert_value(Variable::Count, count_value);
     }
 
     fn push_int_const_inst(&mut self, value: i32) -> Value {

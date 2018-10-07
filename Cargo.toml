@@ -8,5 +8,8 @@ build = "build.rs"
 lalrpop-util = "0.16.0"
 regex = "1.0.2"
 
+[dev-dependencies]
+difference = "2.0.0"
+
 [build-dependencies]
 lalrpop = "0.16.0"

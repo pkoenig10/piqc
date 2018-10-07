@@ -1,5 +1,3 @@
-#![feature(tool_lints)]
-
 #[macro_use]
 extern crate lalrpop_util;
 
@@ -8,7 +6,7 @@ use piqc::ProgParser;
 mod ast;
 mod ir;
 
-lalrpop_mod!(#[allow(clippy::all)] pub piqc);
+lalrpop_mod!(#[allow(clippy)] pub piqc);
 
 pub fn compile(s: &str) -> String {
     let prog = parse(s);

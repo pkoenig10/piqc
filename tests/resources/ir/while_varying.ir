@@ -1,29 +1,20 @@
 func():
 
 ebb0():
-    %0 = bconst true
+    %0 = iconst 0
     %1 = iconst 0
-    %2 = iconst 0
-    %3 = iconst 0
-    %4 = index
-    %5 = add %1, 1
-    %6 = select %0, %1, %5
-    jmp ebb1(%3, %0)
+    %2 = index
+    jmp ebb1(%1)
 
-ebb1(%7, %10):
-    %9 = icmp lt %7, %4
-    %11 = select %10, %9, %10
-    br anyf %11 ebb2()
-    %12 = iconst 1
-    %13 = add %7, %12
-    %14 = select %11, %13, %7
-    jmp ebb1(%14, %11)
+ebb1(%3):
+    %5 = icmp lt %3, %2
+    br anyf %5 ebb2()
+    %6 = iconst 1
+    %7 = add %3, %6
+    %8 = select %5, %7, %3
+    jmp ebb1(%8)
 
 ebb2():
-    %17 = icmp eq %6, 0
-    %18 = sub %6, 1
-    %19 = select %17, %6, %18
-    %22 = iconst 1
-    %23 = add %2, %22
-    %24 = select %17, %23, %2
+    %11 = iconst 1
+    %12 = add %0, %11
     ret
