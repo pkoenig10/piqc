@@ -29,6 +29,22 @@ fn if_varying() {
 }
 
 #[test]
+fn if_return_uniform() {
+    test_compile!(
+        "resources/piq/if_return_uniform.piq",
+        "resources/ir/if_return_uniform.ir"
+    );
+}
+
+#[test]
+fn if_return_varying() {
+    test_compile!(
+        "resources/piq/if_return_varying.piq",
+        "resources/ir/if_return_varying.ir"
+    );
+}
+
+#[test]
 fn if_else_uniform() {
     test_compile!(
         "resources/piq/if_else_uniform.piq",

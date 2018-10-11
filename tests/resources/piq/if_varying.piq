@@ -1,4 +1,4 @@
-fn if_varying(bool bar) {
+fn if_varying() {
     int foo = 0;
 
     int index = @index;

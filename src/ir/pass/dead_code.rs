@@ -121,6 +121,7 @@ impl<'a> DeadCodePass<'a> {
 
         let mut defs_to_remove = Vec::new();
         let mut params_to_remove = Vec::new();
+        let mut ebbs_to_remove = Vec::new();
         let mut replaced_params = HashMap::new();
 
         loop {
@@ -138,13 +139,18 @@ impl<'a> DeadCodePass<'a> {
                 for (i, &param) in self.func.ebb(ebb).params().iter().enumerate() {
                     let mut args = Args::Zero;
 
-                    if let Some(predecessors) = analysis.predecessors(ebb) {
-                        for &inst in predecessors {
-                            let target = self.func.inst(inst).target().unwrap();
-                            let arg = target.args()[i];
-                            if param != arg {
-                                args = args.insert(arg);
+                    match analysis.predecessors(ebb) {
+                        Some(predecessors) => {
+                            for &inst in predecessors {
+                                let target = self.func.inst(inst).target().unwrap();
+                                let arg = target.args()[i];
+                                if param != arg {
+                                    args = args.insert(arg);
+                                }
                             }
+                        }
+                        None => {
+                            // ebbs_to_remove.push(ebb);
                         }
                     }
 
@@ -154,12 +160,13 @@ impl<'a> DeadCodePass<'a> {
                 }
             }
 
-            if defs_to_remove.is_empty() && params_to_remove.is_empty() {
+            if defs_to_remove.is_empty() && params_to_remove.is_empty() && ebbs_to_remove.is_empty()
+            {
                 break;
             }
 
             for value in defs_to_remove.drain(..) {
-                let _inst = analysis.def(value).unwrap();
+                let inst = analysis.def(value).unwrap();
                 // self.func.remove_inst(inst);
 
                 analysis.remove_value(value);
@@ -183,6 +190,10 @@ impl<'a> DeadCodePass<'a> {
 
                 replaced_params.insert(param, arg);
                 analysis.replace_value(param, arg);
+            }
+
+            for ebb in ebbs_to_remove.drain(..) {
+                self.func.remove_ebb(ebb);
             }
 
             replaced_params.clear();

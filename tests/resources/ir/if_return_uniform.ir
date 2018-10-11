@@ -1,0 +1,14 @@
+func(bool):
+
+ebb0(%0):
+    %1 = iconst 0
+    br allf %0 ebb1(%1)
+    ret
+
+ebb2(%3):
+    jmp ebb1(%3)
+
+ebb1(%2):
+    %4 = iconst 1
+    %5 = add %2, %4
+    ret

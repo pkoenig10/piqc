@@ -34,16 +34,16 @@ impl EbbNode {
         self.prev_ebb
     }
 
-    pub fn set_prev_ebb(&mut self, prev_ebb: Ebb) {
-        self.prev_ebb = Some(prev_ebb);
+    pub fn set_prev_ebb(&mut self, prev_ebb: Option<Ebb>) {
+        self.prev_ebb = prev_ebb;
     }
 
     pub fn next_ebb(&self) -> Option<Ebb> {
         self.next_ebb
     }
 
-    pub fn set_next_ebb(&mut self, next_ebb: Ebb) {
-        self.next_ebb = Some(next_ebb);
+    pub fn set_next_ebb(&mut self, next_ebb: Option<Ebb>) {
+        self.next_ebb = next_ebb;
     }
 
     pub fn first_inst(&self) -> Option<Inst> {
@@ -191,14 +191,39 @@ impl Func {
     pub fn push_ebb(&mut self, ebb: Ebb) {
         match self.last_ebb {
             Some(last_ebb) => {
-                self.ebbs.get_mut(last_ebb).set_next_ebb(ebb);
-                self.ebbs.get_mut(ebb).set_prev_ebb(last_ebb);
+                self.ebbs.get_mut(last_ebb).set_next_ebb(Some(ebb));
+                self.ebbs.get_mut(ebb).set_prev_ebb(Some(last_ebb));
             }
             None => {
                 self.first_ebb = Some(ebb);
             }
         }
         self.last_ebb = Some(ebb);
+    }
+
+    pub fn remove_ebb(&mut self, ebb: Ebb) {
+        let (prev_ebb, next_ebb) = {
+            let ebb_node = self.ebbs.get(ebb);
+            (ebb_node.prev_ebb(), ebb_node.next_ebb())
+        };
+
+        match prev_ebb {
+            Some(prev_ebb) => {
+                self.ebbs.get_mut(prev_ebb).set_next_ebb(next_ebb);
+            }
+            None => {
+                self.first_ebb = next_ebb;
+            }
+        }
+
+        match next_ebb {
+            Some(next_ebb) => {
+                self.ebbs.get_mut(next_ebb).set_prev_ebb(prev_ebb);
+            }
+            None => {
+                self.last_ebb = prev_ebb;
+            }
+        }
     }
 
     pub fn push_inst(&mut self, ebb: Ebb, inst: Inst) {

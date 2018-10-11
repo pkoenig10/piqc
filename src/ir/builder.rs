@@ -109,6 +109,7 @@ struct IrBuilder<'input> {
     header_blocks: HashMap<Ebb, Block>,
     position: Option<Position>,
     predicate: Option<Value>,
+    not_returned: Option<Value>,
 }
 
 impl<'input> IrBuilder<'input> {
@@ -120,6 +121,7 @@ impl<'input> IrBuilder<'input> {
             header_blocks: HashMap::new(),
             position: None,
             predicate: None,
+            not_returned: None,
         }
     }
 
@@ -272,7 +274,26 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
-        self.push_return_inst();
+        match self.predicate {
+            Some(predicate) => {
+                let not_predicate = self.push_unary_inst(UnaryOp::Not, Operand::Value(predicate));
+                let not_returned = match self.not_returned {
+                    Some(not_returned) => self.push_binary_inst(
+                        BinaryOp::Add,
+                        Operand::Value(not_returned),
+                        Operand::Value(not_predicate),
+                    ),
+                    None => not_predicate,
+                };
+                self.not_returned = Some(not_returned);
+            }
+            None => {
+                self.push_return_inst();
+
+                let ebb = self.create_ebb();
+                self.set_position_ebb(ebb);
+            }
+        };
     }
 
     fn generate_expr(&mut self, expr: &ast::Expr<'input>) -> Value {
@@ -495,7 +516,20 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn reset_predicate(&mut self, predicate: Option<Value>) {
-        self.predicate = predicate;
+        self.predicate = match self.not_returned {
+            Some(not_returned) => {
+                let predicate = match predicate {
+                    Some(predicate) => self.push_binary_inst(
+                        BinaryOp::And,
+                        Operand::Value(predicate),
+                        Operand::Value(not_returned),
+                    ),
+                    None => not_returned,
+                };
+                Some(predicate)
+            }
+            None => predicate,
+        };
     }
 
     fn insert_value(&mut self, variable: Variable<'input>, value: Value) {
