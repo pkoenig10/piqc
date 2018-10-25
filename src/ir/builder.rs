@@ -453,7 +453,7 @@ impl<'input> IrBuilder<'input> {
         loop {
             match self.values.get_value(block, variable) {
                 Some(value) => return Ok(value),
-                None => match *self.blocks.get(block) {
+                None => match self.blocks[block] {
                     BlockData::Header(ref data) => return Err(data),
                     BlockData::Body(ref data) => block = data.predecessor(),
                 },
@@ -462,10 +462,7 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn get_value_type(&self, value: Value) -> Type {
-        match *self.func.value(value) {
-            ValueData::Inst(ref data) => data.type_(),
-            ValueData::Param(ref data) => data.type_(),
-        }
+        self.func.value(value).type_()
     }
 
     fn position(&self) -> &Position {
@@ -539,7 +536,7 @@ impl<'input> IrBuilder<'input> {
 
     fn insert_predecessor(&mut self, ebb: Ebb, predecessor: Predecessor) {
         let block = self.header_blocks[&ebb];
-        match *self.blocks.get_mut(block) {
+        match self.blocks[block] {
             BlockData::Header(ref mut data) => data.insert_predecessor(predecessor),
             _ => panic!(),
         }
@@ -563,7 +560,7 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn create_block_param(&mut self, variable: Variable<'input>, ebb: Ebb, type_: Type) -> Value {
-        let value = self.create_param_value(type_);
+        let value = self.create_value(type_);
         self.func.push_ebb_param(ebb, value);
 
         let header_block = self.header_blocks[&ebb];
@@ -586,14 +583,8 @@ impl<'input> IrBuilder<'input> {
         target
     }
 
-    fn create_inst_value(&mut self, type_: Type) -> Value {
-        self.func
-            .create_value(ValueData::Inst(InstValue::new(type_)))
-    }
-
-    fn create_param_value(&mut self, type_: Type) -> Value {
-        self.func
-            .create_value(ValueData::Param(ParamValue::new(type_)))
+    fn create_value(&mut self, type_: Type) -> Value {
+        self.func.create_value(ValueData::new(type_))
     }
 
     fn push_target_arg(&mut self, inst: Inst, value: Value) {
@@ -604,7 +595,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_int_const_inst(&mut self, value: i32) -> Value {
         let type_ = Type::new(Uniform, Int);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::IntConst(IntConstInst::new(dest, value));
         self.push_inst(inst);
         dest
@@ -612,7 +603,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_float_const_inst(&mut self, value: f32) -> Value {
         let type_ = Type::new(Uniform, Float);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::FloatConst(FloatConstInst::new(dest, value));
         self.push_inst(inst);
         dest
@@ -620,7 +611,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_bool_const_inst(&mut self, value: bool) -> Value {
         let type_ = Type::new(Uniform, Bool);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::BoolConst(BoolConstInst::new(dest, value));
         self.push_inst(inst);
         dest
@@ -628,7 +619,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_index_inst(&mut self) -> Value {
         let type_ = Type::new(Varying, Int);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::Index(IndexInst::new(dest));
         self.push_inst(inst);
         dest
@@ -636,7 +627,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_count_inst(&mut self) -> Value {
         let type_ = Type::new(Uniform, Int);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::Count(CountInst::new(dest));
         self.push_inst(inst);
         dest
@@ -644,7 +635,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_unary_inst(&mut self, op: UnaryOp, src: Operand) -> Value {
         let type_ = self.get_unary_inst_type(src);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::Unary(UnaryInst::new(op, dest, src));
         self.push_inst(inst);
         dest
@@ -652,7 +643,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_binary_inst(&mut self, op: BinaryOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_binary_inst_type(op, left, right);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::Binary(BinaryInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -660,7 +651,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_int_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::IntComp(IntCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -668,7 +659,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_float_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::FloatComp(FloatCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
@@ -676,7 +667,7 @@ impl<'input> IrBuilder<'input> {
 
     fn push_select_inst(&mut self, cond: Value, left: Operand, right: Operand) -> Value {
         let type_ = self.get_select_inst_type(left, right);
-        let dest = self.create_inst_value(type_);
+        let dest = self.create_value(type_);
         let inst = InstData::Select(SelectInst::new(dest, cond, left, right));
         self.push_inst(inst);
         dest

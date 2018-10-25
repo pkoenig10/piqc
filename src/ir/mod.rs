@@ -1,5 +1,6 @@
 use std::fmt;
 use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
 
 pub use self::block::*;
 pub use self::ebb::*;
@@ -28,7 +29,7 @@ macro_rules! id {
                 $id { id }
             }
 
-            fn get(&self) -> usize {
+            fn index(self) -> usize {
                 self.id
             }
         }
@@ -55,7 +56,7 @@ mod verifier;
 trait Id: Copy {
     fn new(id: usize) -> Self;
 
-    fn get(&self) -> usize;
+    fn index(self) -> usize;
 }
 
 #[derive(Debug)]
@@ -80,13 +81,25 @@ where
         self.values.push(value);
         key
     }
+}
 
-    pub fn get(&self, key: K) -> &V {
-        &self.values[key.get()]
+impl<K, V> Index<K> for Map<K, V>
+where
+    K: Id,
+{
+    type Output = V;
+
+    fn index(&self, key: K) -> &V {
+        &self.values[key.index()]
     }
+}
 
-    pub fn get_mut(&mut self, key: K) -> &mut V {
-        &mut self.values[key.get()]
+impl<K, V> IndexMut<K> for Map<K, V>
+where
+    K: Id,
+{
+    fn index_mut(&mut self, key: K) -> &mut V {
+        &mut self.values[key.index()]
     }
 }
 
