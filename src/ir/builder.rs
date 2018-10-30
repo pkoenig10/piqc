@@ -131,11 +131,7 @@ impl<'input> IrBuilder<'input> {
 
         for param in &func.params {
             let variable = param.identifier.name;
-            let type_ = match param.type_ {
-                ast::Type::Int => Type::new(Uniform, Int),
-                ast::Type::Float => Type::new(Uniform, Float),
-                ast::Type::Bool => Type::new(Uniform, Bool),
-            };
+            let type_ = param.type_;
             self.create_func_param(type_);
             self.create_block_param(variable, entry_ebb, type_);
         }
@@ -199,7 +195,7 @@ impl<'input> IrBuilder<'input> {
     fn generate_if_stmt(&mut self, stmt: &ast::IfStmt<'input>) {
         let condition_value = self.generate_expr(&stmt.expr);
 
-        let qualifier = self.get_value_type(condition_value).qualifier();
+        let qualifier = self.get_value_type(condition_value).qualifier;
         match qualifier {
             Uniform => {
                 let else_ebb = self.create_ebb();
@@ -247,8 +243,8 @@ impl<'input> IrBuilder<'input> {
 
         let condition_value = self.generate_expr(&stmt.expr);
 
-        let qualifier = self.get_value_type(condition_value).qualifier();
-        match qualifier {
+        let ty = self.get_value_type(condition_value);
+        match ty.qualifier {
             Uniform => {
                 self.push_branch_inst(BranchOp::AllFalse, condition_value, after_ebb);
 
@@ -343,14 +339,14 @@ impl<'input> IrBuilder<'input> {
 
         let src = Operand::Value(src_value);
 
-        match (op, src_type.type_()) {
-            (ast::UnaryOp::Negate, Int) => {
+        match (op, src_type.kind) {
+            (ast::UnaryOp::Negate, TypeKind::INT) => {
                 self.push_binary_inst(BinaryOp::Sub, Operand::Int(0), src)
             }
-            (ast::UnaryOp::Negate, Float) => {
+            (ast::UnaryOp::Negate, TypeKind::FLOAT) => {
                 self.push_binary_inst(BinaryOp::Fsub, Operand::Float(0.), src)
             }
-            (ast::UnaryOp::BitNot, Int) | (ast::UnaryOp::LogicalNot, Bool) => {
+            (ast::UnaryOp::BitNot, TypeKind::BOOL) | (ast::UnaryOp::LogicalNot, TypeKind::BOOL) => {
                 self.push_unary_inst(UnaryOp::Not, src)
             }
             _ => panic!(
@@ -594,7 +590,7 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn push_int_const_inst(&mut self, value: i32) -> Value {
-        let type_ = Type::new(Uniform, Int);
+        let type_ = Type::new(Uniform, TypeKind::INT);
         let dest = self.create_value(type_);
         let inst = InstData::IntConst(IntConstInst::new(dest, value));
         self.push_inst(inst);
@@ -602,7 +598,7 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn push_float_const_inst(&mut self, value: f32) -> Value {
-        let type_ = Type::new(Uniform, Float);
+        let type_ = Type::new(Uniform, TypeKind::FLOAT);
         let dest = self.create_value(type_);
         let inst = InstData::FloatConst(FloatConstInst::new(dest, value));
         self.push_inst(inst);
@@ -610,24 +606,21 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn push_bool_const_inst(&mut self, value: bool) -> Value {
-        let type_ = Type::new(Uniform, Bool);
-        let dest = self.create_value(type_);
+        let dest = self.create_value(Type::UNIFORM_BOOL);
         let inst = InstData::BoolConst(BoolConstInst::new(dest, value));
         self.push_inst(inst);
         dest
     }
 
     fn push_index_inst(&mut self) -> Value {
-        let type_ = Type::new(Varying, Int);
-        let dest = self.create_value(type_);
+        let dest = self.create_value(Type::VARYING_INT);
         let inst = InstData::Index(IndexInst::new(dest));
         self.push_inst(inst);
         dest
     }
 
     fn push_count_inst(&mut self) -> Value {
-        let type_ = Type::new(Uniform, Int);
-        let dest = self.create_value(type_);
+        let dest = self.create_value(Type::UNIFORM_INT);
         let inst = InstData::Count(CountInst::new(dest));
         self.push_inst(inst);
         dest
@@ -713,98 +706,86 @@ impl<'input> IrBuilder<'input> {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
         assert_eq!(
-            left_type.type_(),
-            right_type.type_(),
+            left_type.kind, right_type.kind,
             "Invalid binary instruction '{}' with operand types '{}' and '{}'",
-            op,
-            left_type,
-            right_type
+            op, left_type, right_type
         );
 
-        let type_ = left_type.type_();
-        let qualifier = get_type_qualifier(left_type, right_type);
+        let qualifier = get_type_qualifier(left_type.qualifier, right_type.qualifier);
 
-        Type::new(qualifier, type_)
+        Type::new(qualifier, left_type.kind)
     }
 
     fn get_comp_inst_type(&self, op: CompOp, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
         assert_eq!(
-            left_type.type_(),
-            right_type.type_(),
+            left_type.kind, right_type.kind,
             "Invalid comparison instruction '{}' with operand types '{}' and '{}'",
-            op,
-            left_type,
-            right_type
+            op, left_type, right_type
         );
 
-        let qualifier = get_type_qualifier(left_type, right_type);
+        let qualifier = get_type_qualifier(left_type.qualifier, right_type.qualifier);
 
-        Type::new(qualifier, Bool)
+        Type::new(qualifier, TypeKind::BOOL)
     }
 
     fn get_select_inst_type(&self, left: Operand, right: Operand) -> Type {
         let left_type = self.get_operand_type(left);
         let right_type = self.get_operand_type(right);
         assert_eq!(
-            left_type.type_(),
-            right_type.type_(),
+            left_type.kind, right_type.kind,
             "Invalid select instruction with operand types '{}' and '{}'",
-            left_type,
-            right_type
+            left_type, right_type
         );
 
-        let type_ = left_type.type_();
-        let qualifier = get_type_qualifier(left_type, right_type);
+        let qualifier = get_type_qualifier(left_type.qualifier, right_type.qualifier);
 
-        Type::new(qualifier, type_)
+        Type::new(qualifier, left_type.kind)
     }
 
     fn get_operand_type(&self, operand: Operand) -> Type {
         match operand {
-            Operand::Int(_) => Type::new(Uniform, Int),
-            Operand::Float(_) => Type::new(Uniform, Float),
-            Operand::Bool(_) => Type::new(Uniform, Bool),
+            Operand::Int(_) => Type::new(Uniform, TypeKind::INT),
+            Operand::Float(_) => Type::new(Uniform, TypeKind::FLOAT),
+            Operand::Bool(_) => Type::new(Uniform, TypeKind::BOOL),
             Operand::Value(value) => self.get_value_type(value),
         }
     }
 }
 
 fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<BinaryOp> {
-    match (op, left_type.type_(), right_type.type_()) {
-        (ast::BinaryOp::Mul, Float, Float) => Some(BinaryOp::Fmul),
-        (ast::BinaryOp::Add, Int, Int) => Some(BinaryOp::Add),
-        (ast::BinaryOp::Add, Float, Float) => Some(BinaryOp::Fadd),
-        (ast::BinaryOp::Sub, Int, Int) => Some(BinaryOp::Sub),
-        (ast::BinaryOp::Sub, Float, Float) => Some(BinaryOp::Fsub),
-        (ast::BinaryOp::Shl, Int, Int) => Some(BinaryOp::Shl),
-        (ast::BinaryOp::Shr, Int, Int) => Some(BinaryOp::Asr),
-        (ast::BinaryOp::Min, Int, Int) => Some(BinaryOp::Min),
-        (ast::BinaryOp::Min, Float, Float) => Some(BinaryOp::Fmin),
-        (ast::BinaryOp::Max, Int, Int) => Some(BinaryOp::Max),
-        (ast::BinaryOp::Max, Float, Float) => Some(BinaryOp::Fmax),
-        (ast::BinaryOp::BitAnd, Int, Int) | (ast::BinaryOp::LogicalAnd, Bool, Bool) => {
-            Some(BinaryOp::And)
-        }
-        (ast::BinaryOp::BitOr, Int, Int) | (ast::BinaryOp::LogicalOr, Bool, Bool) => {
-            Some(BinaryOp::Or)
-        }
-        (ast::BinaryOp::BitXor, Int, Int) => Some(BinaryOp::Xor),
+    match (op, left_type.kind, right_type.kind) {
+        (ast::BinaryOp::Mul, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fmul),
+        (ast::BinaryOp::Add, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Add),
+        (ast::BinaryOp::Add, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fadd),
+        (ast::BinaryOp::Sub, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Sub),
+        (ast::BinaryOp::Sub, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fsub),
+        (ast::BinaryOp::Shl, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Shl),
+        (ast::BinaryOp::Shr, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Asr),
+        (ast::BinaryOp::Min, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Min),
+        (ast::BinaryOp::Min, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fmin),
+        (ast::BinaryOp::Max, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Max),
+        (ast::BinaryOp::Max, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fmax),
+        (ast::BinaryOp::BitAnd, TypeKind::INT, TypeKind::INT)
+        | (ast::BinaryOp::LogicalAnd, TypeKind::BOOL, TypeKind::BOOL) => Some(BinaryOp::And),
+        (ast::BinaryOp::BitOr, TypeKind::INT, TypeKind::INT)
+        | (ast::BinaryOp::LogicalOr, TypeKind::BOOL, TypeKind::BOOL) => Some(BinaryOp::Or),
+        (ast::BinaryOp::BitXor, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Xor),
         _ => None,
     }
 }
 
 fn get_int_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<CompOp> {
-    match (left_type.type_(), right_type.type_()) {
-        (Int, Int) | (Bool, Bool) => get_comp_op(op),
+    match (left_type.kind, right_type.kind) {
+        (TypeKind::INT, TypeKind::INT) | (TypeKind::BOOL, TypeKind::BOOL) => get_comp_op(op),
         _ => None,
     }
 }
 
 fn get_float_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<CompOp> {
-    match (left_type.type_(), right_type.type_()) {
-        (Float, Float) => get_comp_op(op),
+    match (left_type.kind, right_type.kind) {
+        (TypeKind::FLOAT, TypeKind::FLOAT) => get_comp_op(op),
         _ => None,
     }
 }
@@ -818,12 +799,5 @@ fn get_comp_op(op: ast::BinaryOp) -> Option<CompOp> {
         ast::BinaryOp::Le => Some(CompOp::Le),
         ast::BinaryOp::Ge => Some(CompOp::Ge),
         _ => None,
-    }
-}
-
-pub fn get_type_qualifier(left_type: Type, right_type: Type) -> TypeQualifier {
-    match (left_type.qualifier(), right_type.qualifier()) {
-        (Uniform, Uniform) => Uniform,
-        _ => Varying,
     }
 }

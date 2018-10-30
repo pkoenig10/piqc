@@ -49,7 +49,7 @@ mod func;
 mod inst;
 mod pass;
 mod prog;
-mod type_;
+pub mod type_;
 mod value;
 mod verifier;
 

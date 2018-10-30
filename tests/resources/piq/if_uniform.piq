@@ -1,4 +1,4 @@
-fn if_uniform(bool bar) {
+fn if_uniform(uniform bool bar) {
     int foo = 0;
 
     if (bar) {

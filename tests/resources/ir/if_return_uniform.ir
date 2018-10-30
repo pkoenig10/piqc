@@ -1,4 +1,4 @@
-func(bool):
+func(uniform bool):
 
 ebb0(%0):
     %1 = iconst 0

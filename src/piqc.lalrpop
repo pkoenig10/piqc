@@ -2,11 +2,22 @@ use ast::*;
 
 grammar;
 
+TypeQualifier: TypeQualifier = {
+    "uniform" => TypeQualifier::Uniform,
+    "varying" => TypeQualifier::Varying,
+}
+
+TypeKind: TypeKind = {
+    "int" => TypeKind::INT,
+    "float" => TypeKind::FLOAT,
+    "bool" => TypeKind::BOOL,
+    <TypeKind> "*" => TypeKind::new_ptr(<>),
+}
+
 Type: Type = {
-    "int" => Type::Int,
-    "float" => Type::Float,
-    "bool" => Type::Bool,
-};
+    <TypeKind> => Type::new(TypeQualifier::Varying, <>),
+    <TypeQualifier> <TypeKind> => Type::new(<>),
+}
 
 Int: i32 = {
     r"\d+" => <>.parse().unwrap(),

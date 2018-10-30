@@ -1,4 +1,4 @@
-fn expr(int i, float f) {
+fn expr(uniform int i, uniform float f) {
     int foo = -i + 1;
     float bar = f <? 42.0;
     bool baz = !true;

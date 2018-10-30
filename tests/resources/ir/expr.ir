@@ -1,4 +1,4 @@
-func(int, float):
+func(uniform int, uniform float):
 
 ebb0(%0, %1):
     %2 = sub 0, %0
