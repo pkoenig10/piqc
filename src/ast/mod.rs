@@ -1,13 +1,16 @@
-pub use self::expr::*;
-pub use self::func::*;
-pub use self::prog::*;
-pub use self::stmt::*;
+pub use self::builder::generate_ir;
+pub use self::expr::{
+    BinaryExpr, BinaryOp, BoolLiteral, Count, Expr, FloatLiteral, Identifier, Index, IntLiteral,
+    UnaryExpr, UnaryOp,
+};
+pub use self::func::{Func, Param};
+pub use self::stmt::{AssignStmt, BlockStmt, DeclStmt, IfStmt, ReturnStmt, Stmt, WhileStmt};
 pub use self::type_checker::type_check;
-pub use ir::type_::*;
+pub use ir::{Type, TypeKind, TypeQualifier};
 
+mod builder;
 mod expr;
 mod func;
-mod prog;
 mod stmt;
 mod type_checker;
 

@@ -1,55 +1,28 @@
+pub use self::builder::FuncBuilder;
+pub use self::func::Func;
+pub use self::id::Value;
+pub use self::inst::{BinaryOp, BranchOp, CompOp, Operand, UnaryOp};
+pub use self::pass::run_dead_code;
+pub use self::types::{Type, TypeKind, TypeQualifier};
+pub use self::verifier::verify_ir;
+
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
-pub use self::block::*;
-pub use self::ebb::*;
-pub use self::func::*;
-pub use self::inst::*;
-pub use self::pass::*;
-pub use self::prog::*;
-pub use self::type_::*;
-pub use self::value::*;
+use self::id::{Block, Ebb, Inst};
+use self::inst::{
+    BinaryInst, BoolConstInst, BranchInst, CountInst, FloatCompInst, FloatConstInst, IndexInst,
+    InstData, IntCompInst, IntConstInst, JumpInst, ReturnInst, SelectInst, Target, UnaryInst,
+};
+use self::value::ValueData;
 
-pub use self::BaseType::*;
-pub use self::TypeQualifier::*;
-
-pub use self::builder::generate_ir;
-pub use self::verifier::verify_ir;
-
-macro_rules! id {
-    ($id:ident, $prefix:expr) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub struct $id {
-            id: usize,
-        }
-
-        impl $crate::ir::Id for $id {
-            fn new(id: usize) -> Self {
-                $id { id }
-            }
-
-            fn index(self) -> usize {
-                self.id
-            }
-        }
-
-        impl fmt::Display for $id {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, concat!($prefix, "{}"), self.id)
-            }
-        }
-    };
-}
-
-mod block;
 mod builder;
-mod ebb;
 mod func;
+mod id;
 mod inst;
 mod pass;
-mod prog;
-pub mod type_;
+mod types;
 mod value;
 mod verifier;
 
@@ -103,7 +76,7 @@ where
     }
 }
 
-pub struct DisplayList<'a, T>
+struct DisplayList<'a, T>
 where
     T: 'a,
 {

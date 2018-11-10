@@ -4,7 +4,7 @@ use ir::*;
 
 #[derive(Debug)]
 struct EbbNode {
-    data: EbbData,
+    params: Vec<Value>,
     prev_ebb: Option<Ebb>,
     next_ebb: Option<Ebb>,
     first_inst: Option<Inst>,
@@ -12,9 +12,9 @@ struct EbbNode {
 }
 
 impl EbbNode {
-    pub fn new(data: EbbData) -> EbbNode {
+    pub fn new() -> EbbNode {
         EbbNode {
-            data,
+            params: Vec::new(),
             prev_ebb: None,
             next_ebb: None,
             first_inst: None,
@@ -64,56 +64,42 @@ impl Func {
         }
     }
 
-    pub fn create_ebb(&mut self) -> Ebb {
-        self.ebbs.create(EbbNode::new(EbbData::new()))
-    }
-
-    pub fn create_inst(&mut self, data: InstData) -> Inst {
-        self.insts.create(InstNode::new(data))
+    pub fn push_param(&mut self, type_: Type) {
+        self.params.push(type_);
     }
 
     pub fn create_value(&mut self, data: ValueData) -> Value {
         self.values.create(data)
     }
 
-    pub fn ebb(&self, ebb: Ebb) -> &EbbData {
-        &self.ebbs[ebb].data
-    }
-
-    pub fn ebb_mut(&mut self, ebb: Ebb) -> &mut EbbData {
-        &mut self.ebbs[ebb].data
-    }
-
-    pub fn ebbs(&self) -> EbbIterator {
-        EbbIterator::new(self)
-    }
-
-    pub fn inst(&self, inst: Inst) -> &InstData {
-        &self.insts[inst].data
-    }
-
-    pub fn inst_mut(&mut self, inst: Inst) -> &mut InstData {
-        &mut self.insts[inst].data
-    }
-
-    pub fn insts(&self, ebb: Ebb) -> InstIterator {
-        InstIterator::new(self, ebb)
-    }
-
-    pub fn last_inst(&self, ebb: Ebb) -> Inst {
-        self.ebbs[ebb].last_inst.unwrap()
-    }
-
     pub fn value(&self, value: Value) -> &ValueData {
         &self.values[value]
     }
 
-    pub fn push_param(&mut self, type_: Type) {
-        self.params.push(type_);
+    pub fn create_ebb(&mut self) -> Ebb {
+        self.ebbs.create(EbbNode::new())
+    }
+
+    pub fn ebbs(&self) -> Ebbs {
+        Ebbs::new(self)
+    }
+
+    pub fn ebb_params(&self, ebb: Ebb) -> &[Value] {
+        &self.ebbs[ebb].params
     }
 
     pub fn push_ebb_param(&mut self, ebb: Ebb, value: Value) {
-        self.ebbs[ebb].data.push_param(value);
+        self.ebbs[ebb].params.push(value);
+    }
+
+    pub fn swap_remove_ebb_param(&mut self, ebb: Ebb, value: Value) -> usize {
+        let index = self.ebbs[ebb]
+            .params
+            .iter()
+            .position(|&param| param == value)
+            .unwrap();
+        self.ebbs[ebb].params.swap_remove(index);
+        index
     }
 
     pub fn push_ebb(&mut self, ebb: Ebb) {
@@ -152,6 +138,30 @@ impl Func {
                 self.last_ebb = prev_ebb;
             }
         }
+    }
+
+    pub fn create_inst(&mut self, data: InstData) -> Inst {
+        self.insts.create(InstNode::new(data))
+    }
+
+    pub fn inst(&self, inst: Inst) -> &InstData {
+        &self.insts[inst].data
+    }
+
+    pub fn inst_mut(&mut self, inst: Inst) -> &mut InstData {
+        &mut self.insts[inst].data
+    }
+
+    pub fn insts(&self, ebb: Ebb) -> Insts {
+        Insts::new(self, ebb)
+    }
+
+    pub fn first_inst(&self, ebb: Ebb) -> Inst {
+        self.ebbs[ebb].first_inst.unwrap()
+    }
+
+    pub fn last_inst(&self, ebb: Ebb) -> Inst {
+        self.ebbs[ebb].last_inst.unwrap()
     }
 
     pub fn push_inst(&mut self, ebb: Ebb, inst: Inst) {
@@ -202,9 +212,8 @@ impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "func({}):", DisplayList::new(&self.params))?;
         for ebb in self.ebbs() {
-            let ebb_node = self.ebb(ebb);
             writeln!(f)?;
-            writeln!(f, "{}({}):", ebb, DisplayList::new(ebb_node.params()))?;
+            writeln!(f, "{}({}):", ebb, DisplayList::new(self.ebb_params(ebb)))?;
             for inst in self.insts(ebb) {
                 let inst_node = self.inst(inst);
                 writeln!(f, "    {}", inst_node)?;
@@ -214,21 +223,21 @@ impl fmt::Display for Func {
     }
 }
 
-pub struct EbbIterator<'a> {
+pub struct Ebbs<'a> {
     func: &'a Func,
     next: Option<Ebb>,
 }
 
-impl<'a> EbbIterator<'a> {
-    fn new(func: &Func) -> EbbIterator {
-        EbbIterator {
+impl<'a> Ebbs<'a> {
+    fn new(func: &Func) -> Ebbs {
+        Ebbs {
             func,
             next: func.first_ebb,
         }
     }
 }
 
-impl<'a> Iterator for EbbIterator<'a> {
+impl<'a> Iterator for Ebbs<'a> {
     type Item = Ebb;
 
     fn next(&mut self) -> Option<Ebb> {
@@ -242,21 +251,21 @@ impl<'a> Iterator for EbbIterator<'a> {
     }
 }
 
-pub struct InstIterator<'a> {
+pub struct Insts<'a> {
     func: &'a Func,
     next: Option<Inst>,
 }
 
-impl<'a> InstIterator<'a> {
-    fn new(func: &Func, ebb: Ebb) -> InstIterator {
-        InstIterator {
+impl<'a> Insts<'a> {
+    fn new(func: &Func, ebb: Ebb) -> Insts {
+        Insts {
             func,
             next: func.ebbs[ebb].first_inst,
         }
     }
 }
 
-impl<'a> Iterator for InstIterator<'a> {
+impl<'a> Iterator for Insts<'a> {
     type Item = Inst;
 
     fn next(&mut self) -> Option<Inst> {

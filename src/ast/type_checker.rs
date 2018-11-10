@@ -2,9 +2,12 @@ use std::collections::HashMap;
 
 use ast::*;
 
-pub fn type_check(prog: &Prog) {
-    let mut type_checker = TypeChecker::new();
-    type_checker.check_func(&prog.func);
+use ast::Type;
+use ast::TypeKind;
+use ast::TypeQualifier;
+
+pub fn type_check(func: &Func) {
+    TypeChecker::new().check_func(func);
 }
 
 #[derive(Debug)]
@@ -202,7 +205,7 @@ impl<'input> TypeChecker<'input> {
         let left_type = self.check_expr(&expr.left);
         let right_type = self.check_expr(&expr.right);
 
-        let qualifier = get_type_qualifier(left_type.qualifier, right_type.qualifier);
+        let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
 
         let kind = match (expr.op, left_type.kind, right_type.kind) {
             (BinaryOp::Add, TypeKind::INT, TypeKind::INT)

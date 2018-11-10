@@ -3,10 +3,8 @@ use std::collections::HashSet;
 
 use ir::*;
 
-pub fn run_dead_code(prog: &mut Prog) {
-    let func = prog.func_mut();
-    let pass = DeadCodePass::new(func);
-    pass.run();
+pub fn run_dead_code(func: &mut Func) {
+    DeadCodePass::new(func).run();
 }
 
 #[derive(Debug)]
@@ -136,7 +134,7 @@ impl<'a> DeadCodePass<'a> {
             }
 
             for ebb in self.func.ebbs() {
-                for (i, &param) in self.func.ebb(ebb).params().iter().enumerate() {
+                for (i, &param) in self.func.ebb_params(ebb).iter().enumerate() {
                     let mut args = Args::Zero;
 
                     match analysis.predecessors(ebb) {
@@ -173,7 +171,7 @@ impl<'a> DeadCodePass<'a> {
             }
 
             for (ebb, param, mut arg) in params_to_remove.drain(..) {
-                let index = self.func.ebb_mut(ebb).swap_remove_param(param);
+                let index = self.func.swap_remove_ebb_param(ebb, param);
 
                 while let Some(&value) = replaced_params.get(&arg) {
                     arg = value;

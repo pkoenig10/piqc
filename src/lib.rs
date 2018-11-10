@@ -1,26 +1,29 @@
 #[macro_use]
 extern crate lalrpop_util;
 
-use piqc::ProgParser;
+use piqc::FuncParser;
 
-mod ast;
-mod ir;
+pub mod ast;
+pub mod ir;
 
-lalrpop_mod!(#[allow(clippy)] pub piqc);
+lalrpop_mod!(
+    #[allow(clippy)]
+    piqc
+);
 
 pub fn compile(s: &str) -> String {
-    let prog = parse(s);
-    ast::type_check(&prog);
+    let func = parse(s);
+    ast::type_check(&func);
 
-    let mut prog = ir::generate_ir(&prog);
+    let mut func = ast::generate_ir(&func);
 
-    ir::verify_ir(&prog);
+    ir::verify_ir(&func);
 
-    ir::run_dead_code(&mut prog);
+    ir::run_dead_code(&mut func);
 
-    format!("{}", prog)
+    format!("{}", func)
 }
 
-pub fn parse(input: &str) -> ast::Prog {
-    ProgParser::new().parse(input).unwrap()
+pub fn parse(input: &str) -> ast::Func {
+    FuncParser::new().parse(input).unwrap()
 }

@@ -1,8 +1,4 @@
-use std::fmt;
-
 use ir::*;
-
-id!(Value, "%");
 
 #[derive(Debug)]
 pub struct ValueData {

@@ -1,16 +1,53 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use ast;
 use ir::*;
 
-pub fn generate_ir(prog: &ast::Prog) -> Prog {
-    let builder = IrBuilder::new();
-    let func = builder.generate_func(&prog.func);
-    Prog::new(func)
+type Variable<'a> = &'a str;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct Predecessor {
+    block: Block,
+    inst: Inst,
 }
 
-type Variable<'a> = &'a str;
+impl Predecessor {
+    pub fn new(block: Block, inst: Inst) -> Predecessor {
+        Predecessor { block, inst }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct HeaderBlock {
+    ebb: Ebb,
+    predecessors: Vec<Predecessor>,
+}
+
+impl HeaderBlock {
+    pub fn new(ebb: Ebb) -> HeaderBlock {
+        HeaderBlock {
+            ebb,
+            predecessors: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct BodyBlock {
+    predecessor: Block,
+}
+
+impl BodyBlock {
+    pub fn new(predecessor: Block) -> BodyBlock {
+        BodyBlock { predecessor }
+    }
+}
+
+#[derive(Debug)]
+enum BlockData {
+    Header(HeaderBlock),
+    Body(BodyBlock),
+}
 
 #[derive(Debug)]
 struct BlockValues<'a> {
@@ -83,311 +120,82 @@ impl<'a> ValueTable<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
 struct Position {
-    ebb: Ebb,
-    block: Block,
+    pub ebb: Ebb,
+    pub block: Block,
 }
 
 impl Position {
     fn new(ebb: Ebb, block: Block) -> Position {
         Position { ebb, block }
     }
-
-    fn ebb(&self) -> Ebb {
-        self.ebb
-    }
-
-    fn block(&self) -> Block {
-        self.block
-    }
 }
 
-struct IrBuilder<'input> {
+pub struct FuncBuilder<'input> {
     func: Func,
     values: ValueTable<'input>,
     blocks: Map<Block, BlockData>,
     header_blocks: HashMap<Ebb, Block>,
     position: Option<Position>,
-    predicate: Option<Value>,
-    not_returned: Option<Value>,
 }
 
-impl<'input> IrBuilder<'input> {
-    fn new() -> IrBuilder<'input> {
-        IrBuilder {
+impl<'input> FuncBuilder<'input> {
+    pub fn new() -> FuncBuilder<'input> {
+        FuncBuilder {
             func: Func::new(),
             values: ValueTable::new(),
             blocks: Map::new(),
             header_blocks: HashMap::new(),
             position: None,
-            predicate: None,
-            not_returned: None,
         }
     }
 
-    fn generate_func(mut self, func: &ast::Func<'input>) -> Func {
-        let entry_ebb = self.create_ebb();
-        self.set_position_ebb(entry_ebb);
-
-        for param in &func.params {
-            let variable = param.identifier.name;
-            let type_ = param.type_;
-            self.create_func_param(type_);
-            self.create_block_param(variable, entry_ebb, type_);
-        }
-
-        self.generate_stmt(&func.stmt);
-
-        let ebb = self.position().ebb();
-        let inst = self.func.last_inst(ebb);
-        if !self.func.inst(inst).is_terminator() {
-            self.push_return_inst();
-        }
-
+    pub fn build(self) -> Func {
         self.func
     }
 
-    fn generate_stmt(&mut self, stmt: &ast::Stmt<'input>) {
-        match *stmt {
-            ast::Stmt::Block(ref stmt) => self.generate_block_stmt(stmt),
-            ast::Stmt::Decl(ref stmt) => self.generate_decl_stmt(stmt),
-            ast::Stmt::Assign(ref stmt) => self.generate_assign_stmt(stmt),
-            ast::Stmt::If(ref stmt) => self.generate_if_stmt(stmt),
-            ast::Stmt::While(ref stmt) => self.generate_while_stmt(stmt),
-            ast::Stmt::Return(ref stmt) => self.generate_return_stmt(stmt),
-        }
+    pub fn set_position(&mut self, ebb: Ebb) {
+        self.func.push_ebb(ebb);
+        let block = self.header_blocks[&ebb];
+        self.position = Some(Position::new(ebb, block));
     }
 
-    fn generate_block_stmt(&mut self, stmt: &ast::BlockStmt<'input>) {
-        for stmt in &stmt.stmts {
-            self.generate_stmt(stmt);
-        }
+    pub fn is_filled(&self) -> bool {
+        let ebb = self.position.unwrap().ebb;
+        let inst = self.func.last_inst(ebb);
+        self.func.inst(inst).is_terminator()
     }
 
-    fn generate_decl_stmt(&mut self, stmt: &ast::DeclStmt<'input>) {
-        let expr_value = self.generate_expr(&stmt.expr);
-
-        let variable = stmt.identifier.name;
-
-        self.insert_value(variable, expr_value);
+    pub fn push_param(&mut self, type_: Type) {
+        self.func.push_param(type_);
     }
 
-    fn generate_assign_stmt(&mut self, stmt: &ast::AssignStmt<'input>) {
-        let variable = stmt.identifier.name;
+    pub fn push_ebb_param(&mut self, variable: Variable<'input>, ebb: Ebb, type_: Type) -> Value {
+        let value = self.create_value(type_);
+        self.func.push_ebb_param(ebb, value);
 
-        let expr_value = self.generate_expr(&stmt.expr);
+        let header_block = self.header_blocks[&ebb];
+        self.values.insert_param(header_block, variable, value);
 
-        let value = match self.predicate {
-            Some(predicate) => {
-                let prev_value = self.get_value(variable);
-                self.push_select_inst(
-                    predicate,
-                    Operand::Value(expr_value),
-                    Operand::Value(prev_value),
-                )
-            }
-            None => expr_value,
-        };
-
-        self.insert_value(variable, value);
+        value
     }
 
-    fn generate_if_stmt(&mut self, stmt: &ast::IfStmt<'input>) {
-        let condition_value = self.generate_expr(&stmt.expr);
-
-        let qualifier = self.get_value_type(condition_value).qualifier;
-        match qualifier {
-            Uniform => {
-                let else_ebb = self.create_ebb();
-                let merge_ebb = match stmt.else_stmt {
-                    Some(_) => self.create_ebb(),
-                    None => else_ebb,
-                };
-
-                self.push_branch_inst(BranchOp::AllFalse, condition_value, else_ebb);
-
-                self.generate_stmt(&stmt.if_stmt);
-                self.push_jump_inst(merge_ebb);
-
-                if let Some(ref else_stmt) = stmt.else_stmt {
-                    self.set_position_ebb(else_ebb);
-
-                    self.generate_stmt(else_stmt);
-                    self.push_jump_inst(merge_ebb);
-                }
-
-                self.set_position_ebb(merge_ebb);
-            }
-            Varying => {
-                let prev_predicate = self.set_predicate_and(condition_value);
-
-                self.generate_stmt(&stmt.if_stmt);
-                self.reset_predicate(prev_predicate);
-
-                if let Some(ref else_stmt) = stmt.else_stmt {
-                    self.set_predicate_and_not(condition_value);
-
-                    self.generate_stmt(else_stmt);
-                    self.reset_predicate(prev_predicate);
-                }
-            }
-        }
+    pub fn create_ebb(&mut self) -> Ebb {
+        let ebb = self.func.create_ebb();
+        let block = self.blocks.create(BlockData::Header(HeaderBlock::new(ebb)));
+        self.header_blocks.insert(ebb, block);
+        ebb
     }
 
-    fn generate_while_stmt(&mut self, stmt: &ast::WhileStmt<'input>) {
-        let header_ebb = self.create_ebb();
-        let after_ebb = self.create_ebb();
-
-        self.push_jump_inst(header_ebb);
-        self.set_position_ebb(header_ebb);
-
-        let condition_value = self.generate_expr(&stmt.expr);
-
-        let ty = self.get_value_type(condition_value);
-        match ty.qualifier {
-            Uniform => {
-                self.push_branch_inst(BranchOp::AllFalse, condition_value, after_ebb);
-
-                self.generate_stmt(&stmt.stmt);
-                self.push_jump_inst(header_ebb);
-
-                self.set_position_ebb(after_ebb);
-            }
-            Varying => {
-                let prev_predicate = self.set_predicate_and(condition_value);
-
-                if let Some(predicate) = self.predicate {
-                    self.push_branch_inst(BranchOp::AnyFalse, predicate, after_ebb);
-                }
-
-                self.generate_stmt(&stmt.stmt);
-                self.push_jump_inst(header_ebb);
-                self.set_position_ebb(after_ebb);
-
-                self.reset_predicate(prev_predicate);
-            }
-        };
+    pub fn def_var(&mut self, variable: Variable<'input>, value: Value) {
+        let block = self.position.unwrap().block;
+        self.values.insert_value(block, variable, value);
     }
 
-    fn generate_return_stmt(&mut self, _stmt: &ast::ReturnStmt) {
-        match self.predicate {
-            Some(predicate) => {
-                let not_predicate = self.push_unary_inst(UnaryOp::Not, Operand::Value(predicate));
-                let not_returned = match self.not_returned {
-                    Some(not_returned) => self.push_binary_inst(
-                        BinaryOp::Add,
-                        Operand::Value(not_returned),
-                        Operand::Value(not_predicate),
-                    ),
-                    None => not_predicate,
-                };
-                self.not_returned = Some(not_returned);
-            }
-            None => {
-                self.push_return_inst();
-
-                let ebb = self.create_ebb();
-                self.set_position_ebb(ebb);
-            }
-        };
-    }
-
-    fn generate_expr(&mut self, expr: &ast::Expr<'input>) -> Value {
-        match *expr {
-            ast::Expr::IntLiteral(ref int_literal) => self.generate_int_literal(int_literal),
-            ast::Expr::FloatLiteral(ref float_literal) => {
-                self.generate_float_literal(float_literal)
-            }
-            ast::Expr::BoolLiteral(ref bool_literal) => self.generate_bool_literal(bool_literal),
-            ast::Expr::Index(_) => self.generate_index(),
-            ast::Expr::Count(_) => self.generate_count(),
-            ast::Expr::Identifier(ref identifier) => self.generate_identifier(identifier),
-            ast::Expr::Unary(ref expr) => self.generate_unary_expr(expr),
-            ast::Expr::Binary(ref expr) => self.generate_binary_expr(expr),
-        }
-    }
-
-    fn generate_int_literal(&mut self, int_literal: &ast::IntLiteral) -> Value {
-        self.push_int_const_inst(int_literal.value)
-    }
-
-    fn generate_float_literal(&mut self, float_literal: &ast::FloatLiteral) -> Value {
-        self.push_float_const_inst(float_literal.value)
-    }
-
-    fn generate_bool_literal(&mut self, bool_literal: &ast::BoolLiteral) -> Value {
-        self.push_bool_const_inst(bool_literal.value)
-    }
-
-    fn generate_index(&mut self) -> Value {
-        self.push_index_inst()
-    }
-
-    fn generate_count(&mut self) -> Value {
-        self.push_count_inst()
-    }
-
-    fn generate_identifier(&mut self, identifier: &ast::Identifier<'input>) -> Value {
-        self.get_value(identifier.name)
-    }
-
-    fn generate_unary_expr(&mut self, expr: &ast::UnaryExpr<'input>) -> Value {
-        let src_value = self.generate_expr(&expr.expr);
-
-        let op = expr.op;
-        let src_type = self.get_value_type(src_value);
-
-        let src = Operand::Value(src_value);
-
-        match (op, src_type.kind) {
-            (ast::UnaryOp::Negate, TypeKind::INT) => {
-                self.push_binary_inst(BinaryOp::Sub, Operand::Int(0), src)
-            }
-            (ast::UnaryOp::Negate, TypeKind::FLOAT) => {
-                self.push_binary_inst(BinaryOp::Fsub, Operand::Float(0.), src)
-            }
-            (ast::UnaryOp::BitNot, TypeKind::BOOL) | (ast::UnaryOp::LogicalNot, TypeKind::BOOL) => {
-                self.push_unary_inst(UnaryOp::Not, src)
-            }
-            _ => panic!(
-                "Invalid unary expression '{}' with operand type '{}'",
-                op, src_type
-            ),
-        }
-    }
-
-    fn generate_binary_expr(&mut self, expr: &ast::BinaryExpr<'input>) -> Value {
-        let left_value = self.generate_expr(&expr.left);
-        let right_value = self.generate_expr(&expr.right);
-
-        let op = expr.op;
-        let left_type = self.get_value_type(left_value);
-        let right_type = self.get_value_type(right_value);
-
-        let left = Operand::Value(left_value);
-        let right = Operand::Value(right_value);
-
-        if let Some(op) = get_binary_op(op, left_type, right_type) {
-            return self.push_binary_inst(op, left, right);
-        }
-
-        if let Some(op) = get_int_comp_op(op, left_type, right_type) {
-            return self.push_int_comp_inst(op, left, right);
-        }
-
-        if let Some(op) = get_float_comp_op(op, left_type, right_type) {
-            return self.push_float_comp_inst(op, left, right);
-        }
-
-        panic!(
-            "Invalid binary expression '{}' with operand types '{}' and '{}'",
-            op, left_type, right_type
-        )
-    }
-
-    fn get_value(&mut self, variable: Variable<'input>) -> Value {
-        let block = self.position().block();
-        if let Ok(value) = self.get_value_in_ebb(block, variable) {
+    pub fn use_var(&mut self, variable: Variable<'input>) -> Value {
+        let block = self.position.unwrap().block;
+        if let Ok(value) = self.use_var_in_ebb(block, variable) {
             return value;
         }
 
@@ -399,7 +207,7 @@ impl<'input> IrBuilder<'input> {
         let mut type_ = None;
 
         while let Some(block) = calls.pop() {
-            match self.get_value_in_ebb(block, variable) {
+            match self.use_var_in_ebb(block, variable) {
                 Ok(value) => {
                     let value_type = self.get_value_type(value);
                     let type_ = *type_.get_or_insert(value_type);
@@ -410,16 +218,16 @@ impl<'input> IrBuilder<'input> {
                     );
                 }
                 Err(data) => {
-                    let ebb = data.ebb();
+                    let ebb = data.ebb;
                     if ebbs.contains(&ebb) {
                         continue;
                     }
 
                     ebbs.push(ebb);
 
-                    for &predecessor in data.predecessors() {
+                    for &predecessor in &data.predecessors {
                         predecessors.insert(predecessor);
-                        calls.push(predecessor.block());
+                        calls.push(predecessor.block);
                     }
                 }
             };
@@ -428,19 +236,19 @@ impl<'input> IrBuilder<'input> {
         let type_ = type_.unwrap();
 
         for ebb in ebbs {
-            self.create_block_param(variable, ebb, type_);
+            self.push_ebb_param(variable, ebb, type_);
         }
         for predecessor in predecessors {
-            let block = predecessor.block();
-            let inst = predecessor.inst();
-            let value = self.get_value_in_ebb(block, variable).unwrap();
+            let block = predecessor.block;
+            let inst = predecessor.inst;
+            let value = self.use_var_in_ebb(block, variable).unwrap();
             self.push_target_arg(inst, value);
         }
 
-        self.get_value_in_ebb(block, variable).unwrap()
+        self.use_var_in_ebb(block, variable).unwrap()
     }
 
-    fn get_value_in_ebb(
+    fn use_var_in_ebb(
         &self,
         block: Block,
         variable: Variable<'input>,
@@ -451,136 +259,141 @@ impl<'input> IrBuilder<'input> {
                 Some(value) => return Ok(value),
                 None => match self.blocks[block] {
                     BlockData::Header(ref data) => return Err(data),
-                    BlockData::Body(ref data) => block = data.predecessor(),
+                    BlockData::Body(ref data) => block = data.predecessor,
                 },
             }
         }
     }
 
-    fn get_value_type(&self, value: Value) -> Type {
+    pub fn get_value_type(&self, value: Value) -> Type {
         self.func.value(value).type_()
     }
 
-    fn position(&self) -> &Position {
-        self.position.as_ref().unwrap()
+    pub fn push_int_const_inst(&mut self, value: i32) -> Value {
+        let type_ = Type::new(TypeQualifier::Uniform, TypeKind::INT);
+        let dest = self.create_value(type_);
+        let inst = InstData::IntConst(IntConstInst::new(dest, value));
+        self.push_inst(inst);
+        dest
     }
 
-    fn set_position_ebb(&mut self, ebb: Ebb) {
-        self.func.push_ebb(ebb);
-        let block = self.header_blocks[&ebb];
-        self.position = Some(Position::new(ebb, block));
+    pub fn push_float_const_inst(&mut self, value: f32) -> Value {
+        let type_ = Type::new(TypeQualifier::Uniform, TypeKind::FLOAT);
+        let dest = self.create_value(type_);
+        let inst = InstData::FloatConst(FloatConstInst::new(dest, value));
+        self.push_inst(inst);
+        dest
     }
 
-    fn set_position_block(&mut self, block: Block) {
-        let ebb = self.position().ebb();
-        self.position = Some(Position::new(ebb, block));
+    pub fn push_bool_const_inst(&mut self, value: bool) -> Value {
+        let dest = self.create_value(Type::UNIFORM_BOOL);
+        let inst = InstData::BoolConst(BoolConstInst::new(dest, value));
+        self.push_inst(inst);
+        dest
     }
 
-    fn set_predicate_and(&mut self, value: Value) -> Option<Value> {
-        let predicate = match self.predicate {
-            Some(predicate) => self.push_binary_inst(
-                BinaryOp::And,
-                Operand::Value(predicate),
-                Operand::Value(value),
-            ),
-            None => value,
-        };
-        self.set_predicate(predicate)
+    pub fn push_index_inst(&mut self) -> Value {
+        let dest = self.create_value(Type::VARYING_INT);
+        let inst = InstData::Index(IndexInst::new(dest));
+        self.push_inst(inst);
+        dest
     }
 
-    fn set_predicate_and_not(&mut self, value: Value) -> Option<Value> {
-        let not_value = self.push_unary_inst(UnaryOp::Not, Operand::Value(value));
-
-        let predicate = match self.predicate {
-            Some(predicate) => self.push_binary_inst(
-                BinaryOp::Add,
-                Operand::Value(predicate),
-                Operand::Value(not_value),
-            ),
-            None => not_value,
-        };
-        self.set_predicate(predicate)
+    pub fn push_count_inst(&mut self) -> Value {
+        let dest = self.create_value(Type::UNIFORM_INT);
+        let inst = InstData::Count(CountInst::new(dest));
+        self.push_inst(inst);
+        dest
     }
 
-    fn set_predicate(&mut self, predicate: Value) -> Option<Value> {
-        let prev_predicate = self.predicate;
-        self.predicate = Some(predicate);
-        prev_predicate
+    pub fn push_unary_inst(&mut self, op: UnaryOp, src: Operand) -> Value {
+        let type_ = self.get_unary_inst_type(src);
+        let dest = self.create_value(type_);
+        let inst = InstData::Unary(UnaryInst::new(op, dest, src));
+        self.push_inst(inst);
+        dest
     }
 
-    fn reset_predicate(&mut self, predicate: Option<Value>) {
-        self.predicate = match self.not_returned {
-            Some(not_returned) => {
-                let predicate = match predicate {
-                    Some(predicate) => self.push_binary_inst(
-                        BinaryOp::And,
-                        Operand::Value(predicate),
-                        Operand::Value(not_returned),
-                    ),
-                    None => not_returned,
-                };
-                Some(predicate)
-            }
-            None => predicate,
-        };
+    pub fn push_binary_inst(&mut self, op: BinaryOp, left: Operand, right: Operand) -> Value {
+        let type_ = self.get_binary_inst_type(op, left, right);
+        let dest = self.create_value(type_);
+        let inst = InstData::Binary(BinaryInst::new(op, dest, left, right));
+        self.push_inst(inst);
+        dest
     }
 
-    fn insert_value(&mut self, variable: Variable<'input>, value: Value) {
-        let block = self.position().block();
-        self.values.insert_value(block, variable, value);
+    pub fn push_int_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
+        let type_ = self.get_comp_inst_type(op, left, right);
+        let dest = self.create_value(type_);
+        let inst = InstData::IntComp(IntCompInst::new(op, dest, left, right));
+        self.push_inst(inst);
+        dest
     }
 
-    fn insert_predecessor(&mut self, ebb: Ebb, predecessor: Predecessor) {
-        let block = self.header_blocks[&ebb];
-        match self.blocks[block] {
-            BlockData::Header(ref mut data) => data.insert_predecessor(predecessor),
-            _ => panic!(),
+    pub fn push_float_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
+        let type_ = self.get_comp_inst_type(op, left, right);
+        let dest = self.create_value(type_);
+        let inst = InstData::FloatComp(FloatCompInst::new(op, dest, left, right));
+        self.push_inst(inst);
+        dest
+    }
+
+    pub fn push_select_inst(&mut self, cond: Value, left: Operand, right: Operand) -> Value {
+        let type_ = self.get_select_inst_type(left, right);
+        let dest = self.create_value(type_);
+        let inst = InstData::Select(SelectInst::new(dest, cond, left, right));
+        self.push_inst(inst);
+        dest
+    }
+
+    pub fn push_jump_inst(&mut self, ebb: Ebb) {
+        let target = self.create_target(ebb);
+        let inst = InstData::Jump(JumpInst::new(target));
+        self.push_inst(inst);
+    }
+
+    pub fn push_branch_inst(&mut self, op: BranchOp, cond: Value, ebb: Ebb) {
+        let target = self.create_target(ebb);
+        let inst = InstData::Branch(BranchInst::new(op, cond, target));
+        self.push_inst(inst);
+    }
+
+    pub fn push_return_inst(&mut self) {
+        let inst = InstData::Return(ReturnInst::new());
+        self.push_inst(inst);
+    }
+
+    fn push_inst(&mut self, data: InstData) {
+        let ebb = self.position.unwrap().ebb;
+        let inst = self.func.create_inst(data.clone());
+        self.func.push_inst(ebb, inst);
+
+        if let Some(target) = data.target() {
+            let block = self.position.unwrap().block;
+            let predecessor = Predecessor::new(block, inst);
+            self.push_predecessor(target.ebb(), predecessor);
+
+            self.position.as_mut().unwrap().block =
+                self.blocks.create(BlockData::Body(BodyBlock::new(block)))
         }
     }
 
-    fn create_func_param(&mut self, type_: Type) {
-        self.func.push_param(type_);
-    }
-
-    fn create_ebb(&mut self) -> Ebb {
-        let ebb = self.func.create_ebb();
-        let block = self.blocks.create(BlockData::Header(HeaderBlock::new(ebb)));
-        self.header_blocks.insert(ebb, block);
-        ebb
-    }
-
-    fn create_block(&mut self) -> Block {
-        let predecessor = self.position().block();
-        self.blocks
-            .create(BlockData::Body(BodyBlock::new(predecessor)))
-    }
-
-    fn create_block_param(&mut self, variable: Variable<'input>, ebb: Ebb, type_: Type) -> Value {
-        let value = self.create_value(type_);
-        self.func.push_ebb_param(ebb, value);
-
-        let header_block = self.header_blocks[&ebb];
-        self.values.insert_param(header_block, variable, value);
-
-        value
+    fn create_value(&mut self, type_: Type) -> Value {
+        self.func.create_value(ValueData::new(type_))
     }
 
     fn create_target(&mut self, ebb: Ebb) -> Target {
         let block = self.header_blocks[&ebb];
         let mut target = Target::new(ebb);
 
-        for i in 0..self.func.ebb(ebb).params().len() {
-            let param = self.func.ebb(ebb).params()[i];
+        for i in 0..self.func.ebb_params(ebb).len() {
+            let param = self.func.ebb_params(ebb)[i];
             let variable = self.values.get_param(block, param).unwrap();
-            let value = self.get_value(variable);
+            let value = self.use_var(variable);
             target.push_arg(value);
         }
 
         target
-    }
-
-    fn create_value(&mut self, type_: Type) -> Value {
-        self.func.create_value(ValueData::new(type_))
     }
 
     fn push_target_arg(&mut self, inst: Inst, value: Value) {
@@ -589,112 +402,11 @@ impl<'input> IrBuilder<'input> {
         }
     }
 
-    fn push_int_const_inst(&mut self, value: i32) -> Value {
-        let type_ = Type::new(Uniform, TypeKind::INT);
-        let dest = self.create_value(type_);
-        let inst = InstData::IntConst(IntConstInst::new(dest, value));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_float_const_inst(&mut self, value: f32) -> Value {
-        let type_ = Type::new(Uniform, TypeKind::FLOAT);
-        let dest = self.create_value(type_);
-        let inst = InstData::FloatConst(FloatConstInst::new(dest, value));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_bool_const_inst(&mut self, value: bool) -> Value {
-        let dest = self.create_value(Type::UNIFORM_BOOL);
-        let inst = InstData::BoolConst(BoolConstInst::new(dest, value));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_index_inst(&mut self) -> Value {
-        let dest = self.create_value(Type::VARYING_INT);
-        let inst = InstData::Index(IndexInst::new(dest));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_count_inst(&mut self) -> Value {
-        let dest = self.create_value(Type::UNIFORM_INT);
-        let inst = InstData::Count(CountInst::new(dest));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_unary_inst(&mut self, op: UnaryOp, src: Operand) -> Value {
-        let type_ = self.get_unary_inst_type(src);
-        let dest = self.create_value(type_);
-        let inst = InstData::Unary(UnaryInst::new(op, dest, src));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_binary_inst(&mut self, op: BinaryOp, left: Operand, right: Operand) -> Value {
-        let type_ = self.get_binary_inst_type(op, left, right);
-        let dest = self.create_value(type_);
-        let inst = InstData::Binary(BinaryInst::new(op, dest, left, right));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_int_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
-        let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.create_value(type_);
-        let inst = InstData::IntComp(IntCompInst::new(op, dest, left, right));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_float_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
-        let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.create_value(type_);
-        let inst = InstData::FloatComp(FloatCompInst::new(op, dest, left, right));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_select_inst(&mut self, cond: Value, left: Operand, right: Operand) -> Value {
-        let type_ = self.get_select_inst_type(left, right);
-        let dest = self.create_value(type_);
-        let inst = InstData::Select(SelectInst::new(dest, cond, left, right));
-        self.push_inst(inst);
-        dest
-    }
-
-    fn push_jump_inst(&mut self, ebb: Ebb) {
-        let target = self.create_target(ebb);
-        let inst = InstData::Jump(JumpInst::new(target));
-        self.push_inst(inst);
-    }
-
-    fn push_branch_inst(&mut self, op: BranchOp, cond: Value, ebb: Ebb) {
-        let target = self.create_target(ebb);
-        let inst = InstData::Branch(BranchInst::new(op, cond, target));
-        self.push_inst(inst);
-    }
-
-    fn push_return_inst(&mut self) {
-        let inst = InstData::Return(ReturnInst::new());
-        self.push_inst(inst);
-    }
-
-    fn push_inst(&mut self, data: InstData) {
-        let ebb = self.position().ebb();
-        let inst = self.func.create_inst(data.clone());
-        self.func.push_inst(ebb, inst);
-
-        if let Some(target) = data.target() {
-            let block = self.position().block();
-            let predecessor = Predecessor::new(block, inst);
-            self.insert_predecessor(target.ebb(), predecessor);
-
-            let block = self.create_block();
-            self.set_position_block(block);
+    fn push_predecessor(&mut self, ebb: Ebb, predecessor: Predecessor) {
+        let block = self.header_blocks[&ebb];
+        match self.blocks[block] {
+            BlockData::Header(ref mut data) => data.predecessors.push(predecessor),
+            _ => panic!(),
         }
     }
 
@@ -711,7 +423,7 @@ impl<'input> IrBuilder<'input> {
             op, left_type, right_type
         );
 
-        let qualifier = get_type_qualifier(left_type.qualifier, right_type.qualifier);
+        let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
 
         Type::new(qualifier, left_type.kind)
     }
@@ -725,7 +437,7 @@ impl<'input> IrBuilder<'input> {
             op, left_type, right_type
         );
 
-        let qualifier = get_type_qualifier(left_type.qualifier, right_type.qualifier);
+        let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
 
         Type::new(qualifier, TypeKind::BOOL)
     }
@@ -739,65 +451,17 @@ impl<'input> IrBuilder<'input> {
             left_type, right_type
         );
 
-        let qualifier = get_type_qualifier(left_type.qualifier, right_type.qualifier);
+        let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
 
         Type::new(qualifier, left_type.kind)
     }
 
     fn get_operand_type(&self, operand: Operand) -> Type {
         match operand {
-            Operand::Int(_) => Type::new(Uniform, TypeKind::INT),
-            Operand::Float(_) => Type::new(Uniform, TypeKind::FLOAT),
-            Operand::Bool(_) => Type::new(Uniform, TypeKind::BOOL),
+            Operand::Int(_) => Type::new(TypeQualifier::Uniform, TypeKind::INT),
+            Operand::Float(_) => Type::new(TypeQualifier::Uniform, TypeKind::FLOAT),
+            Operand::Bool(_) => Type::new(TypeQualifier::Uniform, TypeKind::BOOL),
             Operand::Value(value) => self.get_value_type(value),
         }
-    }
-}
-
-fn get_binary_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<BinaryOp> {
-    match (op, left_type.kind, right_type.kind) {
-        (ast::BinaryOp::Mul, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fmul),
-        (ast::BinaryOp::Add, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Add),
-        (ast::BinaryOp::Add, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fadd),
-        (ast::BinaryOp::Sub, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Sub),
-        (ast::BinaryOp::Sub, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fsub),
-        (ast::BinaryOp::Shl, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Shl),
-        (ast::BinaryOp::Shr, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Asr),
-        (ast::BinaryOp::Min, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Min),
-        (ast::BinaryOp::Min, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fmin),
-        (ast::BinaryOp::Max, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Max),
-        (ast::BinaryOp::Max, TypeKind::FLOAT, TypeKind::FLOAT) => Some(BinaryOp::Fmax),
-        (ast::BinaryOp::BitAnd, TypeKind::INT, TypeKind::INT)
-        | (ast::BinaryOp::LogicalAnd, TypeKind::BOOL, TypeKind::BOOL) => Some(BinaryOp::And),
-        (ast::BinaryOp::BitOr, TypeKind::INT, TypeKind::INT)
-        | (ast::BinaryOp::LogicalOr, TypeKind::BOOL, TypeKind::BOOL) => Some(BinaryOp::Or),
-        (ast::BinaryOp::BitXor, TypeKind::INT, TypeKind::INT) => Some(BinaryOp::Xor),
-        _ => None,
-    }
-}
-
-fn get_int_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<CompOp> {
-    match (left_type.kind, right_type.kind) {
-        (TypeKind::INT, TypeKind::INT) | (TypeKind::BOOL, TypeKind::BOOL) => get_comp_op(op),
-        _ => None,
-    }
-}
-
-fn get_float_comp_op(op: ast::BinaryOp, left_type: Type, right_type: Type) -> Option<CompOp> {
-    match (left_type.kind, right_type.kind) {
-        (TypeKind::FLOAT, TypeKind::FLOAT) => get_comp_op(op),
-        _ => None,
-    }
-}
-
-fn get_comp_op(op: ast::BinaryOp) -> Option<CompOp> {
-    match op {
-        ast::BinaryOp::Eq => Some(CompOp::Eq),
-        ast::BinaryOp::Ne => Some(CompOp::Ne),
-        ast::BinaryOp::Lt => Some(CompOp::Lt),
-        ast::BinaryOp::Gt => Some(CompOp::Gt),
-        ast::BinaryOp::Le => Some(CompOp::Le),
-        ast::BinaryOp::Ge => Some(CompOp::Ge),
-        _ => None,
     }
 }

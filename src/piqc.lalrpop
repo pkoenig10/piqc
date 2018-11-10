@@ -216,10 +216,6 @@ FuncBlock: Stmt<'input> = {
     BlockStmt => Stmt::Block(<>),
 };
 
-Func: Func<'input> = {
+pub Func: Func<'input> = {
     <@L> "fn" <Identifier> "(" <Params?> ")" <FuncBlock> <@R> => Func::new(<>),
-};
-
-pub Prog: Prog<'input> = {
-    @L Func @R => Prog::new(<>),
 };

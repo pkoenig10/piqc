@@ -6,6 +6,18 @@ pub enum TypeQualifier {
     Varying,
 }
 
+impl TypeQualifier {
+    pub fn get(
+        left_type_qualifier: TypeQualifier,
+        right_type_qualifier: TypeQualifier,
+    ) -> TypeQualifier {
+        match (left_type_qualifier, right_type_qualifier) {
+            (TypeQualifier::Uniform, TypeQualifier::Uniform) => TypeQualifier::Uniform,
+            _ => TypeQualifier::Varying,
+        }
+    }
+}
+
 impl fmt::Display for TypeQualifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let qualifier = match self {
@@ -128,15 +140,5 @@ impl Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {}", self.qualifier, self.kind)
-    }
-}
-
-pub fn get_type_qualifier(
-    left_type_qualifier: TypeQualifier,
-    right_type_qualifier: TypeQualifier,
-) -> TypeQualifier {
-    match (left_type_qualifier, right_type_qualifier) {
-        (TypeQualifier::Uniform, TypeQualifier::Uniform) => TypeQualifier::Uniform,
-        _ => TypeQualifier::Varying,
     }
 }

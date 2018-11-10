@@ -64,8 +64,6 @@ impl fmt::Display for Target {
     }
 }
 
-id!(Inst, "i");
-
 #[derive(Debug, Clone, Copy)]
 pub struct IntConstInst {
     dest: Value,

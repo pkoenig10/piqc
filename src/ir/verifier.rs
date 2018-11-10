@@ -1,8 +1,7 @@
 use ir::*;
 
-pub fn verify_ir(prog: &Prog) {
-    let verifier = Verifier::new(prog.func());
-    verifier.verify_func();
+pub fn verify_ir(func: &Func) {
+    Verifier::new(func).verify_func();
 }
 
 pub struct Verifier<'a> {
