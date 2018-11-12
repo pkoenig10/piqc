@@ -306,7 +306,7 @@ impl<'input> FuncBuilder<'input> {
         dest
     }
 
-    pub fn push_unary_inst(&mut self, op: UnaryOp, src: Operand) -> Value {
+    pub fn push_unary_inst(&mut self, op: UnaryOp, src: Value) -> Value {
         let type_ = self.get_unary_inst_type(src);
         let dest = self.create_value(type_);
         let inst = InstData::Unary(UnaryInst::new(op, dest, src));
@@ -314,7 +314,7 @@ impl<'input> FuncBuilder<'input> {
         dest
     }
 
-    pub fn push_binary_inst(&mut self, op: BinaryOp, left: Operand, right: Operand) -> Value {
+    pub fn push_binary_inst(&mut self, op: BinaryOp, left: Value, right: Value) -> Value {
         let type_ = self.get_binary_inst_type(op, left, right);
         let dest = self.create_value(type_);
         let inst = InstData::Binary(BinaryInst::new(op, dest, left, right));
@@ -322,7 +322,7 @@ impl<'input> FuncBuilder<'input> {
         dest
     }
 
-    pub fn push_int_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
+    pub fn push_int_comp_inst(&mut self, op: CompOp, left: Value, right: Value) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
         let dest = self.create_value(type_);
         let inst = InstData::IntComp(IntCompInst::new(op, dest, left, right));
@@ -330,7 +330,7 @@ impl<'input> FuncBuilder<'input> {
         dest
     }
 
-    pub fn push_float_comp_inst(&mut self, op: CompOp, left: Operand, right: Operand) -> Value {
+    pub fn push_float_comp_inst(&mut self, op: CompOp, left: Value, right: Value) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
         let dest = self.create_value(type_);
         let inst = InstData::FloatComp(FloatCompInst::new(op, dest, left, right));
@@ -338,7 +338,7 @@ impl<'input> FuncBuilder<'input> {
         dest
     }
 
-    pub fn push_select_inst(&mut self, cond: Value, left: Operand, right: Operand) -> Value {
+    pub fn push_select_inst(&mut self, cond: Value, left: Value, right: Value) -> Value {
         let type_ = self.get_select_inst_type(left, right);
         let dest = self.create_value(type_);
         let inst = InstData::Select(SelectInst::new(dest, cond, left, right));
@@ -410,13 +410,13 @@ impl<'input> FuncBuilder<'input> {
         }
     }
 
-    fn get_unary_inst_type(&self, src: Operand) -> Type {
-        self.get_operand_type(src)
+    fn get_unary_inst_type(&self, src: Value) -> Type {
+        self.get_value_type(src)
     }
 
-    fn get_binary_inst_type(&self, op: BinaryOp, left: Operand, right: Operand) -> Type {
-        let left_type = self.get_operand_type(left);
-        let right_type = self.get_operand_type(right);
+    fn get_binary_inst_type(&self, op: BinaryOp, left: Value, right: Value) -> Type {
+        let left_type = self.get_value_type(left);
+        let right_type = self.get_value_type(right);
         assert_eq!(
             left_type.kind, right_type.kind,
             "Invalid binary instruction '{}' with operand types '{}' and '{}'",
@@ -428,9 +428,9 @@ impl<'input> FuncBuilder<'input> {
         Type::new(qualifier, left_type.kind)
     }
 
-    fn get_comp_inst_type(&self, op: CompOp, left: Operand, right: Operand) -> Type {
-        let left_type = self.get_operand_type(left);
-        let right_type = self.get_operand_type(right);
+    fn get_comp_inst_type(&self, op: CompOp, left: Value, right: Value) -> Type {
+        let left_type = self.get_value_type(left);
+        let right_type = self.get_value_type(right);
         assert_eq!(
             left_type.kind, right_type.kind,
             "Invalid comparison instruction '{}' with operand types '{}' and '{}'",
@@ -442,9 +442,9 @@ impl<'input> FuncBuilder<'input> {
         Type::new(qualifier, TypeKind::BOOL)
     }
 
-    fn get_select_inst_type(&self, left: Operand, right: Operand) -> Type {
-        let left_type = self.get_operand_type(left);
-        let right_type = self.get_operand_type(right);
+    fn get_select_inst_type(&self, left: Value, right: Value) -> Type {
+        let left_type = self.get_value_type(left);
+        let right_type = self.get_value_type(right);
         assert_eq!(
             left_type.kind, right_type.kind,
             "Invalid select instruction with operand types '{}' and '{}'",
@@ -454,14 +454,5 @@ impl<'input> FuncBuilder<'input> {
         let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
 
         Type::new(qualifier, left_type.kind)
-    }
-
-    fn get_operand_type(&self, operand: Operand) -> Type {
-        match operand {
-            Operand::Int(_) => Type::new(TypeQualifier::Uniform, TypeKind::INT),
-            Operand::Float(_) => Type::new(TypeQualifier::Uniform, TypeKind::FLOAT),
-            Operand::Bool(_) => Type::new(TypeQualifier::Uniform, TypeKind::BOOL),
-            Operand::Value(value) => self.get_value_type(value),
-        }
     }
 }

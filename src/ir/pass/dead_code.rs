@@ -68,12 +68,6 @@ impl Analysis {
             .insert(inst);
     }
 
-    fn insert_use_operand(&mut self, operand: Operand, inst: Inst) {
-        if let Operand::Value(value) = operand {
-            self.insert_use(value, inst);
-        }
-    }
-
     fn predecessors(&self, ebb: Ebb) -> Option<&HashSet<Inst>> {
         self.predecessors.get(&ebb)
     }
@@ -230,28 +224,28 @@ impl<'a> DeadCodePass<'a> {
                 analysis.insert_def(data.dest(), inst);
             }
             InstData::Unary(ref data) => {
-                analysis.insert_use_operand(data.src(), inst);
+                analysis.insert_use(data.src(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
             InstData::Binary(ref data) => {
-                analysis.insert_use_operand(data.left(), inst);
-                analysis.insert_use_operand(data.right(), inst);
+                analysis.insert_use(data.left(), inst);
+                analysis.insert_use(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
             InstData::IntComp(ref data) => {
-                analysis.insert_use_operand(data.left(), inst);
-                analysis.insert_use_operand(data.right(), inst);
+                analysis.insert_use(data.left(), inst);
+                analysis.insert_use(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
             InstData::FloatComp(ref data) => {
-                analysis.insert_use_operand(data.left(), inst);
-                analysis.insert_use_operand(data.right(), inst);
+                analysis.insert_use(data.left(), inst);
+                analysis.insert_use(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
             InstData::Select(ref data) => {
                 analysis.insert_use(data.cond(), inst);
-                analysis.insert_use_operand(data.left(), inst);
-                analysis.insert_use_operand(data.right(), inst);
+                analysis.insert_use(data.left(), inst);
+                analysis.insert_use(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
             InstData::Jump(ref data) => {

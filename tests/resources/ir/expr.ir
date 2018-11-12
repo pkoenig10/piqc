@@ -1,11 +1,12 @@
 func(uniform int, uniform float):
 
 ebb0(%0, %1):
-    %2 = sub 0, %0
-    %3 = iconst 1
-    %4 = add %2, %3
-    %5 = fconst 42
-    %6 = fmin %1, %5
-    %7 = bconst true
-    %8 = not %7
+    %2 = iconst 0
+    %3 = sub %2, %0
+    %4 = iconst 1
+    %5 = add %3, %4
+    %6 = fconst 42
+    %7 = fmin %1, %6
+    %8 = bconst true
+    %9 = not %8
     ret

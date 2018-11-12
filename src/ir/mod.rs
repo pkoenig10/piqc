@@ -1,7 +1,7 @@
 pub use self::builder::FuncBuilder;
 pub use self::func::Func;
-pub use self::id::Value;
-pub use self::inst::{BinaryOp, BranchOp, CompOp, Operand, UnaryOp};
+pub use self::id::{Ebb, Inst, Value};
+pub use self::inst::{BinaryOp, BranchOp, CompOp, UnaryOp};
 pub use self::pass::run_dead_code;
 pub use self::types::{Type, TypeKind, TypeQualifier};
 pub use self::verifier::verify_ir;
@@ -10,7 +10,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
-use self::id::{Block, Ebb, Inst};
+use self::id::Block;
 use self::inst::{
     BinaryInst, BoolConstInst, BranchInst, CountInst, FloatCompInst, FloatConstInst, IndexInst,
     InstData, IntCompInst, IntConstInst, JumpInst, ReturnInst, SelectInst, Target, UnaryInst,

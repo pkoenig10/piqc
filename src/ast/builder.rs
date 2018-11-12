@@ -73,11 +73,8 @@ impl<'input> IrBuilder<'input> {
         let value = match self.predicate {
             Some(predicate) => {
                 let prev_value = self.builder.use_var(variable);
-                self.builder.push_select_inst(
-                    predicate,
-                    ir::Operand::Value(expr_value),
-                    ir::Operand::Value(prev_value),
-                )
+                self.builder
+                    .push_select_inst(predicate, expr_value, prev_value)
             }
             None => expr_value,
         };
@@ -168,14 +165,12 @@ impl<'input> IrBuilder<'input> {
     fn return_stmt(&mut self, _stmt: &ReturnStmt) {
         match self.predicate {
             Some(predicate) => {
-                let not_predicate = self
-                    .builder
-                    .push_unary_inst(ir::UnaryOp::Not, ir::Operand::Value(predicate));
+                let not_predicate = self.builder.push_unary_inst(ir::UnaryOp::Not, predicate);
                 let not_returned = match self.not_returned {
                     Some(not_returned) => self.builder.push_binary_inst(
                         ir::BinaryOp::Add,
-                        ir::Operand::Value(not_returned),
-                        ir::Operand::Value(not_predicate),
+                        not_returned,
+                        not_predicate,
                     ),
                     None => not_predicate,
                 };
@@ -228,53 +223,54 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn unary_expr(&mut self, expr: &UnaryExpr<'input>) -> ir::Value {
-        let src_value = self.expr(&expr.expr);
-
         let op = expr.op;
-        let src_type = self.builder.get_value_type(src_value);
 
-        let src = ir::Operand::Value(src_value);
+        let expr_value = self.expr(&expr.expr);
 
-        match (op, src_type.kind) {
+        let expr_type = self.builder.get_value_type(expr_value);
+
+        match (op, expr_type.kind) {
             (UnaryOp::Negate, TypeKind::INT) => {
+                let zero = self.builder.push_int_const_inst(0);
                 self.builder
-                    .push_binary_inst(ir::BinaryOp::Sub, ir::Operand::Int(0), src)
+                    .push_binary_inst(ir::BinaryOp::Sub, zero, expr_value)
             }
             (UnaryOp::Negate, TypeKind::FLOAT) => {
+                let zero = self.builder.push_float_const_inst(0.);
                 self.builder
-                    .push_binary_inst(ir::BinaryOp::Fsub, ir::Operand::Float(0.), src)
+                    .push_binary_inst(ir::BinaryOp::Fsub, zero, expr_value)
             }
             (UnaryOp::BitNot, TypeKind::BOOL) | (UnaryOp::LogicalNot, TypeKind::BOOL) => {
-                self.builder.push_unary_inst(ir::UnaryOp::Not, src)
+                self.builder.push_unary_inst(ir::UnaryOp::Not, expr_value)
             }
             _ => panic!(
                 "Invalid unary expression '{}' with operand type '{}'",
-                op, src_type
+                op, expr_type
             ),
         }
     }
 
     fn binary_expr(&mut self, expr: &BinaryExpr<'input>) -> ir::Value {
+        let op = expr.op;
+
         let left_value = self.expr(&expr.left);
         let right_value = self.expr(&expr.right);
 
-        let op = expr.op;
         let left_type = self.builder.get_value_type(left_value);
         let right_type = self.builder.get_value_type(right_value);
 
-        let left = ir::Operand::Value(left_value);
-        let right = ir::Operand::Value(right_value);
-
         if let Some(op) = get_binary_op(op, left_type, right_type) {
-            return self.builder.push_binary_inst(op, left, right);
+            return self.builder.push_binary_inst(op, left_value, right_value);
         }
 
         if let Some(op) = get_int_comp_op(op, left_type, right_type) {
-            return self.builder.push_int_comp_inst(op, left, right);
+            return self.builder.push_int_comp_inst(op, left_value, right_value);
         }
 
         if let Some(op) = get_float_comp_op(op, left_type, right_type) {
-            return self.builder.push_float_comp_inst(op, left, right);
+            return self
+                .builder
+                .push_float_comp_inst(op, left_value, right_value);
         }
 
         panic!(
@@ -285,27 +281,22 @@ impl<'input> IrBuilder<'input> {
 
     fn set_predicate_and(&mut self, value: ir::Value) -> Option<ir::Value> {
         let predicate = match self.predicate {
-            Some(predicate) => self.builder.push_binary_inst(
-                ir::BinaryOp::And,
-                ir::Operand::Value(predicate),
-                ir::Operand::Value(value),
-            ),
+            Some(predicate) => self
+                .builder
+                .push_binary_inst(ir::BinaryOp::And, predicate, value),
             None => value,
         };
         self.set_predicate(predicate)
     }
 
     fn set_predicate_and_not(&mut self, value: ir::Value) -> Option<ir::Value> {
-        let not_value = self
-            .builder
-            .push_unary_inst(ir::UnaryOp::Not, ir::Operand::Value(value));
+        let not_value = self.builder.push_unary_inst(ir::UnaryOp::Not, value);
 
         let predicate = match self.predicate {
-            Some(predicate) => self.builder.push_binary_inst(
-                ir::BinaryOp::Add,
-                ir::Operand::Value(predicate),
-                ir::Operand::Value(not_value),
-            ),
+            Some(predicate) => {
+                self.builder
+                    .push_binary_inst(ir::BinaryOp::Add, predicate, not_value)
+            }
             None => not_value,
         };
         self.set_predicate(predicate)
@@ -321,11 +312,10 @@ impl<'input> IrBuilder<'input> {
         self.predicate = match self.not_returned {
             Some(not_returned) => {
                 let predicate = match predicate {
-                    Some(predicate) => self.builder.push_binary_inst(
-                        ir::BinaryOp::And,
-                        ir::Operand::Value(predicate),
-                        ir::Operand::Value(not_returned),
-                    ),
+                    Some(predicate) => {
+                        self.builder
+                            .push_binary_inst(ir::BinaryOp::And, predicate, not_returned)
+                    }
                     None => not_returned,
                 };
                 Some(predicate)

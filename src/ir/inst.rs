@@ -2,25 +2,6 @@ use std::fmt;
 
 use ir::*;
 
-#[derive(Debug, Clone, Copy)]
-pub enum Operand {
-    Int(i32),
-    Float(f32),
-    Bool(bool),
-    Value(Value),
-}
-
-impl fmt::Display for Operand {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Operand::Int(ref value) => write!(f, "{}", value),
-            Operand::Float(ref value) => write!(f, "{}", value),
-            Operand::Bool(ref value) => write!(f, "{}", value),
-            Operand::Value(ref value) => write!(f, "{}", value),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Target {
     ebb: Ebb,
@@ -190,11 +171,11 @@ impl fmt::Display for UnaryOp {
 pub struct UnaryInst {
     op: UnaryOp,
     dest: Value,
-    src: Operand,
+    src: Value,
 }
 
 impl UnaryInst {
-    pub fn new(op: UnaryOp, dest: Value, src: Operand) -> UnaryInst {
+    pub fn new(op: UnaryOp, dest: Value, src: Value) -> UnaryInst {
         UnaryInst { op, dest, src }
     }
 
@@ -202,13 +183,13 @@ impl UnaryInst {
         self.dest
     }
 
-    pub fn src(&self) -> Operand {
+    pub fn src(&self) -> Value {
         self.src
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
-        replace_operand_value(&mut self.src, old, new);
+        replace_value(&mut self.src, old, new);
     }
 }
 
@@ -262,12 +243,12 @@ impl fmt::Display for BinaryOp {
 pub struct BinaryInst {
     op: BinaryOp,
     dest: Value,
-    left: Operand,
-    right: Operand,
+    left: Value,
+    right: Value,
 }
 
 impl BinaryInst {
-    pub fn new(op: BinaryOp, dest: Value, left: Operand, right: Operand) -> BinaryInst {
+    pub fn new(op: BinaryOp, dest: Value, left: Value, right: Value) -> BinaryInst {
         BinaryInst {
             op,
             dest,
@@ -280,18 +261,18 @@ impl BinaryInst {
         self.dest
     }
 
-    pub fn left(&self) -> Operand {
+    pub fn left(&self) -> Value {
         self.left
     }
 
-    pub fn right(&self) -> Operand {
+    pub fn right(&self) -> Value {
         self.right
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
-        replace_operand_value(&mut self.left, old, new);
-        replace_operand_value(&mut self.right, old, new);
+        replace_value(&mut self.left, old, new);
+        replace_value(&mut self.right, old, new);
     }
 }
 
@@ -333,12 +314,12 @@ impl fmt::Display for CompOp {
 pub struct IntCompInst {
     op: CompOp,
     dest: Value,
-    left: Operand,
-    right: Operand,
+    left: Value,
+    right: Value,
 }
 
 impl IntCompInst {
-    pub fn new(op: CompOp, dest: Value, left: Operand, right: Operand) -> IntCompInst {
+    pub fn new(op: CompOp, dest: Value, left: Value, right: Value) -> IntCompInst {
         IntCompInst {
             op,
             dest,
@@ -351,18 +332,18 @@ impl IntCompInst {
         self.dest
     }
 
-    pub fn left(&self) -> Operand {
+    pub fn left(&self) -> Value {
         self.left
     }
 
-    pub fn right(&self) -> Operand {
+    pub fn right(&self) -> Value {
         self.right
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
-        replace_operand_value(&mut self.left, old, new);
-        replace_operand_value(&mut self.right, old, new);
+        replace_value(&mut self.left, old, new);
+        replace_value(&mut self.right, old, new);
     }
 }
 
@@ -380,12 +361,12 @@ impl fmt::Display for IntCompInst {
 pub struct FloatCompInst {
     op: CompOp,
     dest: Value,
-    left: Operand,
-    right: Operand,
+    left: Value,
+    right: Value,
 }
 
 impl FloatCompInst {
-    pub fn new(op: CompOp, dest: Value, left: Operand, right: Operand) -> FloatCompInst {
+    pub fn new(op: CompOp, dest: Value, left: Value, right: Value) -> FloatCompInst {
         FloatCompInst {
             op,
             dest,
@@ -398,18 +379,18 @@ impl FloatCompInst {
         self.dest
     }
 
-    pub fn left(&self) -> Operand {
+    pub fn left(&self) -> Value {
         self.left
     }
 
-    pub fn right(&self) -> Operand {
+    pub fn right(&self) -> Value {
         self.right
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
-        replace_operand_value(&mut self.left, old, new);
-        replace_operand_value(&mut self.right, old, new);
+        replace_value(&mut self.left, old, new);
+        replace_value(&mut self.right, old, new);
     }
 }
 
@@ -427,12 +408,12 @@ impl fmt::Display for FloatCompInst {
 pub struct SelectInst {
     dest: Value,
     cond: Value,
-    left: Operand,
-    right: Operand,
+    left: Value,
+    right: Value,
 }
 
 impl SelectInst {
-    pub fn new(dest: Value, cond: Value, left: Operand, right: Operand) -> SelectInst {
+    pub fn new(dest: Value, cond: Value, left: Value, right: Value) -> SelectInst {
         SelectInst {
             dest,
             cond,
@@ -449,19 +430,19 @@ impl SelectInst {
         self.cond
     }
 
-    pub fn left(&self) -> Operand {
+    pub fn left(&self) -> Value {
         self.left
     }
 
-    pub fn right(&self) -> Operand {
+    pub fn right(&self) -> Value {
         self.right
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
         replace_value(&mut self.cond, old, new);
-        replace_operand_value(&mut self.left, old, new);
-        replace_operand_value(&mut self.right, old, new);
+        replace_value(&mut self.left, old, new);
+        replace_value(&mut self.right, old, new);
     }
 }
 
@@ -648,11 +629,5 @@ impl fmt::Display for InstData {
 fn replace_value(value: &mut Value, old: Value, new: Value) {
     if *value == old {
         *value = new;
-    }
-}
-
-fn replace_operand_value(operand: &mut Operand, old: Value, new: Value) {
-    if let Operand::Value(ref mut value) = operand {
-        replace_value(value, old, new);
     }
 }
