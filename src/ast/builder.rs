@@ -190,7 +190,7 @@ impl<'input> IrBuilder<'input> {
             Expr::IntLiteral(ref int_literal) => self.int_literal(int_literal),
             Expr::FloatLiteral(ref float_literal) => self.float_literal(float_literal),
             Expr::BoolLiteral(ref bool_literal) => self.bool_literal(bool_literal),
-            Expr::Index(_) => self.index(),
+            Expr::Element(_) => self.element(),
             Expr::Count(_) => self.count(),
             Expr::Identifier(ref identifier) => self.identifier(identifier),
             Expr::Unary(ref expr) => self.unary_expr(expr),
@@ -210,8 +210,8 @@ impl<'input> IrBuilder<'input> {
         self.builder.push_bool_const_inst(bool_literal.value)
     }
 
-    fn index(&mut self) -> ir::Value {
-        self.builder.push_index_inst()
+    fn element(&mut self) -> ir::Value {
+        self.builder.push_element_inst()
     }
 
     fn count(&mut self) -> ir::Value {

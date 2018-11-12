@@ -1,8 +1,8 @@
 fn if_return_uniform() {
     int foo = 0;
 
-    int index = @index;
-    if (index < 42) {
+    int element = @element;
+    if (element < 42) {
         return;
     }
 

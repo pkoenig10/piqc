@@ -98,8 +98,8 @@ BoolLiteral: BoolLiteral = {
     @L Bool @R => BoolLiteral::new(<>),
 };
 
-Index: Index = {
-    <@L> "@index" <@R> => Index::new(<>),
+Element: Element = {
+    <@L> "@element" <@R> => Element::new(<>),
 };
 
 Count: Count = {
@@ -114,7 +114,7 @@ PrimaryExpr: Expr<'input> = {
     IntLiteral => Expr::IntLiteral(<>),
     FloatLiteral => Expr::FloatLiteral(<>),
     BoolLiteral => Expr::BoolLiteral(<>),
-    Index => Expr::Index(<>),
+    Element => Expr::Element(<>),
     Count => Expr::Count(<>),
     Identifier => Expr::Identifier(<>),
     "(" <Expr> ")" => <>,

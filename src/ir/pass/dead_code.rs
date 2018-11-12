@@ -217,7 +217,7 @@ impl<'a> DeadCodePass<'a> {
             InstData::BoolConst(ref data) => {
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::Index(ref data) => {
+            InstData::Element(ref data) => {
                 analysis.insert_def(data.dest(), inst);
             }
             InstData::Count(ref data) => {

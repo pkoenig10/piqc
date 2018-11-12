@@ -172,7 +172,7 @@ impl<'input> TypeChecker<'input> {
     fn check_expr(&mut self, expr: &Expr) -> Type {
         match *expr {
             Expr::IntLiteral(_) | Expr::Count(_) => Type::UNIFORM_INT,
-            Expr::Index(_) => Type::VARYING_INT,
+            Expr::Element(_) => Type::VARYING_INT,
             Expr::FloatLiteral(_) => Type::UNIFORM_FLOAT,
             Expr::BoolLiteral(_) => Type::UNIFORM_BOOL,
             Expr::Identifier(ref identifier) => self.check_identifier(identifier),

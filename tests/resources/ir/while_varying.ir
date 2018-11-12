@@ -3,7 +3,7 @@ func():
 ebb0():
     %0 = iconst 0
     %1 = iconst 0
-    %2 = index
+    %2 = element
     jmp ebb1(%1)
 
 ebb1(%3):

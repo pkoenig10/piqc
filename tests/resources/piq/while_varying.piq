@@ -2,8 +2,8 @@ fn while_varying() {
     int foo = 0;
 
     int bar = 0;
-    int index = @index;
-    while (bar < index) {
+    int element = @element;
+    while (bar < element) {
         bar = bar + 1;
     }
 

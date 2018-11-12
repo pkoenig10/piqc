@@ -292,9 +292,9 @@ impl<'input> FuncBuilder<'input> {
         dest
     }
 
-    pub fn push_index_inst(&mut self) -> Value {
+    pub fn push_element_inst(&mut self) -> Value {
         let dest = self.create_value(Type::VARYING_INT);
-        let inst = InstData::Index(IndexInst::new(dest));
+        let inst = InstData::Element(ElementInst::new(dest));
         self.push_inst(inst);
         dest
     }

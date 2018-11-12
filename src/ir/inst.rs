@@ -112,13 +112,13 @@ impl fmt::Display for BoolConstInst {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct IndexInst {
+pub struct ElementInst {
     dest: Value,
 }
 
-impl IndexInst {
-    pub fn new(dest: Value) -> IndexInst {
-        IndexInst { dest }
+impl ElementInst {
+    pub fn new(dest: Value) -> ElementInst {
+        ElementInst { dest }
     }
 
     pub fn dest(&self) -> Value {
@@ -126,9 +126,9 @@ impl IndexInst {
     }
 }
 
-impl fmt::Display for IndexInst {
+impl fmt::Display for ElementInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} = index", self.dest)
+        write!(f, "{} = element", self.dest)
     }
 }
 
@@ -556,7 +556,7 @@ pub enum InstData {
     IntConst(IntConstInst),
     FloatConst(FloatConstInst),
     BoolConst(BoolConstInst),
-    Index(IndexInst),
+    Element(ElementInst),
     Count(CountInst),
     Unary(UnaryInst),
     Binary(BinaryInst),
@@ -612,7 +612,7 @@ impl fmt::Display for InstData {
             InstData::IntConst(ref inst) => write!(f, "{}", inst),
             InstData::FloatConst(ref inst) => write!(f, "{}", inst),
             InstData::BoolConst(ref inst) => write!(f, "{}", inst),
-            InstData::Index(ref inst) => write!(f, "{}", inst),
+            InstData::Element(ref inst) => write!(f, "{}", inst),
             InstData::Count(ref inst) => write!(f, "{}", inst),
             InstData::Unary(ref inst) => write!(f, "{}", inst),
             InstData::Binary(ref inst) => write!(f, "{}", inst),

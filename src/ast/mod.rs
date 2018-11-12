@@ -1,6 +1,6 @@
 pub use self::builder::generate_ir;
 pub use self::expr::{
-    BinaryExpr, BinaryOp, BoolLiteral, Count, Expr, FloatLiteral, Identifier, Index, IntLiteral,
+    BinaryExpr, BinaryOp, BoolLiteral, Count, Element, Expr, FloatLiteral, Identifier, IntLiteral,
     UnaryExpr, UnaryOp,
 };
 pub use self::func::{Func, Param};

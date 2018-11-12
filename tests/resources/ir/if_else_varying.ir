@@ -2,7 +2,7 @@ func():
 
 ebb0():
     %0 = iconst 0
-    %1 = index
+    %1 = element
     %2 = iconst 42
     %3 = icmp lt %1, %2
     %4 = iconst 1

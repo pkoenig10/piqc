@@ -48,13 +48,13 @@ impl BoolLiteral {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Index {
+pub struct Element {
     span: Span,
 }
 
-impl Index {
-    pub fn new(l: usize, r: usize) -> Index {
-        Index {
+impl Element {
+    pub fn new(l: usize, r: usize) -> Element {
+        Element {
             span: Span::new(l, r),
         }
     }
@@ -201,7 +201,7 @@ pub enum Expr<'input> {
     IntLiteral(IntLiteral),
     FloatLiteral(FloatLiteral),
     BoolLiteral(BoolLiteral),
-    Index(Index),
+    Element(Element),
     Count(Count),
     Identifier(Identifier<'input>),
     Unary(UnaryExpr<'input>),
