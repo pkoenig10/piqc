@@ -590,6 +590,10 @@ impl BranchInst {
         BranchInst { op, cond, target }
     }
 
+    pub fn cond(&self) -> Value {
+        self.cond
+    }
+
     pub fn target(&self) -> &Target {
         &self.target
     }

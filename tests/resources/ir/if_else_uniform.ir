@@ -1,7 +1,6 @@
 func(uniform int*, uniform bool):
 
 ebb0(%0, %1):
-    %2 = iconst 0
     br allf %1 ebb1()
     %3 = iconst 1
     jmp ebb2(%3)

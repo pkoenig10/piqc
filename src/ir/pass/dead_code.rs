@@ -127,7 +127,7 @@ impl<'a> DeadCodePass<'a> {
                 }
             }
 
-            for ebb in self.func.ebbs() {
+            for ebb in self.func.ebbs().skip(1) {
                 for (i, &param) in self.func.ebb_params(ebb).iter().enumerate() {
                     let mut args = Args::Zero;
 
@@ -142,7 +142,7 @@ impl<'a> DeadCodePass<'a> {
                             }
                         }
                         None => {
-                            // ebbs_to_remove.push(ebb);
+                            ebbs_to_remove.push(ebb);
                         }
                     }
 
@@ -152,16 +152,15 @@ impl<'a> DeadCodePass<'a> {
                 }
             }
 
-            if defs_to_remove.is_empty() && params_to_remove.is_empty() && ebbs_to_remove.is_empty()
-            {
-                break;
-            }
+            let mut changed = false;
 
             for value in defs_to_remove.drain(..) {
                 let inst = analysis.def(value).unwrap();
-                // self.func.remove_inst(inst);
+                self.func.remove_inst(inst);
 
                 analysis.remove_value(value);
+
+                changed = true;
             }
 
             for (ebb, param, mut arg) in params_to_remove.drain(..) {
@@ -182,10 +181,18 @@ impl<'a> DeadCodePass<'a> {
 
                 replaced_params.insert(param, arg);
                 analysis.replace_value(param, arg);
+
+                changed = true;
             }
 
             for ebb in ebbs_to_remove.drain(..) {
                 self.func.remove_ebb(ebb);
+
+                changed = true;
+            }
+
+            if !changed {
+                break;
             }
 
             replaced_params.clear();
@@ -262,6 +269,7 @@ impl<'a> DeadCodePass<'a> {
                 analysis.insert_predecessor(data.target(), inst);
             }
             InstData::Branch(ref data) => {
+                analysis.insert_use(data.cond(), inst);
                 analysis.insert_predecessor(data.target(), inst);
             }
             InstData::Return(_) => {}

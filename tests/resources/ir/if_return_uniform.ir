@@ -4,9 +4,6 @@ ebb0(%0, %1):
     br allf %1 ebb1(%0)
     ret
 
-ebb2(%4):
-    jmp ebb1(%4)
-
 ebb1(%3):
     %2 = iconst 42
     %5 = iconst 0
