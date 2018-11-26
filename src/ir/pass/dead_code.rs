@@ -232,6 +232,16 @@ impl<'a> DeadCodePass<'a> {
                 analysis.insert_use(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
+            InstData::Load(ref data) => {
+                analysis.insert_use(data.addr(), inst);
+                analysis.insert_use(data.offset(), inst);
+                analysis.insert_def(data.dest(), inst);
+            }
+            InstData::Store(ref data) => {
+                analysis.insert_use(data.src(), inst);
+                analysis.insert_use(data.addr(), inst);
+                analysis.insert_use(data.offset(), inst);
+            }
             InstData::IntComp(ref data) => {
                 analysis.insert_use(data.left(), inst);
                 analysis.insert_use(data.right(), inst);
@@ -254,7 +264,7 @@ impl<'a> DeadCodePass<'a> {
             InstData::Branch(ref data) => {
                 analysis.insert_predecessor(data.target(), inst);
             }
-            _ => {}
+            InstData::Return(_) => {}
         }
     }
 }

@@ -1,9 +1,7 @@
-fn if_return_uniform(uniform bool bar) {
-    int foo = 0;
-
+fn if_return_uniform(uniform int *output, uniform bool bar) {
     if (bar) {
         return;
     }
 
-    foo = foo + 1;
+    output[0] = 42;
 }

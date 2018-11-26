@@ -1,11 +1,9 @@
-fn while_varying() {
+fn while_varying(uniform int *output) {
     int foo = 0;
 
-    int bar = 0;
-    int element = @element;
-    while (bar < element) {
-        bar = bar + 1;
+    while (foo < @element) {
+        foo = foo + 1;
     }
 
-    foo = foo + 1;
+    output[@element] = foo;
 }

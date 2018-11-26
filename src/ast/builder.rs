@@ -66,20 +66,39 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn assign_stmt(&mut self, stmt: &AssignStmt<'input>) {
-        let variable = stmt.identifier.name;
+        let src_value = self.expr(&stmt.src);
 
-        let expr_value = self.expr(&stmt.expr);
+        macro_rules! value {
+            ($prev_value:expr) => {
+                match self.predicate {
+                    Some(predicate) => {
+                        let prev_value = $prev_value;
+                        self.builder
+                            .push_select_inst(predicate, src_value, prev_value)
+                    }
+                    None => src_value,
+                }
+            };
+        }
 
-        let value = match self.predicate {
-            Some(predicate) => {
-                let prev_value = self.builder.use_var(variable);
-                self.builder
-                    .push_select_inst(predicate, expr_value, prev_value)
+        match stmt.dest {
+            Expr::Identifier(ref identifier) => {
+                let variable = identifier.name;
+
+                let value = value!(self.builder.use_var(variable));
+
+                self.builder.def_var(variable, value);
             }
-            None => expr_value,
-        };
+            Expr::Index(ref expr) => {
+                let expr_value = self.expr(&expr.expr);
+                let index_value = self.expr(&expr.index);
 
-        self.builder.def_var(variable, value);
+                let value = value!(self.builder.push_load_inst(expr_value, index_value));
+
+                self.builder.push_store_inst(value, expr_value, index_value);
+            }
+            _ => panic!("Can't assign to left-hand side of assign expression"),
+        }
     }
 
     fn if_stmt(&mut self, stmt: &IfStmt<'input>) {
@@ -195,6 +214,7 @@ impl<'input> IrBuilder<'input> {
             Expr::Identifier(ref identifier) => self.identifier(identifier),
             Expr::Unary(ref expr) => self.unary_expr(expr),
             Expr::Binary(ref expr) => self.binary_expr(expr),
+            Expr::Index(ref expr) => self.index_expr(expr),
         }
     }
 
@@ -277,6 +297,13 @@ impl<'input> IrBuilder<'input> {
             "Invalid binary expression '{}' with operand types '{}' and '{}'",
             op, left_type, right_type
         )
+    }
+
+    fn index_expr(&mut self, expr: &IndexExpr<'input>) -> ir::Value {
+        let expr_value = self.expr(&expr.expr);
+        let index_value = self.expr(&expr.index);
+
+        self.builder.push_load_inst(expr_value, index_value)
     }
 
     fn set_predicate_and(&mut self, value: ir::Value) -> Option<ir::Value> {

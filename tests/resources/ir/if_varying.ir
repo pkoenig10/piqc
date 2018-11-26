@@ -1,12 +1,12 @@
-func():
+func(uniform int*):
 
-ebb0():
-    %0 = iconst 0
-    %1 = element
-    %2 = iconst 42
-    %3 = icmp lt %1, %2
-    %4 = iconst 1
-    %5 = select %3, %4, %0
-    %6 = iconst 1
-    %7 = add %5, %6
+ebb0(%0):
+    %1 = iconst 0
+    %2 = element
+    %3 = iconst 8
+    %4 = icmp lt %2, %3
+    %5 = iconst 1
+    %6 = select %4, %5, %1
+    %7 = element
+    store %6, %0, %7
     ret

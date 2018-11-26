@@ -1,12 +1,11 @@
-fn if_else_varying() {
+fn if_else_varying(uniform int *output) {
     int foo = 0;
 
-    int element = @element;
-    if (element < 42) {
+    if (@element < 8) {
         foo = 1;
     } else {
         foo = 2;
     }
 
-    foo = foo + 1;
+    output[@element] = foo;
 }

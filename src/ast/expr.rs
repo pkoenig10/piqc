@@ -197,6 +197,23 @@ impl<'input> BinaryExpr<'input> {
 }
 
 #[derive(Debug)]
+pub struct IndexExpr<'input> {
+    span: Span,
+    pub expr: Box<Expr<'input>>,
+    pub index: Box<Expr<'input>>,
+}
+
+impl<'input> IndexExpr<'input> {
+    pub fn new(l: usize, expr: Expr<'input>, index: Expr<'input>, r: usize) -> IndexExpr<'input> {
+        IndexExpr {
+            span: Span::new(l, r),
+            expr: Box::new(expr),
+            index: Box::new(index),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum Expr<'input> {
     IntLiteral(IntLiteral),
     FloatLiteral(FloatLiteral),
@@ -206,4 +223,5 @@ pub enum Expr<'input> {
     Identifier(Identifier<'input>),
     Unary(UnaryExpr<'input>),
     Binary(BinaryExpr<'input>),
+    Index(IndexExpr<'input>),
 }

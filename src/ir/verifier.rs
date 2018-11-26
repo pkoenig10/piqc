@@ -22,7 +22,7 @@ impl<'a> Verifier<'a> {
     }
 
     pub fn verify_inst(&self, ebb: Ebb, inst: Inst) {
-        let is_last_inst = self.func.last_inst(ebb) == inst;
+        let is_last_inst = self.func.last_inst(ebb).unwrap() == inst;
         let is_terminator = self.func.inst(inst).is_terminator();
 
         if !is_last_inst && is_terminator {

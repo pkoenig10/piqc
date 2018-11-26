@@ -120,8 +120,13 @@ PrimaryExpr: Expr<'input> = {
     "(" <Expr> ")" => <>,
 };
 
-UnaryExpr: Expr<'input> = {
+PostfixExpr: Expr<'input> = {
     PrimaryExpr,
+    <@L> <PostfixExpr> "[" <Expr> "]" <@R> => Expr::Index(IndexExpr::new(<>)),
+};
+
+UnaryExpr: Expr<'input> = {
+    PostfixExpr,
     @L UnaryOp UnaryExpr @R => Expr::Unary(UnaryExpr::new(<>)),
 };
 
@@ -163,7 +168,7 @@ DeclStmt: DeclStmt<'input> = {
 };
 
 AssignStmt: AssignStmt<'input> = {
-    <@L> <Identifier> "=" <Expr> ";" <@R> => AssignStmt::new(<>),
+    <@L> <PostfixExpr> "=" <Expr> ";" <@R> => AssignStmt::new(<>),
 };
 
 IfBlock: Stmt<'input> = {

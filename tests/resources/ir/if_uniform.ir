@@ -1,12 +1,12 @@
-func(uniform bool):
+func(uniform int*, uniform bool):
 
-ebb0(%0):
-    %1 = iconst 0
-    br allf %0 ebb1(%1)
-    %2 = iconst 1
-    jmp ebb1(%2)
+ebb0(%0, %1):
+    %2 = iconst 0
+    br allf %1 ebb1(%2)
+    %3 = iconst 1
+    jmp ebb1(%3)
 
-ebb1(%3):
-    %4 = iconst 1
-    %5 = add %3, %4
+ebb1(%4):
+    %6 = iconst 0
+    store %4, %0, %6
     ret

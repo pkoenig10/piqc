@@ -43,21 +43,16 @@ impl<'input> DeclStmt<'input> {
 #[derive(Debug)]
 pub struct AssignStmt<'input> {
     span: Span,
-    pub identifier: Identifier<'input>,
-    pub expr: Expr<'input>,
+    pub dest: Expr<'input>,
+    pub src: Expr<'input>,
 }
 
 impl<'input> AssignStmt<'input> {
-    pub fn new(
-        l: usize,
-        identifier: Identifier<'input>,
-        expr: Expr<'input>,
-        r: usize,
-    ) -> AssignStmt<'input> {
+    pub fn new(l: usize, dest: Expr<'input>, src: Expr<'input>, r: usize) -> AssignStmt<'input> {
         AssignStmt {
             span: Span::new(l, r),
-            identifier,
-            expr,
+            dest,
+            src,
         }
     }
 }

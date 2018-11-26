@@ -130,14 +130,14 @@ impl<'input> TypeChecker<'input> {
     }
 
     fn check_assign_stmt(&mut self, stmt: &AssignStmt<'input>) {
-        let expr_type = self.check_expr(&stmt.expr);
-        let type_ = self.check_identifier(&stmt.identifier);
+        let src_type = self.check_expr(&stmt.src);
+        let dest_type = self.check_expr(&stmt.dest);
 
-        let valid = match (type_.qualifier, expr_type.qualifier) {
+        let valid = match (dest_type.qualifier, src_type.qualifier) {
             (TypeQualifier::Uniform, TypeQualifier::Varying) => false,
-            _ => type_.kind == expr_type.kind,
+            _ => dest_type.kind == src_type.kind,
         };
-        assert!(valid, "Mismatched types '{}' and '{}'", type_, expr_type);
+        assert!(valid, "Mismatched types '{}' and '{}'", dest_type, src_type);
     }
 
     fn check_if_stmt(&mut self, stmt: &IfStmt<'input>) {
@@ -169,7 +169,7 @@ impl<'input> TypeChecker<'input> {
         self.check_stmt(&stmt.stmt);
     }
 
-    fn check_expr(&mut self, expr: &Expr) -> Type {
+    fn check_expr(&mut self, expr: &Expr<'input>) -> Type {
         match *expr {
             Expr::IntLiteral(_) | Expr::Count(_) => Type::UNIFORM_INT,
             Expr::Element(_) => Type::VARYING_INT,
@@ -178,14 +178,15 @@ impl<'input> TypeChecker<'input> {
             Expr::Identifier(ref identifier) => self.check_identifier(identifier),
             Expr::Unary(ref expr) => self.check_unary_expr(expr),
             Expr::Binary(ref expr) => self.check_binary_expr(expr),
+            Expr::Index(ref expr) => self.check_index_expr(expr),
         }
     }
 
-    fn check_identifier(&mut self, identifier: &Identifier) -> Type {
+    fn check_identifier(&mut self, identifier: &Identifier<'input>) -> Type {
         self.get_symbol(identifier).type_()
     }
 
-    fn check_unary_expr(&mut self, expr: &UnaryExpr) -> Type {
+    fn check_unary_expr(&mut self, expr: &UnaryExpr<'input>) -> Type {
         let expr_type = self.check_expr(&expr.expr);
 
         let kind = match (expr.op, expr_type.kind) {
@@ -193,7 +194,7 @@ impl<'input> TypeChecker<'input> {
             (UnaryOp::Negate, TypeKind::FLOAT) => TypeKind::FLOAT,
             (UnaryOp::LogicalNot, TypeKind::BOOL) => TypeKind::BOOL,
             _ => panic!(
-                "Cannot apply unary operator '{}' to type '{}'",
+                "Can't apply unary operator '{}' to type '{}'",
                 expr.op, expr_type
             ),
         };
@@ -201,7 +202,7 @@ impl<'input> TypeChecker<'input> {
         Type::new(expr_type.qualifier, kind)
     }
 
-    fn check_binary_expr(&mut self, expr: &BinaryExpr) -> Type {
+    fn check_binary_expr(&mut self, expr: &BinaryExpr<'input>) -> Type {
         let left_type = self.check_expr(&expr.left);
         let right_type = self.check_expr(&expr.right);
 
@@ -239,12 +240,33 @@ impl<'input> TypeChecker<'input> {
             | (BinaryOp::LogicalAnd, TypeKind::BOOL, TypeKind::BOOL)
             | (BinaryOp::LogicalOr, TypeKind::BOOL, TypeKind::BOOL) => TypeKind::BOOL,
             _ => panic!(
-                "Cannot apply binary operator '{}' to types '{}' and '{}'",
+                "Can't apply binary operator '{}' to types '{}' and '{}'",
                 expr.op, left_type, right_type
             ),
         };
 
         Type::new(qualifier, kind)
+    }
+
+    fn check_index_expr(&mut self, expr: &IndexExpr<'input>) -> Type {
+        let expr_type = self.check_expr(&expr.expr);
+        let index_type = self.check_expr(&expr.index);
+
+        let qualifier = TypeQualifier::get(expr_type.qualifier, index_type.qualifier);
+
+        let expr_type = match expr_type.kind {
+            TypeKind::Ptr(ty) => ty,
+            _ => panic!("Can't index type '{}'", expr_type),
+        };
+
+        assert_eq!(
+            index_type.kind,
+            TypeKind::INT,
+            "Can't index using type '{}'",
+            index_type
+        );
+
+        Type::new(qualifier, expr_type.deref())
     }
 
     fn insert_symbol(&mut self, identifier: &Identifier<'input>, type_: Type) {

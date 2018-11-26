@@ -156,12 +156,12 @@ impl Func {
         Insts::new(self, ebb)
     }
 
-    pub fn first_inst(&self, ebb: Ebb) -> Inst {
-        self.ebbs[ebb].first_inst.unwrap()
+    pub fn first_inst(&self, ebb: Ebb) -> Option<Inst> {
+        self.ebbs[ebb].first_inst
     }
 
-    pub fn last_inst(&self, ebb: Ebb) -> Inst {
-        self.ebbs[ebb].last_inst.unwrap()
+    pub fn last_inst(&self, ebb: Ebb) -> Option<Inst> {
+        self.ebbs[ebb].last_inst
     }
 
     pub fn push_inst(&mut self, ebb: Ebb, inst: Inst) {

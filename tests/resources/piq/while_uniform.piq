@@ -1,10 +1,9 @@
-fn while_uniform() {
-    int foo = 0;
+fn while_uniform(uniform int *output) {
+    uniform int foo = 0;
 
-    int bar = 0;
-    while (bar < 42) {
-        bar = bar + 1;
+    while (foo < 42) {
+        foo = foo + 1;
     }
 
-    foo = foo + 1;
+    output[0] = foo;
 }

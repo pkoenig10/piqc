@@ -1,5 +1,5 @@
-fn expr(uniform int i, uniform float f) {
-    int foo = -i + 1;
-    float bar = f <? 42.0;
-    bool baz = !true;
+fn expr(uniform int *i, uniform float *f, uniform bool *b) {
+    i[0] = -i[0] + 1;
+    f[0] = f[0] <? 8.5;
+    b[0] = !b[0];
 }

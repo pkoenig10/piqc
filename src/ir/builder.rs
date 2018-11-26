@@ -163,8 +163,10 @@ impl<'input> FuncBuilder<'input> {
 
     pub fn is_filled(&self) -> bool {
         let ebb = self.position.unwrap().ebb;
-        let inst = self.func.last_inst(ebb);
-        self.func.inst(inst).is_terminator()
+        match self.func.last_inst(ebb) {
+            Some(inst) => self.func.inst(inst).is_terminator(),
+            None => false,
+        }
     }
 
     pub fn push_param(&mut self, type_: Type) {
@@ -322,6 +324,19 @@ impl<'input> FuncBuilder<'input> {
         dest
     }
 
+    pub fn push_load_inst(&mut self, addr: Value, offset: Value) -> Value {
+        let type_ = self.get_load_inst_type(addr);
+        let dest = self.create_value(type_);
+        let inst = InstData::Load(LoadInst::new(dest, addr, offset));
+        self.push_inst(inst);
+        dest
+    }
+
+    pub fn push_store_inst(&mut self, src: Value, addr: Value, offset: Value) {
+        let inst = InstData::Store(StoreInst::new(src, addr, offset));
+        self.push_inst(inst);
+    }
+
     pub fn push_int_comp_inst(&mut self, op: CompOp, left: Value, right: Value) -> Value {
         let type_ = self.get_comp_inst_type(op, left, right);
         let dest = self.create_value(type_);
@@ -426,6 +441,17 @@ impl<'input> FuncBuilder<'input> {
         let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
 
         Type::new(qualifier, left_type.kind)
+    }
+
+    fn get_load_inst_type(&self, addr: Value) -> Type {
+        let addr_type = self.get_value_type(addr);
+
+        let kind = match addr_type.kind {
+            TypeKind::Ptr(ty) => ty.deref(),
+            _ => panic!("Invalid load instruction with operand type `{}`", addr_type),
+        };
+
+        Type::new(addr_type.qualifier, kind)
     }
 
     fn get_comp_inst_type(&self, op: CompOp, left: Value, right: Value) -> Type {

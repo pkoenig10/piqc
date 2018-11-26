@@ -1,7 +1,7 @@
 pub use self::builder::generate_ir;
 pub use self::expr::{
-    BinaryExpr, BinaryOp, BoolLiteral, Count, Element, Expr, FloatLiteral, Identifier, IntLiteral,
-    UnaryExpr, UnaryOp,
+    BinaryExpr, BinaryOp, BoolLiteral, Count, Element, Expr, FloatLiteral, Identifier, IndexExpr,
+    IntLiteral, UnaryExpr, UnaryOp,
 };
 pub use self::func::{Func, Param};
 pub use self::stmt::{AssignStmt, BlockStmt, DeclStmt, IfStmt, ReturnStmt, Stmt, WhileStmt};

@@ -286,6 +286,79 @@ impl fmt::Display for BinaryInst {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct LoadInst {
+    dest: Value,
+    addr: Value,
+    offset: Value,
+}
+
+impl LoadInst {
+    pub fn new(dest: Value, addr: Value, offset: Value) -> LoadInst {
+        LoadInst { dest, addr, offset }
+    }
+
+    pub fn dest(&self) -> Value {
+        self.dest
+    }
+
+    pub fn addr(&self) -> Value {
+        self.addr
+    }
+
+    pub fn offset(&self) -> Value {
+        self.offset
+    }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+        replace_value(&mut self.addr, old, new);
+    }
+}
+
+impl fmt::Display for LoadInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} = load {}, {}", self.dest, self.addr, self.offset)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StoreInst {
+    src: Value,
+    addr: Value,
+    offset: Value,
+}
+
+impl StoreInst {
+    pub fn new(src: Value, addr: Value, offset: Value) -> StoreInst {
+        StoreInst { src, addr, offset }
+    }
+
+    pub fn src(&self) -> Value {
+        self.src
+    }
+
+    pub fn addr(&self) -> Value {
+        self.addr
+    }
+
+    pub fn offset(&self) -> Value {
+        self.offset
+    }
+
+    pub fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.src, old, new);
+        replace_value(&mut self.addr, old, new);
+        replace_value(&mut self.offset, old, new);
+    }
+}
+
+impl fmt::Display for StoreInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "store {}, {}, {}", self.src, self.addr, self.offset)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum CompOp {
     Eq,
@@ -560,6 +633,8 @@ pub enum InstData {
     Count(CountInst),
     Unary(UnaryInst),
     Binary(BinaryInst),
+    Load(LoadInst),
+    Store(StoreInst),
     IntComp(IntCompInst),
     FloatComp(FloatCompInst),
     Select(SelectInst),
@@ -594,14 +669,21 @@ impl InstData {
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
         match *self {
+            InstData::IntConst(_) => {}
+            InstData::FloatConst(_) => {}
+            InstData::BoolConst(_) => {}
+            InstData::Element(_) => {}
+            InstData::Count(_) => {}
             InstData::Unary(ref mut inst) => inst.replace_value(old, new),
             InstData::Binary(ref mut inst) => inst.replace_value(old, new),
+            InstData::Load(ref mut inst) => inst.replace_value(old, new),
+            InstData::Store(ref mut inst) => inst.replace_value(old, new),
             InstData::IntComp(ref mut inst) => inst.replace_value(old, new),
             InstData::FloatComp(ref mut inst) => inst.replace_value(old, new),
             InstData::Select(ref mut inst) => inst.replace_value(old, new),
             InstData::Jump(ref mut inst) => inst.replace_value(old, new),
             InstData::Branch(ref mut inst) => inst.replace_value(old, new),
-            _ => {}
+            InstData::Return(_) => {}
         }
     }
 }
@@ -616,6 +698,8 @@ impl fmt::Display for InstData {
             InstData::Count(ref inst) => write!(f, "{}", inst),
             InstData::Unary(ref inst) => write!(f, "{}", inst),
             InstData::Binary(ref inst) => write!(f, "{}", inst),
+            InstData::Load(ref inst) => write!(f, "{}", inst),
+            InstData::Store(ref inst) => write!(f, "{}", inst),
             InstData::IntComp(ref inst) => write!(f, "{}", inst),
             InstData::FloatComp(ref inst) => write!(f, "{}", inst),
             InstData::Select(ref inst) => write!(f, "{}", inst),
