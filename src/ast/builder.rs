@@ -1,5 +1,5 @@
-use ast::*;
-use ir;
+use crate::ast::*;
+use crate::ir;
 
 pub fn generate_ir(func: &Func) -> ir::Func {
     IrBuilder::new().func(func)
@@ -41,7 +41,7 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn stmt(&mut self, stmt: &Stmt<'input>) {
-        match *stmt {
+        match stmt {
             Stmt::Block(ref stmt) => self.block_stmt(stmt),
             Stmt::Decl(ref stmt) => self.decl_stmt(stmt),
             Stmt::Assign(ref stmt) => self.assign_stmt(stmt),
@@ -205,7 +205,7 @@ impl<'input> IrBuilder<'input> {
     }
 
     fn expr(&mut self, expr: &Expr<'input>) -> ir::Value {
-        match *expr {
+        match expr {
             Expr::IntLiteral(ref int_literal) => self.int_literal(int_literal),
             Expr::FloatLiteral(ref float_literal) => self.float_literal(float_literal),
             Expr::BoolLiteral(ref bool_literal) => self.bool_literal(bool_literal),

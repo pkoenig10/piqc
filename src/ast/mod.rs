@@ -6,7 +6,7 @@ pub use self::expr::{
 pub use self::func::{Func, Param};
 pub use self::stmt::{AssignStmt, BlockStmt, DeclStmt, IfStmt, ReturnStmt, Stmt, WhileStmt};
 pub use self::type_checker::type_check;
-pub use ir::{Type, TypeKind, TypeQualifier};
+pub use crate::ir::{Type, TypeKind, TypeQualifier};
 
 mod builder;
 mod expr;

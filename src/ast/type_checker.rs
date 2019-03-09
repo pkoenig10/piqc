@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use ast::*;
-
-use ast::Type;
-use ast::TypeKind;
-use ast::TypeQualifier;
+use crate::ast::*;
 
 pub fn type_check(func: &Func) {
     TypeChecker::new().check_func(func);
@@ -96,7 +92,7 @@ impl<'input> TypeChecker<'input> {
     }
 
     fn check_stmt(&mut self, stmt: &Stmt<'input>) {
-        match *stmt {
+        match stmt {
             Stmt::Block(ref stmt) => self.check_block_stmt(stmt),
             Stmt::Decl(ref stmt) => self.check_decl_stmt(stmt),
             Stmt::Assign(ref stmt) => self.check_assign_stmt(stmt),
@@ -170,7 +166,7 @@ impl<'input> TypeChecker<'input> {
     }
 
     fn check_expr(&mut self, expr: &Expr<'input>) -> Type {
-        match *expr {
+        match expr {
             Expr::IntLiteral(_) | Expr::Count(_) => Type::UNIFORM_INT,
             Expr::Element(_) => Type::VARYING_INT,
             Expr::FloatLiteral(_) => Type::UNIFORM_FLOAT,

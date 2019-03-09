@@ -57,7 +57,7 @@ impl PtrType {
         PtrType { base, level }
     }
 
-    pub fn deref(&self) -> TypeKind {
+    pub fn deref(self) -> TypeKind {
         match self.level {
             0 => TypeKind::Base(self.base),
             _ => TypeKind::Ptr(PtrType::new(self.base, self.level - 1)),

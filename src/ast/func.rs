@@ -1,4 +1,4 @@
-use ast::*;
+use crate::ast::*;
 
 #[derive(Debug)]
 pub struct Param<'input> {

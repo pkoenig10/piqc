@@ -7,7 +7,7 @@ pub mod ast;
 pub mod ir;
 
 lalrpop_mod!(
-    #[allow(clippy)]
+    #[allow(warnings)]
     piqc
 );
 

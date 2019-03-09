@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ir::*;
+use crate::ir::*;
 
 #[derive(Debug, Clone)]
 pub struct Target {
@@ -45,7 +45,7 @@ impl fmt::Display for Target {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct IntConstInst {
     dest: Value,
     value: i32,
@@ -67,7 +67,7 @@ impl fmt::Display for IntConstInst {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct FloatConstInst {
     dest: Value,
     value: f32,
@@ -89,7 +89,7 @@ impl fmt::Display for FloatConstInst {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct BoolConstInst {
     dest: Value,
     value: bool,
@@ -111,7 +111,7 @@ impl fmt::Display for BoolConstInst {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ElementInst {
     dest: Value,
 }
@@ -132,7 +132,7 @@ impl fmt::Display for ElementInst {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct CountInst {
     dest: Value,
 }
@@ -160,7 +160,7 @@ pub enum UnaryOp {
 
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let op = match *self {
+        let op = match self {
             UnaryOp::Not => "not",
         };
         write!(f, "{}", op)
@@ -219,7 +219,7 @@ pub enum BinaryOp {
 
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let op = match *self {
+        let op = match self {
             BinaryOp::Add => "add",
             BinaryOp::Sub => "sub",
             BinaryOp::Asr => "asr",
@@ -371,7 +371,7 @@ pub enum CompOp {
 
 impl fmt::Display for CompOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let op = match *self {
+        let op = match self {
             CompOp::Eq => "eq",
             CompOp::Ne => "ne",
             CompOp::Lt => "lt",
@@ -568,7 +568,7 @@ pub enum BranchOp {
 
 impl fmt::Display for BranchOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let op = match *self {
+        let op = match self {
             BranchOp::AnyFalse => "anyf",
             BranchOp::AnyTrue => "anyt",
             BranchOp::AllFalse => "allf",
@@ -649,14 +649,14 @@ pub enum InstData {
 
 impl InstData {
     pub fn is_terminator(&self) -> bool {
-        match *self {
+        match self {
             InstData::Jump(_) | InstData::Return(_) => true,
             _ => false,
         }
     }
 
     pub fn target(&self) -> Option<&Target> {
-        match *self {
+        match self {
             InstData::Jump(ref inst) => Some(inst.target()),
             InstData::Branch(ref inst) => Some(inst.target()),
             _ => None,
@@ -664,7 +664,7 @@ impl InstData {
     }
 
     pub fn target_mut(&mut self) -> Option<&mut Target> {
-        match *self {
+        match self {
             InstData::Jump(ref mut inst) => Some(inst.target_mut()),
             InstData::Branch(ref mut inst) => Some(inst.target_mut()),
             _ => None,
@@ -672,7 +672,7 @@ impl InstData {
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
-        match *self {
+        match self {
             InstData::IntConst(_) => {}
             InstData::FloatConst(_) => {}
             InstData::BoolConst(_) => {}
@@ -694,7 +694,7 @@ impl InstData {
 
 impl fmt::Display for InstData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
+        match self {
             InstData::IntConst(ref inst) => write!(f, "{}", inst),
             InstData::FloatConst(ref inst) => write!(f, "{}", inst),
             InstData::BoolConst(ref inst) => write!(f, "{}", inst),

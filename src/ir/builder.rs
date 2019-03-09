@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use ir::*;
+use crate::ir::*;
 
 type Variable<'a> = &'a str;
 

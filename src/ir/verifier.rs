@@ -1,4 +1,4 @@
-use ir::*;
+use crate::ir::*;
 
 pub fn verify_ir(func: &Func) {
     Verifier::new(func).verify_func();

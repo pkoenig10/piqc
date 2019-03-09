@@ -1,4 +1,4 @@
-use ir::*;
+use crate::ir::*;
 
 #[derive(Debug)]
 pub struct ValueData {

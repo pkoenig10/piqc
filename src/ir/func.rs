@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ir::*;
+use crate::ir::*;
 
 #[derive(Debug)]
 struct EbbNode {

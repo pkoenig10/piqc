@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use ir::*;
+use crate::ir::*;
 
 pub fn run_dead_code(func: &mut Func) {
     DeadCodePass::new(func).run();
@@ -117,7 +117,7 @@ impl<'a> DeadCodePass<'a> {
         let mut replaced_params = HashMap::new();
 
         loop {
-            for (&value, _) in analysis.defs() {
+            for &value in analysis.defs().keys() {
                 let has_uses = match analysis.uses(value) {
                     Some(insts) => !insts.is_empty(),
                     None => false,

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ast::*;
+use crate::ast::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct IntLiteral {
@@ -97,7 +97,7 @@ pub enum UnaryOp {
 
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let op = match *self {
+        let op = match self {
             UnaryOp::Negate => "-",
             UnaryOp::BitNot => "~",
             UnaryOp::LogicalNot => "!",
@@ -147,7 +147,7 @@ pub enum BinaryOp {
 
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let op = match *self {
+        let op = match self {
             BinaryOp::Mul => "*",
             BinaryOp::Add => "+",
             BinaryOp::Sub => "-",
