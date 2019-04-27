@@ -216,61 +216,61 @@ impl<'a> DeadCodePass<'a> {
 
         match *inst_data {
             InstData::IntConst(ref data) => {
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::FloatConst(ref data) => {
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::BoolConst(ref data) => {
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::Element(ref data) => {
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::Count(ref data) => {
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::Unary(ref data) => {
-                analysis.insert_use(data.src(), inst);
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_use(data.src, inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::Binary(ref data) => {
-                analysis.insert_use(data.left(), inst);
-                analysis.insert_use(data.right(), inst);
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_use(data.left, inst);
+                analysis.insert_use(data.right, inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::Fetch(ref data) => {
-                analysis.insert_use(data.addr(), inst);
-                analysis.insert_use(data.offset(), inst);
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_use(data.addr, inst);
+                analysis.insert_use(data.offset, inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::Store(ref data) => {
-                analysis.insert_use(data.src(), inst);
-                analysis.insert_use(data.addr(), inst);
-                analysis.insert_use(data.offset(), inst);
+                analysis.insert_use(data.src, inst);
+                analysis.insert_use(data.addr, inst);
+                analysis.insert_use(data.offset, inst);
             }
             InstData::IntComp(ref data) => {
-                analysis.insert_use(data.left(), inst);
-                analysis.insert_use(data.right(), inst);
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_use(data.left, inst);
+                analysis.insert_use(data.right, inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::FloatComp(ref data) => {
-                analysis.insert_use(data.left(), inst);
-                analysis.insert_use(data.right(), inst);
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_use(data.left, inst);
+                analysis.insert_use(data.right, inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::Select(ref data) => {
-                analysis.insert_use(data.cond(), inst);
-                analysis.insert_use(data.left(), inst);
-                analysis.insert_use(data.right(), inst);
-                analysis.insert_def(data.dest(), inst);
+                analysis.insert_use(data.cond, inst);
+                analysis.insert_use(data.left, inst);
+                analysis.insert_use(data.right, inst);
+                analysis.insert_def(data.dest, inst);
             }
             InstData::Jump(ref data) => {
-                analysis.insert_predecessor(data.target(), inst);
+                analysis.insert_predecessor(&data.target, inst);
             }
             InstData::Branch(ref data) => {
-                analysis.insert_use(data.cond(), inst);
-                analysis.insert_predecessor(data.target(), inst);
+                analysis.insert_use(data.cond, inst);
+                analysis.insert_predecessor(&data.target, inst);
             }
             InstData::Return(_) => {}
         }

@@ -47,17 +47,13 @@ impl fmt::Display for Target {
 
 #[derive(Debug, Clone)]
 pub struct IntConstInst {
-    dest: Value,
-    value: i32,
+    pub dest: Value,
+    pub value: i32,
 }
 
 impl IntConstInst {
     pub fn new(dest: Value, value: i32) -> IntConstInst {
         IntConstInst { dest, value }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
     }
 }
 
@@ -69,17 +65,13 @@ impl fmt::Display for IntConstInst {
 
 #[derive(Debug, Clone)]
 pub struct FloatConstInst {
-    dest: Value,
-    value: f32,
+    pub dest: Value,
+    pub value: f32,
 }
 
 impl FloatConstInst {
     pub fn new(dest: Value, value: f32) -> FloatConstInst {
         FloatConstInst { dest, value }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
     }
 }
 
@@ -91,17 +83,13 @@ impl fmt::Display for FloatConstInst {
 
 #[derive(Debug, Clone)]
 pub struct BoolConstInst {
-    dest: Value,
-    value: bool,
+    pub dest: Value,
+    pub value: bool,
 }
 
 impl BoolConstInst {
     pub fn new(dest: Value, value: bool) -> BoolConstInst {
         BoolConstInst { dest, value }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
     }
 }
 
@@ -113,16 +101,12 @@ impl fmt::Display for BoolConstInst {
 
 #[derive(Debug, Clone)]
 pub struct ElementInst {
-    dest: Value,
+    pub dest: Value,
 }
 
 impl ElementInst {
     pub fn new(dest: Value) -> ElementInst {
         ElementInst { dest }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
     }
 }
 
@@ -134,16 +118,12 @@ impl fmt::Display for ElementInst {
 
 #[derive(Debug, Clone)]
 pub struct CountInst {
-    dest: Value,
+    pub dest: Value,
 }
 
 impl CountInst {
     pub fn new(dest: Value) -> CountInst {
         CountInst { dest }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
     }
 }
 
@@ -169,22 +149,14 @@ impl fmt::Display for UnaryOp {
 
 #[derive(Debug, Clone)]
 pub struct UnaryInst {
-    op: UnaryOp,
-    dest: Value,
-    src: Value,
+    pub op: UnaryOp,
+    pub dest: Value,
+    pub src: Value,
 }
 
 impl UnaryInst {
     pub fn new(op: UnaryOp, dest: Value, src: Value) -> UnaryInst {
         UnaryInst { op, dest, src }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
-    }
-
-    pub fn src(&self) -> Value {
-        self.src
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -241,10 +213,10 @@ impl fmt::Display for BinaryOp {
 
 #[derive(Debug, Clone)]
 pub struct BinaryInst {
-    op: BinaryOp,
-    dest: Value,
-    left: Value,
-    right: Value,
+    pub op: BinaryOp,
+    pub dest: Value,
+    pub left: Value,
+    pub right: Value,
 }
 
 impl BinaryInst {
@@ -255,18 +227,6 @@ impl BinaryInst {
             left,
             right,
         }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
-    }
-
-    pub fn left(&self) -> Value {
-        self.left
-    }
-
-    pub fn right(&self) -> Value {
-        self.right
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -288,26 +248,14 @@ impl fmt::Display for BinaryInst {
 
 #[derive(Debug, Clone)]
 pub struct FetchInst {
-    dest: Value,
-    addr: Value,
-    offset: Value,
+    pub dest: Value,
+    pub addr: Value,
+    pub offset: Value,
 }
 
 impl FetchInst {
     pub fn new(dest: Value, addr: Value, offset: Value) -> FetchInst {
         FetchInst { dest, addr, offset }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
-    }
-
-    pub fn addr(&self) -> Value {
-        self.addr
-    }
-
-    pub fn offset(&self) -> Value {
-        self.offset
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -324,26 +272,14 @@ impl fmt::Display for FetchInst {
 
 #[derive(Debug, Clone)]
 pub struct StoreInst {
-    src: Value,
-    addr: Value,
-    offset: Value,
+    pub src: Value,
+    pub addr: Value,
+    pub offset: Value,
 }
 
 impl StoreInst {
     pub fn new(src: Value, addr: Value, offset: Value) -> StoreInst {
         StoreInst { src, addr, offset }
-    }
-
-    pub fn src(&self) -> Value {
-        self.src
-    }
-
-    pub fn addr(&self) -> Value {
-        self.addr
-    }
-
-    pub fn offset(&self) -> Value {
-        self.offset
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -385,10 +321,10 @@ impl fmt::Display for CompOp {
 
 #[derive(Debug, Clone)]
 pub struct IntCompInst {
-    op: CompOp,
-    dest: Value,
-    left: Value,
-    right: Value,
+    pub op: CompOp,
+    pub dest: Value,
+    pub left: Value,
+    pub right: Value,
 }
 
 impl IntCompInst {
@@ -399,18 +335,6 @@ impl IntCompInst {
             left,
             right,
         }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
-    }
-
-    pub fn left(&self) -> Value {
-        self.left
-    }
-
-    pub fn right(&self) -> Value {
-        self.right
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -432,10 +356,10 @@ impl fmt::Display for IntCompInst {
 
 #[derive(Debug, Clone)]
 pub struct FloatCompInst {
-    op: CompOp,
-    dest: Value,
-    left: Value,
-    right: Value,
+    pub op: CompOp,
+    pub dest: Value,
+    pub left: Value,
+    pub right: Value,
 }
 
 impl FloatCompInst {
@@ -446,18 +370,6 @@ impl FloatCompInst {
             left,
             right,
         }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
-    }
-
-    pub fn left(&self) -> Value {
-        self.left
-    }
-
-    pub fn right(&self) -> Value {
-        self.right
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -479,10 +391,10 @@ impl fmt::Display for FloatCompInst {
 
 #[derive(Debug, Clone)]
 pub struct SelectInst {
-    dest: Value,
-    cond: Value,
-    left: Value,
-    right: Value,
+    pub dest: Value,
+    pub cond: Value,
+    pub left: Value,
+    pub right: Value,
 }
 
 impl SelectInst {
@@ -493,22 +405,6 @@ impl SelectInst {
             left,
             right,
         }
-    }
-
-    pub fn dest(&self) -> Value {
-        self.dest
-    }
-
-    pub fn cond(&self) -> Value {
-        self.cond
-    }
-
-    pub fn left(&self) -> Value {
-        self.left
-    }
-
-    pub fn right(&self) -> Value {
-        self.right
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -531,20 +427,12 @@ impl fmt::Display for SelectInst {
 
 #[derive(Debug, Clone)]
 pub struct JumpInst {
-    target: Target,
+    pub target: Target,
 }
 
 impl JumpInst {
     pub fn new(target: Target) -> JumpInst {
         JumpInst { target }
-    }
-
-    pub fn target(&self) -> &Target {
-        &self.target
-    }
-
-    pub fn target_mut(&mut self) -> &mut Target {
-        &mut self.target
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -580,26 +468,14 @@ impl fmt::Display for BranchOp {
 
 #[derive(Debug, Clone)]
 pub struct BranchInst {
-    op: BranchOp,
-    cond: Value,
-    target: Target,
+    pub op: BranchOp,
+    pub cond: Value,
+    pub target: Target,
 }
 
 impl BranchInst {
     pub fn new(op: BranchOp, cond: Value, target: Target) -> BranchInst {
         BranchInst { op, cond, target }
-    }
-
-    pub fn cond(&self) -> Value {
-        self.cond
-    }
-
-    pub fn target(&self) -> &Target {
-        &self.target
-    }
-
-    pub fn target_mut(&mut self) -> &mut Target {
-        &mut self.target
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -657,16 +533,16 @@ impl InstData {
 
     pub fn target(&self) -> Option<&Target> {
         match self {
-            InstData::Jump(ref inst) => Some(inst.target()),
-            InstData::Branch(ref inst) => Some(inst.target()),
+            InstData::Jump(ref inst) => Some(&inst.target),
+            InstData::Branch(ref inst) => Some(&inst.target),
             _ => None,
         }
     }
 
     pub fn target_mut(&mut self) -> Option<&mut Target> {
         match self {
-            InstData::Jump(ref mut inst) => Some(inst.target_mut()),
-            InstData::Branch(ref mut inst) => Some(inst.target_mut()),
+            InstData::Jump(ref mut inst) => Some(&mut inst.target),
+            InstData::Branch(ref mut inst) => Some(&mut inst.target),
             _ => None,
         }
     }
