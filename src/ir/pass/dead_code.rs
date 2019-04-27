@@ -239,7 +239,7 @@ impl<'a> DeadCodePass<'a> {
                 analysis.insert_use(data.right(), inst);
                 analysis.insert_def(data.dest(), inst);
             }
-            InstData::Load(ref data) => {
+            InstData::Fetch(ref data) => {
                 analysis.insert_use(data.addr(), inst);
                 analysis.insert_use(data.offset(), inst);
                 analysis.insert_def(data.dest(), inst);

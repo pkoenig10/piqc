@@ -93,7 +93,7 @@ impl<'input> IrBuilder<'input> {
                 let expr_value = self.expr(&expr.expr);
                 let index_value = self.expr(&expr.index);
 
-                let value = value!(self.builder.push_load_inst(expr_value, index_value));
+                let value = value!(self.builder.push_fetch_inst(expr_value, index_value));
 
                 self.builder.push_store_inst(value, expr_value, index_value);
             }
@@ -303,7 +303,7 @@ impl<'input> IrBuilder<'input> {
         let expr_value = self.expr(&expr.expr);
         let index_value = self.expr(&expr.index);
 
-        self.builder.push_load_inst(expr_value, index_value)
+        self.builder.push_fetch_inst(expr_value, index_value)
     }
 
     fn set_predicate_and(&mut self, value: ir::Value) -> Option<ir::Value> {

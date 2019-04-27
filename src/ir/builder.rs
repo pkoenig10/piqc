@@ -324,10 +324,10 @@ impl<'input> FuncBuilder<'input> {
         dest
     }
 
-    pub fn push_load_inst(&mut self, addr: Value, offset: Value) -> Value {
-        let type_ = self.get_load_inst_type(addr);
+    pub fn push_fetch_inst(&mut self, addr: Value, offset: Value) -> Value {
+        let type_ = self.get_fetch_inst_type(addr);
         let dest = self.create_value(type_);
-        let inst = InstData::Load(LoadInst::new(dest, addr, offset));
+        let inst = InstData::Fetch(FetchInst::new(dest, addr, offset));
         self.push_inst(inst);
         dest
     }
@@ -443,12 +443,15 @@ impl<'input> FuncBuilder<'input> {
         Type::new(qualifier, left_type.kind)
     }
 
-    fn get_load_inst_type(&self, addr: Value) -> Type {
+    fn get_fetch_inst_type(&self, addr: Value) -> Type {
         let addr_type = self.get_value_type(addr);
 
         let kind = match addr_type.kind {
             TypeKind::Ptr(ty) => ty.deref(),
-            _ => panic!("Invalid load instruction with operand type `{}`", addr_type),
+            _ => panic!(
+                "Invalid fetch instruction with operand type `{}`",
+                addr_type
+            ),
         };
 
         Type::new(addr_type.qualifier, kind)

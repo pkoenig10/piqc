@@ -12,9 +12,9 @@ use std::ops::{Index, IndexMut};
 
 use self::id::Block;
 use self::inst::{
-    BinaryInst, BoolConstInst, BranchInst, CountInst, ElementInst, FloatCompInst, FloatConstInst,
-    InstData, IntCompInst, IntConstInst, JumpInst, LoadInst, ReturnInst, SelectInst, StoreInst,
-    Target, UnaryInst,
+    BinaryInst, BoolConstInst, BranchInst, CountInst, ElementInst, FetchInst, FloatCompInst,
+    FloatConstInst, InstData, IntCompInst, IntConstInst, JumpInst, ReturnInst, SelectInst,
+    StoreInst, Target, UnaryInst,
 };
 use self::value::ValueData;
 

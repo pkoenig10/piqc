@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate lalrpop_util;
 
-use piqc::FuncParser;
+use crate::piqc::FuncParser;
 
 pub mod ast;
 pub mod ir;

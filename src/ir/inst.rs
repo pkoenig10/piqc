@@ -287,15 +287,15 @@ impl fmt::Display for BinaryInst {
 }
 
 #[derive(Debug, Clone)]
-pub struct LoadInst {
+pub struct FetchInst {
     dest: Value,
     addr: Value,
     offset: Value,
 }
 
-impl LoadInst {
-    pub fn new(dest: Value, addr: Value, offset: Value) -> LoadInst {
-        LoadInst { dest, addr, offset }
+impl FetchInst {
+    pub fn new(dest: Value, addr: Value, offset: Value) -> FetchInst {
+        FetchInst { dest, addr, offset }
     }
 
     pub fn dest(&self) -> Value {
@@ -316,9 +316,9 @@ impl LoadInst {
     }
 }
 
-impl fmt::Display for LoadInst {
+impl fmt::Display for FetchInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} = load {}, {}", self.dest, self.addr, self.offset)
+        write!(f, "{} = fetch {}, {}", self.dest, self.addr, self.offset)
     }
 }
 
@@ -637,7 +637,7 @@ pub enum InstData {
     Count(CountInst),
     Unary(UnaryInst),
     Binary(BinaryInst),
-    Load(LoadInst),
+    Fetch(FetchInst),
     Store(StoreInst),
     IntComp(IntCompInst),
     FloatComp(FloatCompInst),
@@ -680,7 +680,7 @@ impl InstData {
             InstData::Count(_) => {}
             InstData::Unary(ref mut inst) => inst.replace_value(old, new),
             InstData::Binary(ref mut inst) => inst.replace_value(old, new),
-            InstData::Load(ref mut inst) => inst.replace_value(old, new),
+            InstData::Fetch(ref mut inst) => inst.replace_value(old, new),
             InstData::Store(ref mut inst) => inst.replace_value(old, new),
             InstData::IntComp(ref mut inst) => inst.replace_value(old, new),
             InstData::FloatComp(ref mut inst) => inst.replace_value(old, new),
@@ -702,7 +702,7 @@ impl fmt::Display for InstData {
             InstData::Count(ref inst) => write!(f, "{}", inst),
             InstData::Unary(ref inst) => write!(f, "{}", inst),
             InstData::Binary(ref inst) => write!(f, "{}", inst),
-            InstData::Load(ref inst) => write!(f, "{}", inst),
+            InstData::Fetch(ref inst) => write!(f, "{}", inst),
             InstData::Store(ref inst) => write!(f, "{}", inst),
             InstData::IntComp(ref inst) => write!(f, "{}", inst),
             InstData::FloatComp(ref inst) => write!(f, "{}", inst),
