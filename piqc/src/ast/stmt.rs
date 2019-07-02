@@ -1,13 +1,13 @@
 use crate::ast::*;
 
 #[derive(Debug)]
-pub struct BlockStmt<'input> {
+pub struct BlockStmt {
     span: Span,
-    pub stmts: Vec<Stmt<'input>>,
+    pub stmts: Vec<Stmt>,
 }
 
-impl<'input> BlockStmt<'input> {
-    pub fn new(l: usize, stmts: Vec<Stmt<'input>>, r: usize) -> BlockStmt<'input> {
+impl BlockStmt {
+    pub fn new(l: usize, stmts: Vec<Stmt>, r: usize) -> BlockStmt {
         BlockStmt {
             span: Span::new(l, r),
             stmts,
@@ -16,21 +16,15 @@ impl<'input> BlockStmt<'input> {
 }
 
 #[derive(Debug)]
-pub struct DeclStmt<'input> {
+pub struct DeclStmt {
     span: Span,
     pub type_: Type,
-    pub identifier: Identifier<'input>,
-    pub expr: Expr<'input>,
+    pub identifier: Identifier,
+    pub expr: Expr,
 }
 
-impl<'input> DeclStmt<'input> {
-    pub fn new(
-        l: usize,
-        type_: Type,
-        identifier: Identifier<'input>,
-        expr: Expr<'input>,
-        r: usize,
-    ) -> DeclStmt<'input> {
+impl DeclStmt {
+    pub fn new(l: usize, type_: Type, identifier: Identifier, expr: Expr, r: usize) -> DeclStmt {
         DeclStmt {
             span: Span::new(l, r),
             type_,
@@ -41,14 +35,14 @@ impl<'input> DeclStmt<'input> {
 }
 
 #[derive(Debug)]
-pub struct AssignStmt<'input> {
+pub struct AssignStmt {
     span: Span,
-    pub dest: Expr<'input>,
-    pub src: Expr<'input>,
+    pub dest: Expr,
+    pub src: Expr,
 }
 
-impl<'input> AssignStmt<'input> {
-    pub fn new(l: usize, dest: Expr<'input>, src: Expr<'input>, r: usize) -> AssignStmt<'input> {
+impl AssignStmt {
+    pub fn new(l: usize, dest: Expr, src: Expr, r: usize) -> AssignStmt {
         AssignStmt {
             span: Span::new(l, r),
             dest,
@@ -71,21 +65,15 @@ impl ReturnStmt {
 }
 
 #[derive(Debug)]
-pub struct IfStmt<'input> {
+pub struct IfStmt {
     span: Span,
-    pub expr: Expr<'input>,
-    pub if_stmt: Box<Stmt<'input>>,
-    pub else_stmt: Option<Box<Stmt<'input>>>,
+    pub expr: Expr,
+    pub if_stmt: Box<Stmt>,
+    pub else_stmt: Option<Box<Stmt>>,
 }
 
-impl<'input> IfStmt<'input> {
-    pub fn new(
-        l: usize,
-        expr: Expr<'input>,
-        if_stmt: Stmt<'input>,
-        else_stmt: Option<Stmt<'input>>,
-        r: usize,
-    ) -> IfStmt<'input> {
+impl IfStmt {
+    pub fn new(l: usize, expr: Expr, if_stmt: Stmt, else_stmt: Option<Stmt>, r: usize) -> IfStmt {
         IfStmt {
             span: Span::new(l, r),
             expr,
@@ -96,14 +84,14 @@ impl<'input> IfStmt<'input> {
 }
 
 #[derive(Debug)]
-pub struct WhileStmt<'input> {
+pub struct WhileStmt {
     span: Span,
-    pub expr: Expr<'input>,
-    pub stmt: Box<Stmt<'input>>,
+    pub expr: Expr,
+    pub stmt: Box<Stmt>,
 }
 
-impl<'input> WhileStmt<'input> {
-    pub fn new(l: usize, expr: Expr<'input>, stmt: Stmt<'input>, r: usize) -> WhileStmt<'input> {
+impl WhileStmt {
+    pub fn new(l: usize, expr: Expr, stmt: Stmt, r: usize) -> WhileStmt {
         WhileStmt {
             span: Span::new(l, r),
             expr,
@@ -113,11 +101,11 @@ impl<'input> WhileStmt<'input> {
 }
 
 #[derive(Debug)]
-pub enum Stmt<'input> {
-    Block(BlockStmt<'input>),
-    Decl(DeclStmt<'input>),
-    Assign(AssignStmt<'input>),
-    If(IfStmt<'input>),
-    While(WhileStmt<'input>),
+pub enum Stmt {
+    Block(BlockStmt),
+    Decl(DeclStmt),
+    Assign(AssignStmt),
+    If(IfStmt),
+    While(WhileStmt),
     Return(ReturnStmt),
 }

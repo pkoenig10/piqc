@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::ir::*;
-
-type Variable<'a> = &'a str;
+use crate::util::Map;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Predecessor {
@@ -50,72 +49,72 @@ enum BlockData {
 }
 
 #[derive(Debug)]
-struct BlockValues<'a> {
-    params: HashMap<Value, Variable<'a>>,
-    values: HashMap<Variable<'a>, Value>,
+struct BlockValues {
+    params: HashMap<Value, Variable>,
+    values: HashMap<Variable, Value>,
 }
 
-impl<'a> BlockValues<'a> {
-    fn new() -> BlockValues<'a> {
+impl BlockValues {
+    fn new() -> BlockValues {
         BlockValues {
             params: HashMap::new(),
             values: HashMap::new(),
         }
     }
 
-    fn get_param(&self, value: Value) -> Option<Variable<'a>> {
+    fn get_param(&self, value: Value) -> Option<Variable> {
         self.params.get(&value).cloned()
     }
 
-    fn insert_param(&mut self, variable: Variable<'a>, value: Value) {
+    fn insert_param(&mut self, variable: Variable, value: Value) {
         self.params.insert(value, variable);
         self.insert_value(variable, value);
     }
 
-    fn get_value(&self, variable: Variable<'a>) -> Option<Value> {
+    fn get_value(&self, variable: Variable) -> Option<Value> {
         self.values.get(&variable).cloned()
     }
 
-    fn insert_value(&mut self, variable: Variable<'a>, value: Value) {
+    fn insert_value(&mut self, variable: Variable, value: Value) {
         self.values.insert(variable, value);
     }
 }
 
 #[derive(Debug)]
-struct ValueTable<'a> {
-    values: HashMap<Block, BlockValues<'a>>,
+struct ValueTable {
+    values: HashMap<Block, BlockValues>,
 }
 
-impl<'a> ValueTable<'a> {
-    fn new() -> ValueTable<'a> {
+impl ValueTable {
+    fn new() -> ValueTable {
         ValueTable {
             values: HashMap::new(),
         }
     }
 
-    fn insert_param(&mut self, block: Block, variable: Variable<'a>, value: Value) {
+    fn insert_param(&mut self, block: Block, variable: Variable, value: Value) {
         self.get_values_mut(block).insert_param(variable, value);
     }
 
-    fn get_param(&self, block: Block, value: Value) -> Option<Variable<'a>> {
+    fn get_param(&self, block: Block, value: Value) -> Option<Variable> {
         self.get_values(block)
             .and_then(|values| values.get_param(value))
     }
 
-    fn insert_value(&mut self, block: Block, variable: Variable<'a>, value: Value) {
+    fn insert_value(&mut self, block: Block, variable: Variable, value: Value) {
         self.get_values_mut(block).insert_value(variable, value);
     }
 
-    fn get_value(&self, block: Block, variable: Variable<'a>) -> Option<Value> {
+    fn get_value(&self, block: Block, variable: Variable) -> Option<Value> {
         self.get_values(block)
             .and_then(|values| values.get_value(variable))
     }
 
-    fn get_values(&self, block: Block) -> Option<&BlockValues<'a>> {
+    fn get_values(&self, block: Block) -> Option<&BlockValues> {
         self.values.get(&block)
     }
 
-    fn get_values_mut(&mut self, block: Block) -> &mut BlockValues<'a> {
+    fn get_values_mut(&mut self, block: Block) -> &mut BlockValues {
         self.values.entry(block).or_insert_with(BlockValues::new)
     }
 }
@@ -132,16 +131,16 @@ impl Position {
     }
 }
 
-pub struct FuncBuilder<'input> {
+pub struct FuncBuilder {
     func: Func,
-    values: ValueTable<'input>,
+    values: ValueTable,
     blocks: Map<Block, BlockData>,
     header_blocks: HashMap<Ebb, Block>,
     position: Option<Position>,
 }
 
-impl<'input> FuncBuilder<'input> {
-    pub fn new() -> FuncBuilder<'input> {
+impl FuncBuilder {
+    pub fn new() -> FuncBuilder {
         FuncBuilder {
             func: Func::new(),
             values: ValueTable::new(),
@@ -173,7 +172,7 @@ impl<'input> FuncBuilder<'input> {
         self.func.push_param(type_);
     }
 
-    pub fn push_ebb_param(&mut self, variable: Variable<'input>, ebb: Ebb, type_: Type) -> Value {
+    pub fn push_ebb_param(&mut self, variable: Variable, ebb: Ebb, type_: Type) -> Value {
         let value = self.create_value(type_);
         self.func.push_ebb_param(ebb, value);
 
@@ -190,12 +189,12 @@ impl<'input> FuncBuilder<'input> {
         ebb
     }
 
-    pub fn def_var(&mut self, variable: Variable<'input>, value: Value) {
+    pub fn def_var(&mut self, variable: Variable, value: Value) {
         let block = self.position.unwrap().block;
         self.values.insert_value(block, variable, value);
     }
 
-    pub fn use_var(&mut self, variable: Variable<'input>) -> Value {
+    pub fn use_var(&mut self, variable: Variable) -> Value {
         let block = self.position.unwrap().block;
         if let Ok(value) = self.use_var_in_ebb(block, variable) {
             return value;
@@ -250,11 +249,7 @@ impl<'input> FuncBuilder<'input> {
         self.use_var_in_ebb(block, variable).unwrap()
     }
 
-    fn use_var_in_ebb(
-        &self,
-        block: Block,
-        variable: Variable<'input>,
-    ) -> Result<Value, &HeaderBlock> {
+    fn use_var_in_ebb(&self, block: Block, variable: Variable) -> Result<Value, &HeaderBlock> {
         let mut block = block;
         loop {
             match self.values.get_value(block, variable) {

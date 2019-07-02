@@ -1,6 +1,7 @@
 use crate::ast::*;
+use crate::parser::Context;
 
-grammar;
+grammar(context: &mut Context<'input>);
 
 TypeQualifier: TypeQualifier = {
     "uniform" => TypeQualifier::Uniform,
@@ -106,11 +107,15 @@ Count: Count = {
     <@L> "@count" <@R> => Count::new(<>),
 };
 
-Identifier: Identifier<'input> = {
-    @L r"[A-Za-z_][0-9A-Za-z_]*" @R => Identifier::new(<>),
+Variable: Variable = {
+    r"[A-Za-z_][0-9A-Za-z_]*" => context.intern_variable(<>)
 };
 
-PrimaryExpr: Expr<'input> = {
+Identifier: Identifier = {
+    @L Variable @R => Identifier::new(<>),
+};
+
+PrimaryExpr: Expr = {
     IntLiteral => Expr::IntLiteral(<>),
     FloatLiteral => Expr::FloatLiteral(<>),
     BoolLiteral => Expr::BoolLiteral(<>),
@@ -120,17 +125,17 @@ PrimaryExpr: Expr<'input> = {
     "(" <Expr> ")" => <>,
 };
 
-PostfixExpr: Expr<'input> = {
+PostfixExpr: Expr = {
     PrimaryExpr,
     <@L> <PostfixExpr> "[" <Expr> "]" <@R> => Expr::Index(IndexExpr::new(<>)),
 };
 
-UnaryExpr: Expr<'input> = {
+UnaryExpr: Expr = {
     PostfixExpr,
     @L UnaryOp UnaryExpr @R => Expr::Unary(UnaryExpr::new(<>)),
 };
 
-BinaryExpr<Op, PrevExpr>: Expr<'input> = {
+BinaryExpr<Op, PrevExpr>: Expr = {
     PrevExpr,
     @L BinaryExpr<Op, PrevExpr> Op PrevExpr @R => Expr::Binary(BinaryExpr::new(<>)),
 };
@@ -155,40 +160,40 @@ LogicalAndExpr = BinaryExpr<LogicalAndOp, ComparisonExpr>;
 
 LogicalOrExpr = BinaryExpr<LogicalOrOp, LogicalAndExpr>;
 
-Expr: Expr<'input> = {
+Expr: Expr = {
     LogicalOrExpr,
 };
 
-BlockStmt: BlockStmt<'input> = {
+BlockStmt: BlockStmt = {
     <@L> "{" <Stmt*> "}" <@R> => BlockStmt::new(<>),
 };
 
-DeclStmt: DeclStmt<'input> = {
+DeclStmt: DeclStmt = {
     <@L> <Type> <Identifier> "=" <Expr> ";" <@R> => DeclStmt::new(<>),
 };
 
-AssignStmt: AssignStmt<'input> = {
+AssignStmt: AssignStmt = {
     <@L> <PostfixExpr> "=" <Expr> ";" <@R> => AssignStmt::new(<>),
 };
 
-IfBlock: Stmt<'input> = {
+IfBlock: Stmt = {
     BlockStmt => Stmt::Block(<>),
 };
 
-ElseBlock: Stmt<'input> = {
+ElseBlock: Stmt = {
     BlockStmt => Stmt::Block(<>),
     IfStmt => Stmt::If(<>),
 };
 
-IfStmt: IfStmt<'input> = {
+IfStmt: IfStmt = {
     <@L> "if" "(" <Expr> ")" <IfBlock> <("else" <ElseBlock>)?> <@R> => IfStmt::new(<>),
 };
 
-WhileBlock: Stmt<'input> = {
+WhileBlock: Stmt = {
     BlockStmt => Stmt::Block(<>),
 };
 
-WhileStmt: WhileStmt<'input> = {
+WhileStmt: WhileStmt = {
     <@L> "while" "(" <Expr> ")" <WhileBlock> <@R> => WhileStmt::new(<>),
 };
 
@@ -196,7 +201,7 @@ ReturnStmt: ReturnStmt = {
     <@L> "return" ";" <@R> => ReturnStmt::new(<>),
 };
 
-Stmt: Stmt<'input> = {
+Stmt: Stmt = {
     BlockStmt => Stmt::Block(<>),
     DeclStmt => Stmt::Decl(<>),
     AssignStmt => Stmt::Assign(<>),
@@ -205,11 +210,11 @@ Stmt: Stmt<'input> = {
     ReturnStmt => Stmt::Return(<>),
 };
 
-Param: Param<'input> = {
+Param: Param = {
     @L Type Identifier @R => Param::new(<>),
 };
 
-Params: Vec<Param<'input>> = {
+Params: Vec<Param> = {
     <params: (<Params> ",")?> <param: Param> => {
         let mut params = params.unwrap_or_else(Vec::new);
         params.push(param);
@@ -217,10 +222,10 @@ Params: Vec<Param<'input>> = {
     },
 };
 
-FuncBlock: Stmt<'input> = {
+FuncBlock: Stmt = {
     BlockStmt => Stmt::Block(<>),
 };
 
-pub Func: Func<'input> = {
+pub Func: Func = {
     <@L> "fn" <Identifier> "(" <Params?> ")" <FuncBlock> <@R> => Func::new(<>),
 };

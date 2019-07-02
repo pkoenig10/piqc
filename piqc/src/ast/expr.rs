@@ -1,6 +1,16 @@
 use std::fmt;
 
 use crate::ast::*;
+use crate::ir;
+use crate::util::Id;
+
+id!(pub Variable, "v");
+
+impl From<Variable> for ir::Variable {
+    fn from(variable: Variable) -> ir::Variable {
+        ir::Variable::new(variable.get())
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct IntLiteral {
@@ -74,16 +84,16 @@ impl Count {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Identifier<'input> {
+pub struct Identifier {
     span: Span,
-    pub name: &'input str,
+    pub variable: Variable,
 }
 
-impl<'input> Identifier<'input> {
-    pub fn new(l: usize, name: &'input str, r: usize) -> Identifier<'input> {
+impl Identifier {
+    pub fn new(l: usize, variable: Variable, r: usize) -> Identifier {
         Identifier {
             span: Span::new(l, r),
-            name,
+            variable,
         }
     }
 }
@@ -107,14 +117,14 @@ impl fmt::Display for UnaryOp {
 }
 
 #[derive(Debug)]
-pub struct UnaryExpr<'input> {
+pub struct UnaryExpr {
     span: Span,
     pub op: UnaryOp,
-    pub expr: Box<Expr<'input>>,
+    pub expr: Box<Expr>,
 }
 
-impl<'input> UnaryExpr<'input> {
-    pub fn new(l: usize, op: UnaryOp, expr: Expr<'input>, r: usize) -> UnaryExpr<'input> {
+impl UnaryExpr {
+    pub fn new(l: usize, op: UnaryOp, expr: Expr, r: usize) -> UnaryExpr {
         UnaryExpr {
             span: Span::new(l, r),
             op,
@@ -172,21 +182,15 @@ impl fmt::Display for BinaryOp {
 }
 
 #[derive(Debug)]
-pub struct BinaryExpr<'input> {
+pub struct BinaryExpr {
     span: Span,
     pub op: BinaryOp,
-    pub left: Box<Expr<'input>>,
-    pub right: Box<Expr<'input>>,
+    pub left: Box<Expr>,
+    pub right: Box<Expr>,
 }
 
-impl<'input> BinaryExpr<'input> {
-    pub fn new(
-        l: usize,
-        left: Expr<'input>,
-        op: BinaryOp,
-        right: Expr<'input>,
-        r: usize,
-    ) -> BinaryExpr<'input> {
+impl BinaryExpr {
+    pub fn new(l: usize, left: Expr, op: BinaryOp, right: Expr, r: usize) -> BinaryExpr {
         BinaryExpr {
             span: Span::new(l, r),
             op,
@@ -197,14 +201,14 @@ impl<'input> BinaryExpr<'input> {
 }
 
 #[derive(Debug)]
-pub struct IndexExpr<'input> {
+pub struct IndexExpr {
     span: Span,
-    pub expr: Box<Expr<'input>>,
-    pub index: Box<Expr<'input>>,
+    pub expr: Box<Expr>,
+    pub index: Box<Expr>,
 }
 
-impl<'input> IndexExpr<'input> {
-    pub fn new(l: usize, expr: Expr<'input>, index: Expr<'input>, r: usize) -> IndexExpr<'input> {
+impl IndexExpr {
+    pub fn new(l: usize, expr: Expr, index: Expr, r: usize) -> IndexExpr {
         IndexExpr {
             span: Span::new(l, r),
             expr: Box::new(expr),
@@ -214,14 +218,14 @@ impl<'input> IndexExpr<'input> {
 }
 
 #[derive(Debug)]
-pub enum Expr<'input> {
+pub enum Expr {
     IntLiteral(IntLiteral),
     FloatLiteral(FloatLiteral),
     BoolLiteral(BoolLiteral),
     Element(Element),
     Count(Count),
-    Identifier(Identifier<'input>),
-    Unary(UnaryExpr<'input>),
-    Binary(BinaryExpr<'input>),
-    Index(IndexExpr<'input>),
+    Identifier(Identifier),
+    Unary(UnaryExpr),
+    Binary(BinaryExpr),
+    Index(IndexExpr),
 }

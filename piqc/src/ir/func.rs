@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::ir::*;
+use crate::util::Map;
 
 #[derive(Debug)]
 struct EbbNode {

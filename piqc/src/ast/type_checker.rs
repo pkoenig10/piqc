@@ -7,13 +7,13 @@ pub fn type_check(func: &Func) {
 }
 
 #[derive(Debug)]
-struct Symbol<'a> {
-    identifier: Identifier<'a>,
+struct Symbol {
+    identifier: Identifier,
     type_: Type,
 }
 
-impl<'a> Symbol<'a> {
-    fn new(identifier: Identifier<'a>, type_: Type) -> Symbol<'a> {
+impl Symbol {
+    fn new(identifier: Identifier, type_: Type) -> Symbol {
         Symbol { identifier, type_ }
     }
 
@@ -23,12 +23,12 @@ impl<'a> Symbol<'a> {
 }
 
 #[derive(Debug)]
-struct SymbolTable<'a> {
-    scopes: Vec<HashMap<&'a str, Symbol<'a>>>,
+struct SymbolTable {
+    scopes: Vec<HashMap<Variable, Symbol>>,
 }
 
-impl<'a> SymbolTable<'a> {
-    fn new() -> SymbolTable<'a> {
+impl SymbolTable {
+    fn new() -> SymbolTable {
         SymbolTable { scopes: Vec::new() }
     }
 
@@ -40,9 +40,9 @@ impl<'a> SymbolTable<'a> {
         self.scopes.pop().unwrap();
     }
 
-    fn get(&self, name: &str) -> Option<&Symbol<'a>> {
+    fn get(&self, variable: Variable) -> Option<&Symbol> {
         for scope in self.scopes.iter().rev() {
-            let symbol = scope.get(name);
+            let symbol = scope.get(&variable);
             if symbol.is_some() {
                 return symbol;
             }
@@ -50,23 +50,23 @@ impl<'a> SymbolTable<'a> {
         None
     }
 
-    fn insert(&mut self, name: &'a str, symbol: Symbol<'a>) {
-        self.scopes.last_mut().unwrap().insert(name, symbol);
+    fn insert(&mut self, variable: Variable, symbol: Symbol) {
+        self.scopes.last_mut().unwrap().insert(variable, symbol);
     }
 }
 
-struct TypeChecker<'input> {
-    symbols: SymbolTable<'input>,
+struct TypeChecker {
+    symbols: SymbolTable,
 }
 
-impl<'input> TypeChecker<'input> {
-    fn new() -> TypeChecker<'input> {
+impl TypeChecker {
+    fn new() -> TypeChecker {
         TypeChecker {
             symbols: SymbolTable::new(),
         }
     }
 
-    fn check_func(&mut self, func: &Func<'input>) {
+    fn check_func(&mut self, func: &Func) {
         self.symbols.push_scope();
 
         for param in &func.params {
@@ -78,7 +78,7 @@ impl<'input> TypeChecker<'input> {
         self.symbols.pop_scope();
     }
 
-    fn check_param(&mut self, param: &Param<'input>) {
+    fn check_param(&mut self, param: &Param) {
         let type_ = param.type_;
 
         assert_eq!(
@@ -91,7 +91,7 @@ impl<'input> TypeChecker<'input> {
         self.insert_symbol(&param.identifier, param.type_);
     }
 
-    fn check_stmt(&mut self, stmt: &Stmt<'input>) {
+    fn check_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Block(ref stmt) => self.check_block_stmt(stmt),
             Stmt::Decl(ref stmt) => self.check_decl_stmt(stmt),
@@ -102,7 +102,7 @@ impl<'input> TypeChecker<'input> {
         }
     }
 
-    fn check_block_stmt(&mut self, stmt: &BlockStmt<'input>) {
+    fn check_block_stmt(&mut self, stmt: &BlockStmt) {
         self.symbols.push_scope();
 
         for stmt in &stmt.stmts {
@@ -112,7 +112,7 @@ impl<'input> TypeChecker<'input> {
         self.symbols.pop_scope();
     }
 
-    fn check_decl_stmt(&mut self, stmt: &DeclStmt<'input>) {
+    fn check_decl_stmt(&mut self, stmt: &DeclStmt) {
         let expr_type = self.check_expr(&stmt.expr);
         let type_ = stmt.type_;
 
@@ -125,7 +125,7 @@ impl<'input> TypeChecker<'input> {
         self.insert_symbol(&stmt.identifier, type_);
     }
 
-    fn check_assign_stmt(&mut self, stmt: &AssignStmt<'input>) {
+    fn check_assign_stmt(&mut self, stmt: &AssignStmt) {
         let src_type = self.check_expr(&stmt.src);
         let dest_type = self.check_expr(&stmt.dest);
 
@@ -136,7 +136,7 @@ impl<'input> TypeChecker<'input> {
         assert!(valid, "Mismatched types '{}' and '{}'", dest_type, src_type);
     }
 
-    fn check_if_stmt(&mut self, stmt: &IfStmt<'input>) {
+    fn check_if_stmt(&mut self, stmt: &IfStmt) {
         let expr_type = self.check_expr(&stmt.expr);
 
         assert_eq!(
@@ -153,7 +153,7 @@ impl<'input> TypeChecker<'input> {
         }
     }
 
-    fn check_while_stmt(&mut self, stmt: &WhileStmt<'input>) {
+    fn check_while_stmt(&mut self, stmt: &WhileStmt) {
         let expr_type = self.check_expr(&stmt.expr);
         assert_eq!(
             expr_type.kind,
@@ -165,7 +165,7 @@ impl<'input> TypeChecker<'input> {
         self.check_stmt(&stmt.stmt);
     }
 
-    fn check_expr(&mut self, expr: &Expr<'input>) -> Type {
+    fn check_expr(&mut self, expr: &Expr) -> Type {
         match expr {
             Expr::IntLiteral(_) | Expr::Count(_) => Type::UNIFORM_INT,
             Expr::Element(_) => Type::VARYING_INT,
@@ -178,11 +178,11 @@ impl<'input> TypeChecker<'input> {
         }
     }
 
-    fn check_identifier(&mut self, identifier: &Identifier<'input>) -> Type {
+    fn check_identifier(&mut self, identifier: &Identifier) -> Type {
         self.get_symbol(identifier).type_()
     }
 
-    fn check_unary_expr(&mut self, expr: &UnaryExpr<'input>) -> Type {
+    fn check_unary_expr(&mut self, expr: &UnaryExpr) -> Type {
         let expr_type = self.check_expr(&expr.expr);
 
         let kind = match (expr.op, expr_type.kind) {
@@ -198,7 +198,7 @@ impl<'input> TypeChecker<'input> {
         Type::new(expr_type.qualifier, kind)
     }
 
-    fn check_binary_expr(&mut self, expr: &BinaryExpr<'input>) -> Type {
+    fn check_binary_expr(&mut self, expr: &BinaryExpr) -> Type {
         let left_type = self.check_expr(&expr.left);
         let right_type = self.check_expr(&expr.right);
 
@@ -244,7 +244,7 @@ impl<'input> TypeChecker<'input> {
         Type::new(qualifier, kind)
     }
 
-    fn check_index_expr(&mut self, expr: &IndexExpr<'input>) -> Type {
+    fn check_index_expr(&mut self, expr: &IndexExpr) -> Type {
         let expr_type = self.check_expr(&expr.expr);
         let index_type = self.check_expr(&expr.index);
 
@@ -265,12 +265,12 @@ impl<'input> TypeChecker<'input> {
         Type::new(qualifier, expr_type.deref())
     }
 
-    fn insert_symbol(&mut self, identifier: &Identifier<'input>, type_: Type) {
+    fn insert_symbol(&mut self, identifier: &Identifier, type_: Type) {
         let symbol = Symbol::new(*identifier, type_);
-        self.symbols.insert(identifier.name, symbol);
+        self.symbols.insert(identifier.variable, symbol);
     }
 
-    fn get_symbol(&self, identifier: &Identifier) -> &Symbol<'input> {
-        self.symbols.get(identifier.name).unwrap()
+    fn get_symbol(&self, identifier: &Identifier) -> &Symbol {
+        self.symbols.get(identifier.variable).unwrap()
     }
 }

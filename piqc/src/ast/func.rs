@@ -1,14 +1,14 @@
 use crate::ast::*;
 
 #[derive(Debug)]
-pub struct Param<'input> {
+pub struct Param {
     span: Span,
     pub type_: Type,
-    pub identifier: Identifier<'input>,
+    pub identifier: Identifier,
 }
 
-impl<'input> Param<'input> {
-    pub fn new(l: usize, type_: Type, identifier: Identifier<'input>, r: usize) -> Param<'input> {
+impl Param {
+    pub fn new(l: usize, type_: Type, identifier: Identifier, r: usize) -> Param {
         Param {
             span: Span::new(l, r),
             type_,
@@ -18,26 +18,26 @@ impl<'input> Param<'input> {
 }
 
 #[derive(Debug)]
-pub struct Func<'input> {
+pub struct Func {
     span: Span,
-    pub identifier: Identifier<'input>,
-    pub params: Vec<Param<'input>>,
-    pub stmt: Box<Stmt<'input>>,
+    pub identifier: Identifier,
+    pub params: Vec<Param>,
+    pub stmt: Stmt,
 }
 
-impl<'input> Func<'input> {
+impl Func {
     pub fn new(
         l: usize,
-        identifier: Identifier<'input>,
-        params: Option<Vec<Param<'input>>>,
-        stmt: Stmt<'input>,
+        identifier: Identifier,
+        params: Option<Vec<Param>>,
+        stmt: Stmt,
         r: usize,
-    ) -> Func<'input> {
+    ) -> Func {
         Func {
             span: Span::new(l, r),
             identifier,
             params: params.unwrap_or_else(Vec::new),
-            stmt: Box::new(stmt),
+            stmt,
         }
     }
 }

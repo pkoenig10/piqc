@@ -5,14 +5,14 @@ pub fn generate_ir(func: &Func) -> ir::Func {
     IrBuilder::new().func(func)
 }
 
-struct IrBuilder<'input> {
-    builder: ir::FuncBuilder<'input>,
+struct IrBuilder {
+    builder: ir::FuncBuilder,
     predicate: Option<ir::Value>,
     not_returned: Option<ir::Value>,
 }
 
-impl<'input> IrBuilder<'input> {
-    fn new() -> IrBuilder<'input> {
+impl IrBuilder {
+    fn new() -> IrBuilder {
         IrBuilder {
             builder: ir::FuncBuilder::new(),
             predicate: None,
@@ -20,12 +20,12 @@ impl<'input> IrBuilder<'input> {
         }
     }
 
-    fn func(mut self, func: &Func<'input>) -> ir::Func {
+    fn func(mut self, func: &Func) -> ir::Func {
         let entry_ebb = self.builder.create_ebb();
         self.builder.set_position(entry_ebb);
 
         for param in &func.params {
-            let variable = param.identifier.name;
+            let variable = param.identifier.variable.into();
             let type_ = param.type_;
             self.builder.push_param(type_);
             self.builder.push_ebb_param(variable, entry_ebb, type_);
@@ -40,7 +40,7 @@ impl<'input> IrBuilder<'input> {
         self.builder.build()
     }
 
-    fn stmt(&mut self, stmt: &Stmt<'input>) {
+    fn stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Block(ref stmt) => self.block_stmt(stmt),
             Stmt::Decl(ref stmt) => self.decl_stmt(stmt),
@@ -51,21 +51,21 @@ impl<'input> IrBuilder<'input> {
         }
     }
 
-    fn block_stmt(&mut self, stmt: &BlockStmt<'input>) {
+    fn block_stmt(&mut self, stmt: &BlockStmt) {
         for stmt in &stmt.stmts {
             self.stmt(stmt);
         }
     }
 
-    fn decl_stmt(&mut self, stmt: &DeclStmt<'input>) {
+    fn decl_stmt(&mut self, stmt: &DeclStmt) {
         let expr_value = self.expr(&stmt.expr);
 
-        let variable = stmt.identifier.name;
+        let variable = stmt.identifier.variable.into();
 
         self.builder.def_var(variable, expr_value);
     }
 
-    fn assign_stmt(&mut self, stmt: &AssignStmt<'input>) {
+    fn assign_stmt(&mut self, stmt: &AssignStmt) {
         let src_value = self.expr(&stmt.src);
 
         macro_rules! value {
@@ -83,7 +83,7 @@ impl<'input> IrBuilder<'input> {
 
         match stmt.dest {
             Expr::Identifier(ref identifier) => {
-                let variable = identifier.name;
+                let variable = identifier.variable.into();
 
                 let value = value!(self.builder.use_var(variable));
 
@@ -101,7 +101,7 @@ impl<'input> IrBuilder<'input> {
         }
     }
 
-    fn if_stmt(&mut self, stmt: &IfStmt<'input>) {
+    fn if_stmt(&mut self, stmt: &IfStmt) {
         let condition_value = self.expr(&stmt.expr);
 
         let qualifier = self.builder.get_value_type(condition_value).qualifier;
@@ -144,7 +144,7 @@ impl<'input> IrBuilder<'input> {
         }
     }
 
-    fn while_stmt(&mut self, stmt: &WhileStmt<'input>) {
+    fn while_stmt(&mut self, stmt: &WhileStmt) {
         let header_ebb = self.builder.create_ebb();
         let after_ebb = self.builder.create_ebb();
 
@@ -204,7 +204,7 @@ impl<'input> IrBuilder<'input> {
         };
     }
 
-    fn expr(&mut self, expr: &Expr<'input>) -> ir::Value {
+    fn expr(&mut self, expr: &Expr) -> ir::Value {
         match expr {
             Expr::IntLiteral(ref int_literal) => self.int_literal(int_literal),
             Expr::FloatLiteral(ref float_literal) => self.float_literal(float_literal),
@@ -238,11 +238,11 @@ impl<'input> IrBuilder<'input> {
         self.builder.push_count_inst()
     }
 
-    fn identifier(&mut self, identifier: &Identifier<'input>) -> ir::Value {
-        self.builder.use_var(identifier.name)
+    fn identifier(&mut self, identifier: &Identifier) -> ir::Value {
+        self.builder.use_var(identifier.variable.into())
     }
 
-    fn unary_expr(&mut self, expr: &UnaryExpr<'input>) -> ir::Value {
+    fn unary_expr(&mut self, expr: &UnaryExpr) -> ir::Value {
         let op = expr.op;
 
         let expr_value = self.expr(&expr.expr);
@@ -270,7 +270,7 @@ impl<'input> IrBuilder<'input> {
         }
     }
 
-    fn binary_expr(&mut self, expr: &BinaryExpr<'input>) -> ir::Value {
+    fn binary_expr(&mut self, expr: &BinaryExpr) -> ir::Value {
         let op = expr.op;
 
         let left_value = self.expr(&expr.left);
@@ -299,7 +299,7 @@ impl<'input> IrBuilder<'input> {
         )
     }
 
-    fn index_expr(&mut self, expr: &IndexExpr<'input>) -> ir::Value {
+    fn index_expr(&mut self, expr: &IndexExpr) -> ir::Value {
         let expr_value = self.expr(&expr.expr);
         let index_value = self.expr(&expr.index);
 
