@@ -1,3 +1,4 @@
+use enum_dispatch::enum_dispatch;
 use std::fmt;
 
 use crate::ast::*;
@@ -13,88 +14,76 @@ impl From<Variable> for ir::Variable {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct IntLiteral {
-    span: Span,
-    pub value: i32,
-}
-
-impl IntLiteral {
-    pub fn new(l: usize, value: i32, r: usize) -> IntLiteral {
-        IntLiteral {
-            span: Span::new(l, r),
-            value,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct FloatLiteral {
-    span: Span,
-    pub value: f32,
-}
-
-impl FloatLiteral {
-    pub fn new(l: usize, value: f32, r: usize) -> FloatLiteral {
-        FloatLiteral {
-            span: Span::new(l, r),
-            value,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct BoolLiteral {
-    span: Span,
-    pub value: bool,
-}
-
-impl BoolLiteral {
-    pub fn new(l: usize, value: bool, r: usize) -> BoolLiteral {
-        BoolLiteral {
-            span: Span::new(l, r),
-            value,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Element {
-    span: Span,
-}
-
-impl Element {
-    pub fn new(l: usize, r: usize) -> Element {
-        Element {
-            span: Span::new(l, r),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Count {
-    span: Span,
-}
-
-impl Count {
-    pub fn new(l: usize, r: usize) -> Count {
-        Count {
-            span: Span::new(l, r),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
 pub struct Identifier {
-    span: Span,
+    pub span: Span,
     pub variable: Variable,
 }
 
 impl Identifier {
-    pub fn new(l: usize, variable: Variable, r: usize) -> Identifier {
-        Identifier {
-            span: Span::new(l, r),
-            variable,
-        }
+    pub fn new(span: Span, variable: Variable) -> Identifier {
+        Identifier { span, variable }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct IntExpr {
+    pub value: i32,
+}
+
+impl IntExpr {
+    pub fn new(value: i32) -> IntExpr {
+        IntExpr { value }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct FloatExpr {
+    pub value: f32,
+}
+
+impl FloatExpr {
+    pub fn new(value: f32) -> FloatExpr {
+        FloatExpr { value }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BoolExpr {
+    pub value: bool,
+}
+
+impl BoolExpr {
+    pub fn new(value: bool) -> BoolExpr {
+        BoolExpr { value }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ElementExpr;
+
+impl ElementExpr {
+    pub fn new() -> ElementExpr {
+        ElementExpr {}
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CountExpr;
+
+impl CountExpr {
+    pub fn new() -> CountExpr {
+        CountExpr {}
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct IdentifierExpr {
+    pub identifier: Identifier,
+}
+
+impl IdentifierExpr {
+    pub fn new(identifier: Identifier) -> IdentifierExpr {
+        IdentifierExpr { identifier }
     }
 }
 
@@ -118,15 +107,13 @@ impl fmt::Display for UnaryOp {
 
 #[derive(Debug)]
 pub struct UnaryExpr {
-    span: Span,
     pub op: UnaryOp,
     pub expr: Box<Expr>,
 }
 
 impl UnaryExpr {
-    pub fn new(l: usize, op: UnaryOp, expr: Expr, r: usize) -> UnaryExpr {
+    pub fn new(op: UnaryOp, expr: Expr) -> UnaryExpr {
         UnaryExpr {
-            span: Span::new(l, r),
             op,
             expr: Box::new(expr),
         }
@@ -183,16 +170,14 @@ impl fmt::Display for BinaryOp {
 
 #[derive(Debug)]
 pub struct BinaryExpr {
-    span: Span,
     pub op: BinaryOp,
     pub left: Box<Expr>,
     pub right: Box<Expr>,
 }
 
 impl BinaryExpr {
-    pub fn new(l: usize, left: Expr, op: BinaryOp, right: Expr, r: usize) -> BinaryExpr {
+    pub fn new(left: Expr, op: BinaryOp, right: Expr) -> BinaryExpr {
         BinaryExpr {
-            span: Span::new(l, r),
             op,
             left: Box::new(left),
             right: Box::new(right),
@@ -202,15 +187,13 @@ impl BinaryExpr {
 
 #[derive(Debug)]
 pub struct IndexExpr {
-    span: Span,
     pub expr: Box<Expr>,
     pub index: Box<Expr>,
 }
 
 impl IndexExpr {
-    pub fn new(l: usize, expr: Expr, index: Expr, r: usize) -> IndexExpr {
+    pub fn new(expr: Expr, index: Expr) -> IndexExpr {
         IndexExpr {
-            span: Span::new(l, r),
             expr: Box::new(expr),
             index: Box::new(index),
         }
@@ -218,14 +201,44 @@ impl IndexExpr {
 }
 
 #[derive(Debug)]
-pub enum Expr {
-    IntLiteral(IntLiteral),
-    FloatLiteral(FloatLiteral),
-    BoolLiteral(BoolLiteral),
-    Element(Element),
-    Count(Count),
-    Identifier(Identifier),
+pub struct ParenExpr {
+    pub expr: Box<Expr>,
+}
+
+impl ParenExpr {
+    pub fn new(expr: Expr) -> ParenExpr {
+        ParenExpr {
+            expr: Box::new(expr),
+        }
+    }
+}
+
+#[enum_dispatch]
+#[derive(Debug)]
+pub enum ExprKind {
+    Int(IntExpr),
+    Float(FloatExpr),
+    Bool(BoolExpr),
+    Element(ElementExpr),
+    Count(CountExpr),
+    Identifier(IdentifierExpr),
     Unary(UnaryExpr),
     Binary(BinaryExpr),
     Index(IndexExpr),
+    Paren(ParenExpr),
+}
+
+#[enum_dispatch(ExprKind)]
+trait ExprTrait {}
+
+#[derive(Debug)]
+pub struct Expr {
+    pub span: Span,
+    pub kind: ExprKind,
+}
+
+impl Expr {
+    pub fn new(span: Span, kind: ExprKind) -> Expr {
+        Expr { span, kind }
+    }
 }

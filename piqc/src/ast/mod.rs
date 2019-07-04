@@ -1,10 +1,12 @@
 pub use self::builder::generate_ir;
 pub use self::expr::{
-    BinaryExpr, BinaryOp, BoolLiteral, Count, Element, Expr, FloatLiteral, Identifier, IndexExpr,
-    IntLiteral, UnaryExpr, UnaryOp, Variable,
+    BinaryExpr, BinaryOp, BoolExpr, CountExpr, ElementExpr, Expr, ExprKind, FloatExpr, Identifier,
+    IdentifierExpr, IndexExpr, IntExpr, ParenExpr, UnaryExpr, UnaryOp, Variable,
 };
 pub use self::func::{Func, Param};
-pub use self::stmt::{AssignStmt, BlockStmt, DeclStmt, IfStmt, ReturnStmt, Stmt, WhileStmt};
+pub use self::stmt::{
+    AssignStmt, BlockStmt, DeclStmt, IfStmt, ReturnStmt, Stmt, StmtKind, WhileStmt,
+};
 pub use self::type_checker::type_check;
 pub use crate::ir::{Type, TypeKind, TypeQualifier};
 

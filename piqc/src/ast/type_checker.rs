@@ -92,13 +92,13 @@ impl TypeChecker {
     }
 
     fn check_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::Block(ref stmt) => self.check_block_stmt(stmt),
-            Stmt::Decl(ref stmt) => self.check_decl_stmt(stmt),
-            Stmt::Assign(ref stmt) => self.check_assign_stmt(stmt),
-            Stmt::If(ref stmt) => self.check_if_stmt(stmt),
-            Stmt::While(ref stmt) => self.check_while_stmt(stmt),
-            Stmt::Return(_) => {}
+        match stmt.kind {
+            StmtKind::Block(ref stmt) => self.check_block_stmt(stmt),
+            StmtKind::Decl(ref stmt) => self.check_decl_stmt(stmt),
+            StmtKind::Assign(ref stmt) => self.check_assign_stmt(stmt),
+            StmtKind::If(ref stmt) => self.check_if_stmt(stmt),
+            StmtKind::While(ref stmt) => self.check_while_stmt(stmt),
+            StmtKind::Return(_) => {}
         }
     }
 
@@ -166,20 +166,21 @@ impl TypeChecker {
     }
 
     fn check_expr(&mut self, expr: &Expr) -> Type {
-        match expr {
-            Expr::IntLiteral(_) | Expr::Count(_) => Type::UNIFORM_INT,
-            Expr::Element(_) => Type::VARYING_INT,
-            Expr::FloatLiteral(_) => Type::UNIFORM_FLOAT,
-            Expr::BoolLiteral(_) => Type::UNIFORM_BOOL,
-            Expr::Identifier(ref identifier) => self.check_identifier(identifier),
-            Expr::Unary(ref expr) => self.check_unary_expr(expr),
-            Expr::Binary(ref expr) => self.check_binary_expr(expr),
-            Expr::Index(ref expr) => self.check_index_expr(expr),
+        match expr.kind {
+            ExprKind::Int(_) | ExprKind::Count(_) => Type::UNIFORM_INT,
+            ExprKind::Element(_) => Type::VARYING_INT,
+            ExprKind::Float(_) => Type::UNIFORM_FLOAT,
+            ExprKind::Bool(_) => Type::UNIFORM_BOOL,
+            ExprKind::Identifier(ref expr) => self.check_identifier_expr(expr),
+            ExprKind::Unary(ref expr) => self.check_unary_expr(expr),
+            ExprKind::Binary(ref expr) => self.check_binary_expr(expr),
+            ExprKind::Index(ref expr) => self.check_index_expr(expr),
+            ExprKind::Paren(ref expr) => self.check_paren_expr(expr),
         }
     }
 
-    fn check_identifier(&mut self, identifier: &Identifier) -> Type {
-        self.get_symbol(identifier).type_()
+    fn check_identifier_expr(&mut self, expr: &IdentifierExpr) -> Type {
+        self.get_symbol(&expr.identifier).type_()
     }
 
     fn check_unary_expr(&mut self, expr: &UnaryExpr) -> Type {
@@ -263,6 +264,10 @@ impl TypeChecker {
         );
 
         Type::new(qualifier, expr_type.deref())
+    }
+
+    fn check_paren_expr(&mut self, expr: &ParenExpr) -> Type {
+        self.check_expr(&expr.expr)
     }
 
     fn insert_symbol(&mut self, identifier: &Identifier, type_: Type) {

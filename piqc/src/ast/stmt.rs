@@ -1,32 +1,28 @@
+use enum_dispatch::enum_dispatch;
+
 use crate::ast::*;
 
 #[derive(Debug)]
 pub struct BlockStmt {
-    span: Span,
     pub stmts: Vec<Stmt>,
 }
 
 impl BlockStmt {
-    pub fn new(l: usize, stmts: Vec<Stmt>, r: usize) -> BlockStmt {
-        BlockStmt {
-            span: Span::new(l, r),
-            stmts,
-        }
+    pub fn new(stmts: Vec<Stmt>) -> BlockStmt {
+        BlockStmt { stmts }
     }
 }
 
 #[derive(Debug)]
 pub struct DeclStmt {
-    span: Span,
     pub type_: Type,
     pub identifier: Identifier,
     pub expr: Expr,
 }
 
 impl DeclStmt {
-    pub fn new(l: usize, type_: Type, identifier: Identifier, expr: Expr, r: usize) -> DeclStmt {
+    pub fn new(type_: Type, identifier: Identifier, expr: Expr) -> DeclStmt {
         DeclStmt {
-            span: Span::new(l, r),
             type_,
             identifier,
             expr,
@@ -36,46 +32,35 @@ impl DeclStmt {
 
 #[derive(Debug)]
 pub struct AssignStmt {
-    span: Span,
     pub dest: Expr,
     pub src: Expr,
 }
 
 impl AssignStmt {
-    pub fn new(l: usize, dest: Expr, src: Expr, r: usize) -> AssignStmt {
-        AssignStmt {
-            span: Span::new(l, r),
-            dest,
-            src,
-        }
+    pub fn new(dest: Expr, src: Expr) -> AssignStmt {
+        AssignStmt { dest, src }
     }
 }
 
 #[derive(Debug)]
-pub struct ReturnStmt {
-    span: Span,
-}
+pub struct ReturnStmt {}
 
 impl ReturnStmt {
-    pub fn new(l: usize, r: usize) -> ReturnStmt {
-        ReturnStmt {
-            span: Span::new(l, r),
-        }
+    pub fn new() -> ReturnStmt {
+        ReturnStmt {}
     }
 }
 
 #[derive(Debug)]
 pub struct IfStmt {
-    span: Span,
     pub expr: Expr,
     pub if_stmt: Box<Stmt>,
     pub else_stmt: Option<Box<Stmt>>,
 }
 
 impl IfStmt {
-    pub fn new(l: usize, expr: Expr, if_stmt: Stmt, else_stmt: Option<Stmt>, r: usize) -> IfStmt {
+    pub fn new(expr: Expr, if_stmt: Stmt, else_stmt: Option<Stmt>) -> IfStmt {
         IfStmt {
-            span: Span::new(l, r),
             expr,
             if_stmt: Box::new(if_stmt),
             else_stmt: else_stmt.map(Box::new),
@@ -85,27 +70,41 @@ impl IfStmt {
 
 #[derive(Debug)]
 pub struct WhileStmt {
-    span: Span,
     pub expr: Expr,
     pub stmt: Box<Stmt>,
 }
 
 impl WhileStmt {
-    pub fn new(l: usize, expr: Expr, stmt: Stmt, r: usize) -> WhileStmt {
+    pub fn new(expr: Expr, stmt: Stmt) -> WhileStmt {
         WhileStmt {
-            span: Span::new(l, r),
             expr,
             stmt: Box::new(stmt),
         }
     }
 }
 
+#[enum_dispatch]
 #[derive(Debug)]
-pub enum Stmt {
+pub enum StmtKind {
     Block(BlockStmt),
     Decl(DeclStmt),
     Assign(AssignStmt),
     If(IfStmt),
     While(WhileStmt),
     Return(ReturnStmt),
+}
+
+#[enum_dispatch(StmtKind)]
+trait StmtTrait {}
+
+#[derive(Debug)]
+pub struct Stmt {
+    pub span: Span,
+    pub kind: StmtKind,
+}
+
+impl Stmt {
+    pub fn new(span: Span, kind: StmtKind) -> Stmt {
+        Stmt { span, kind }
+    }
 }

@@ -3,23 +3,6 @@ use crate::parser::Context;
 
 grammar(context: &mut Context<'input>);
 
-TypeQualifier: TypeQualifier = {
-    "uniform" => TypeQualifier::Uniform,
-    "varying" => TypeQualifier::Varying,
-}
-
-TypeKind: TypeKind = {
-    "int" => TypeKind::INT,
-    "float" => TypeKind::FLOAT,
-    "bool" => TypeKind::BOOL,
-    <TypeKind> "*" => TypeKind::new_ptr(<>),
-}
-
-Type: Type = {
-    <TypeKind> => Type::new(TypeQualifier::Varying, <>),
-    <TypeQualifier> <TypeKind> => Type::new(<>),
-}
-
 Int: i32 = {
     r"\d+" => <>.parse().unwrap(),
 };
@@ -87,57 +70,101 @@ LogicalOrOp: BinaryOp = {
     "||" => BinaryOp::LogicalOr,
 };
 
-IntLiteral: IntLiteral = {
-    @L Int @R => IntLiteral::new(<>),
-};
-
-FloatLiteral: FloatLiteral = {
-    @L Float @R => FloatLiteral::new(<>),
-};
-
-BoolLiteral: BoolLiteral = {
-    @L Bool @R => BoolLiteral::new(<>),
-};
-
-Element: Element = {
-    <@L> "@element" <@R> => Element::new(<>),
-};
-
-Count: Count = {
-    <@L> "@count" <@R> => Count::new(<>),
-};
-
 Variable: Variable = {
     r"[A-Za-z_][0-9A-Za-z_]*" => context.intern_variable(<>)
 };
 
 Identifier: Identifier = {
-    @L Variable @R => Identifier::new(<>),
+    <l: @L> <variable: Variable> <r: @R> => Identifier::new(Span::new(l, r), variable),
 };
 
-PrimaryExpr: Expr = {
-    IntLiteral => Expr::IntLiteral(<>),
-    FloatLiteral => Expr::FloatLiteral(<>),
-    BoolLiteral => Expr::BoolLiteral(<>),
-    Element => Expr::Element(<>),
-    Count => Expr::Count(<>),
-    Identifier => Expr::Identifier(<>),
-    "(" <Expr> ")" => <>,
+TypeQualifier: TypeQualifier = {
+    "uniform" => TypeQualifier::Uniform,
+    "varying" => TypeQualifier::Varying,
+}
+
+TypeKind: TypeKind = {
+    "int" => TypeKind::INT,
+    "float" => TypeKind::FLOAT,
+    "bool" => TypeKind::BOOL,
+    <TypeKind> "*" => TypeKind::new_ptr(<>),
+}
+
+Type: Type = {
+    <qualifier: TypeQualifier?> <kind: TypeKind> => Type::new(qualifier.unwrap_or(TypeQualifier::Varying), kind),
+}
+
+BaseExpr<T>: Expr = {
+    <l: @L> <kind: T> <r: @R> => Expr::new(Span::new(l, r), kind),
 };
 
-PostfixExpr: Expr = {
-    PrimaryExpr,
-    <@L> <PostfixExpr> "[" <Expr> "]" <@R> => Expr::Index(IndexExpr::new(<>)),
+IntExpr: IntExpr = {
+    Int => IntExpr::new(<>),
+};
+
+FloatExpr: FloatExpr = {
+    Float => FloatExpr::new(<>),
+};
+
+BoolExpr: BoolExpr = {
+    Bool => BoolExpr::new(<>),
+};
+
+ElementExpr: ElementExpr = {
+    "@element" => ElementExpr::new(),
+};
+
+CountExpr: CountExpr = {
+    "@count" => CountExpr::new(),
+};
+
+IdentifierExpr: IdentifierExpr = {
+    Identifier => IdentifierExpr::new(<>),
+};
+
+ParenExpr: ParenExpr = {
+    "(" <Expr> ")" => ParenExpr::new(<>),
+}
+
+PrimaryExprKind: ExprKind = {
+    IntExpr => <>.into(),
+    FloatExpr => <>.into(),
+    BoolExpr => <>.into(),
+    ElementExpr => <>.into(),
+    CountExpr => <>.into(),
+    IdentifierExpr => <>.into(),
+    ParenExpr => <>.into(),
+};
+
+PrimaryExpr = BaseExpr<PrimaryExprKind>;
+
+IndexExpr: IndexExpr = {
+    <PostfixExpr> "[" <Expr> "]" => IndexExpr::new(<>).into(),
+}
+
+PostfixExprKind: ExprKind = {
+    PrimaryExprKind,
+    IndexExpr => <>.into(),
+};
+
+PostfixExpr: Expr = BaseExpr<PostfixExprKind>;
+
+UnaryExprKind: ExprKind = {
+    UnaryOp UnaryExpr => UnaryExpr::new(<>).into(),
 };
 
 UnaryExpr: Expr = {
     PostfixExpr,
-    @L UnaryOp UnaryExpr @R => Expr::Unary(UnaryExpr::new(<>)),
+    BaseExpr<UnaryExprKind>
+};
+
+BinaryExprKind<Op, PrevExpr>: ExprKind = {
+    BinaryExpr<Op, PrevExpr> Op PrevExpr => BinaryExpr::new(<>).into(),
 };
 
 BinaryExpr<Op, PrevExpr>: Expr = {
     PrevExpr,
-    @L BinaryExpr<Op, PrevExpr> Op PrevExpr @R => Expr::Binary(BinaryExpr::new(<>)),
+    BaseExpr<BinaryExprKind<Op, PrevExpr>>,
 };
 
 MultiplicativeExpr = BinaryExpr<MultiplicativeOp, UnaryExpr>;
@@ -164,54 +191,70 @@ Expr: Expr = {
     LogicalOrExpr,
 };
 
-BlockStmt: BlockStmt = {
-    <@L> "{" <Stmt*> "}" <@R> => BlockStmt::new(<>),
+BaseStmt<T>: Stmt = {
+    <l: @L> <kind: T> <r: @R> => Stmt::new(Span::new(l, r), kind),
 };
 
-DeclStmt: DeclStmt = {
-    <@L> <Type> <Identifier> "=" <Expr> ";" <@R> => DeclStmt::new(<>),
+BlockStmtKind: StmtKind = {
+    "{" <Stmt*> "}" => BlockStmt::new(<>).into(),
 };
 
-AssignStmt: AssignStmt = {
-    <@L> <PostfixExpr> "=" <Expr> ";" <@R> => AssignStmt::new(<>),
+BlockStmt = BaseStmt<BlockStmtKind>;
+
+DeclStmtKind: StmtKind = {
+    <Type> <Identifier> "=" <Expr> ";" => DeclStmt::new(<>).into(),
 };
+
+DeclStmt = BaseStmt<DeclStmtKind>;
+
+AssignStmtKind: StmtKind = {
+    <PostfixExpr> "=" <Expr> ";" => AssignStmt::new(<>).into(),
+};
+
+AssignStmt = BaseStmt<AssignStmtKind>;
 
 IfBlock: Stmt = {
-    BlockStmt => Stmt::Block(<>),
+    BlockStmt,
 };
 
 ElseBlock: Stmt = {
-    BlockStmt => Stmt::Block(<>),
-    IfStmt => Stmt::If(<>),
+    BlockStmt,
+    IfStmt,
 };
 
-IfStmt: IfStmt = {
-    <@L> "if" "(" <Expr> ")" <IfBlock> <("else" <ElseBlock>)?> <@R> => IfStmt::new(<>),
+IfStmtKind: StmtKind = {
+    "if" "(" <Expr> ")" <IfBlock> <("else" <ElseBlock>)?> => IfStmt::new(<>).into(),
 };
+
+IfStmt = BaseStmt<IfStmtKind>;
 
 WhileBlock: Stmt = {
-    BlockStmt => Stmt::Block(<>),
+    BlockStmt,
 };
 
-WhileStmt: WhileStmt = {
-    <@L> "while" "(" <Expr> ")" <WhileBlock> <@R> => WhileStmt::new(<>),
+WhileStmtKind: StmtKind = {
+    "while" "(" <Expr> ")" <WhileBlock> => WhileStmt::new(<>).into(),
 };
 
-ReturnStmt: ReturnStmt = {
-    <@L> "return" ";" <@R> => ReturnStmt::new(<>),
+WhileStmt = BaseStmt<WhileStmtKind>;
+
+ReturnStmtKind: StmtKind = {
+    "return" ";" => ReturnStmt::new().into(),
 };
+
+ReturnStmt = BaseStmt<ReturnStmtKind>;
 
 Stmt: Stmt = {
-    BlockStmt => Stmt::Block(<>),
-    DeclStmt => Stmt::Decl(<>),
-    AssignStmt => Stmt::Assign(<>),
-    IfStmt => Stmt::If(<>),
-    WhileStmt => Stmt::While(<>),
-    ReturnStmt => Stmt::Return(<>),
+    BlockStmt,
+    DeclStmt,
+    AssignStmt,
+    IfStmt,
+    WhileStmt,
+    ReturnStmt,
 };
 
 Param: Param = {
-    @L Type Identifier @R => Param::new(<>),
+    Type Identifier => Param::new(<>),
 };
 
 Params: Vec<Param> = {
@@ -223,9 +266,9 @@ Params: Vec<Param> = {
 };
 
 FuncBlock: Stmt = {
-    BlockStmt => Stmt::Block(<>),
+    BlockStmt,
 };
 
 pub Func: Func = {
-    <@L> "fn" <Identifier> "(" <Params?> ")" <FuncBlock> <@R> => Func::new(<>),
+    <l: @L> "fn" <identifier: Identifier> "(" <params: Params?> ")" <stmt: FuncBlock> <r: @R> => Func::new(Span::new(l, r), identifier, params.unwrap_or_default(), stmt),
 };

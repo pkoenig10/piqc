@@ -41,13 +41,13 @@ impl IrBuilder {
     }
 
     fn stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::Block(ref stmt) => self.block_stmt(stmt),
-            Stmt::Decl(ref stmt) => self.decl_stmt(stmt),
-            Stmt::Assign(ref stmt) => self.assign_stmt(stmt),
-            Stmt::If(ref stmt) => self.if_stmt(stmt),
-            Stmt::While(ref stmt) => self.while_stmt(stmt),
-            Stmt::Return(ref stmt) => self.return_stmt(stmt),
+        match stmt.kind {
+            StmtKind::Block(ref stmt) => self.block_stmt(stmt),
+            StmtKind::Decl(ref stmt) => self.decl_stmt(stmt),
+            StmtKind::Assign(ref stmt) => self.assign_stmt(stmt),
+            StmtKind::If(ref stmt) => self.if_stmt(stmt),
+            StmtKind::While(ref stmt) => self.while_stmt(stmt),
+            StmtKind::Return(ref stmt) => self.return_stmt(stmt),
         }
     }
 
@@ -81,15 +81,15 @@ impl IrBuilder {
             };
         }
 
-        match stmt.dest {
-            Expr::Identifier(ref identifier) => {
-                let variable = identifier.variable.into();
+        match stmt.dest.kind {
+            ExprKind::Identifier(ref expr) => {
+                let variable = expr.identifier.variable.into();
 
                 let value = value!(self.builder.use_var(variable));
 
                 self.builder.def_var(variable, value);
             }
-            Expr::Index(ref expr) => {
+            ExprKind::Index(ref expr) => {
                 let expr_value = self.expr(&expr.expr);
                 let index_value = self.expr(&expr.index);
 
@@ -205,41 +205,42 @@ impl IrBuilder {
     }
 
     fn expr(&mut self, expr: &Expr) -> ir::Value {
-        match expr {
-            Expr::IntLiteral(ref int_literal) => self.int_literal(int_literal),
-            Expr::FloatLiteral(ref float_literal) => self.float_literal(float_literal),
-            Expr::BoolLiteral(ref bool_literal) => self.bool_literal(bool_literal),
-            Expr::Element(_) => self.element(),
-            Expr::Count(_) => self.count(),
-            Expr::Identifier(ref identifier) => self.identifier(identifier),
-            Expr::Unary(ref expr) => self.unary_expr(expr),
-            Expr::Binary(ref expr) => self.binary_expr(expr),
-            Expr::Index(ref expr) => self.index_expr(expr),
+        match expr.kind {
+            ExprKind::Int(ref expr) => self.int_expr(expr),
+            ExprKind::Float(ref expr) => self.float_expr(expr),
+            ExprKind::Bool(ref expr) => self.bool_expr(expr),
+            ExprKind::Element(_) => self.element_expr(),
+            ExprKind::Count(_) => self.count_expr(),
+            ExprKind::Identifier(ref expr) => self.identifier_expr(expr),
+            ExprKind::Unary(ref expr) => self.unary_expr(expr),
+            ExprKind::Binary(ref expr) => self.binary_expr(expr),
+            ExprKind::Index(ref expr) => self.index_expr(expr),
+            ExprKind::Paren(ref expr) => self.paren_expr(expr),
         }
     }
 
-    fn int_literal(&mut self, int_literal: &IntLiteral) -> ir::Value {
-        self.builder.push_int_const_inst(int_literal.value)
+    fn int_expr(&mut self, expr: &IntExpr) -> ir::Value {
+        self.builder.push_int_const_inst(expr.value)
     }
 
-    fn float_literal(&mut self, float_literal: &FloatLiteral) -> ir::Value {
-        self.builder.push_float_const_inst(float_literal.value)
+    fn float_expr(&mut self, expr: &FloatExpr) -> ir::Value {
+        self.builder.push_float_const_inst(expr.value)
     }
 
-    fn bool_literal(&mut self, bool_literal: &BoolLiteral) -> ir::Value {
-        self.builder.push_bool_const_inst(bool_literal.value)
+    fn bool_expr(&mut self, expr: &BoolExpr) -> ir::Value {
+        self.builder.push_bool_const_inst(expr.value)
     }
 
-    fn element(&mut self) -> ir::Value {
+    fn element_expr(&mut self) -> ir::Value {
         self.builder.push_element_inst()
     }
 
-    fn count(&mut self) -> ir::Value {
+    fn count_expr(&mut self) -> ir::Value {
         self.builder.push_count_inst()
     }
 
-    fn identifier(&mut self, identifier: &Identifier) -> ir::Value {
-        self.builder.use_var(identifier.variable.into())
+    fn identifier_expr(&mut self, expr: &IdentifierExpr) -> ir::Value {
+        self.builder.use_var(expr.identifier.variable.into())
     }
 
     fn unary_expr(&mut self, expr: &UnaryExpr) -> ir::Value {
@@ -304,6 +305,10 @@ impl IrBuilder {
         let index_value = self.expr(&expr.index);
 
         self.builder.push_fetch_inst(expr_value, index_value)
+    }
+
+    fn paren_expr(&mut self, expr: &ParenExpr) -> ir::Value {
+        self.expr(&expr.expr)
     }
 
     fn set_predicate_and(&mut self, value: ir::Value) -> Option<ir::Value> {
