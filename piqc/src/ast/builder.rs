@@ -25,7 +25,7 @@ impl IrBuilder {
         self.builder.set_position(entry_ebb);
 
         for param in &func.params {
-            let variable = param.identifier.variable.into();
+            let variable = param.identifier.symbol.into();
             let type_ = param.type_;
             self.builder.push_param(type_);
             self.builder.push_ebb_param(variable, entry_ebb, type_);
@@ -60,7 +60,7 @@ impl IrBuilder {
     fn decl_stmt(&mut self, stmt: &DeclStmt) {
         let expr_value = self.expr(&stmt.expr);
 
-        let variable = stmt.identifier.variable.into();
+        let variable = stmt.identifier.symbol.into();
 
         self.builder.def_var(variable, expr_value);
     }
@@ -83,7 +83,7 @@ impl IrBuilder {
 
         match stmt.dest.kind {
             ExprKind::Identifier(ref expr) => {
-                let variable = expr.identifier.variable.into();
+                let variable = expr.identifier.symbol.into();
 
                 let value = value!(self.builder.use_var(variable));
 
@@ -240,7 +240,7 @@ impl IrBuilder {
     }
 
     fn identifier_expr(&mut self, expr: &IdentifierExpr) -> ir::Value {
-        self.builder.use_var(expr.identifier.variable.into())
+        self.builder.use_var(expr.identifier.symbol.into())
     }
 
     fn unary_expr(&mut self, expr: &UnaryExpr) -> ir::Value {

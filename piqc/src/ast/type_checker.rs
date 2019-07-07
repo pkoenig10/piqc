@@ -7,24 +7,8 @@ pub fn type_check(func: &Func) {
 }
 
 #[derive(Debug)]
-struct Symbol {
-    identifier: Identifier,
-    type_: Type,
-}
-
-impl Symbol {
-    fn new(identifier: Identifier, type_: Type) -> Symbol {
-        Symbol { identifier, type_ }
-    }
-
-    fn type_(&self) -> Type {
-        self.type_
-    }
-}
-
-#[derive(Debug)]
 struct SymbolTable {
-    scopes: Vec<HashMap<Variable, Symbol>>,
+    scopes: Vec<HashMap<Symbol, Type>>,
 }
 
 impl SymbolTable {
@@ -40,18 +24,16 @@ impl SymbolTable {
         self.scopes.pop().unwrap();
     }
 
-    fn get(&self, variable: Variable) -> Option<&Symbol> {
-        for scope in self.scopes.iter().rev() {
-            let symbol = scope.get(&variable);
-            if symbol.is_some() {
-                return symbol;
-            }
-        }
-        None
+    fn get(&self, symbol: Symbol) -> Option<&Type> {
+        self.scopes
+            .iter()
+            .rev()
+            .flat_map(|scope| scope.get(&symbol))
+            .nth(0)
     }
 
-    fn insert(&mut self, variable: Variable, symbol: Symbol) {
-        self.scopes.last_mut().unwrap().insert(variable, symbol);
+    fn insert(&mut self, symbol: Symbol, type_: Type) {
+        self.scopes.last_mut().unwrap().insert(symbol, type_);
     }
 }
 
@@ -88,7 +70,7 @@ impl TypeChecker {
             type_
         );
 
-        self.insert_symbol(&param.identifier, param.type_);
+        self.symbols.insert(param.identifier.symbol, type_);
     }
 
     fn check_stmt(&mut self, stmt: &Stmt) {
@@ -122,7 +104,7 @@ impl TypeChecker {
         };
         assert!(valid, "Mismatched types '{}' and '{}'", type_, expr_type);
 
-        self.insert_symbol(&stmt.identifier, type_);
+        self.symbols.insert(stmt.identifier.symbol, type_);
     }
 
     fn check_assign_stmt(&mut self, stmt: &AssignStmt) {
@@ -180,7 +162,7 @@ impl TypeChecker {
     }
 
     fn check_identifier_expr(&mut self, expr: &IdentifierExpr) -> Type {
-        self.get_symbol(&expr.identifier).type_()
+        *self.symbols.get(expr.identifier.symbol).unwrap()
     }
 
     fn check_unary_expr(&mut self, expr: &UnaryExpr) -> Type {
@@ -268,14 +250,5 @@ impl TypeChecker {
 
     fn check_paren_expr(&mut self, expr: &ParenExpr) -> Type {
         self.check_expr(&expr.expr)
-    }
-
-    fn insert_symbol(&mut self, identifier: &Identifier, type_: Type) {
-        let symbol = Symbol::new(*identifier, type_);
-        self.symbols.insert(identifier.variable, symbol);
-    }
-
-    fn get_symbol(&self, identifier: &Identifier) -> &Symbol {
-        self.symbols.get(identifier.variable).unwrap()
     }
 }

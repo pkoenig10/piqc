@@ -8,10 +8,7 @@ pub struct Param {
 
 impl Param {
     pub fn new(type_: Type, identifier: Identifier) -> Param {
-        Param {
-            type_,
-            identifier,
-        }
+        Param { type_, identifier }
     }
 }
 
@@ -24,12 +21,7 @@ pub struct Func {
 }
 
 impl Func {
-    pub fn new(
-        span: Span,
-        identifier: Identifier,
-        params: Vec<Param>,
-        stmt: Stmt,
-    ) -> Func {
+    pub fn new(span: Span, identifier: Identifier, params: Vec<Param>, stmt: Stmt) -> Func {
         Func {
             span,
             identifier,

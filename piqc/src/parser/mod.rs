@@ -15,17 +15,17 @@ pub fn parse(input: &str) -> ast::Func {
 }
 
 pub struct Context<'input> {
-    variables: InternMap<ast::Variable, &'input str>,
+    symbols: InternMap<ast::Symbol, &'input str>,
 }
 
 impl<'input> Context<'input> {
     pub fn new() -> Context<'input> {
         Context {
-            variables: InternMap::new(),
+            symbols: InternMap::new(),
         }
     }
 
-    pub fn intern_variable(&mut self, name: &'input str) -> ast::Variable {
-        self.variables.intern(name)
+    pub fn intern_symbol(&mut self, name: &'input str) -> ast::Symbol {
+        self.symbols.intern(name)
     }
 }

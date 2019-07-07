@@ -16,6 +16,10 @@ Bool: bool = {
     "false" => false,
 };
 
+Symbol: Symbol = {
+    r"[A-Za-z_][0-9A-Za-z_]*" => context.intern_symbol(<>)
+};
+
 UnaryOp: UnaryOp = {
     "-" => UnaryOp::Negate,
     "~" => UnaryOp::BitNot,
@@ -70,14 +74,6 @@ LogicalOrOp: BinaryOp = {
     "||" => BinaryOp::LogicalOr,
 };
 
-Variable: Variable = {
-    r"[A-Za-z_][0-9A-Za-z_]*" => context.intern_variable(<>)
-};
-
-Identifier: Identifier = {
-    <l: @L> <variable: Variable> <r: @R> => Identifier::new(Span::new(l, r), variable),
-};
-
 TypeQualifier: TypeQualifier = {
     "uniform" => TypeQualifier::Uniform,
     "varying" => TypeQualifier::Varying,
@@ -93,6 +89,10 @@ TypeKind: TypeKind = {
 Type: Type = {
     <qualifier: TypeQualifier?> <kind: TypeKind> => Type::new(qualifier.unwrap_or(TypeQualifier::Varying), kind),
 }
+
+Identifier: Identifier = {
+    <l: @L> <symbol: Symbol> <r: @R> => Identifier::new(Span::new(l, r), symbol),
+};
 
 BaseExpr<T>: Expr = {
     <l: @L> <kind: T> <r: @R> => Expr::new(Span::new(l, r), kind),

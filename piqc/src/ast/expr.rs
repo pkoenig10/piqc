@@ -5,23 +5,23 @@ use crate::ast::*;
 use crate::ir;
 use crate::util::Id;
 
-id!(pub Variable, "v");
+id!(pub Symbol, "s");
 
-impl From<Variable> for ir::Variable {
-    fn from(variable: Variable) -> ir::Variable {
-        ir::Variable::new(variable.get())
+impl From<Symbol> for ir::Variable {
+    fn from(symbol: Symbol) -> ir::Variable {
+        ir::Variable::new(symbol.get())
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Identifier {
     pub span: Span,
-    pub variable: Variable,
+    pub symbol: Symbol,
 }
 
 impl Identifier {
-    pub fn new(span: Span, variable: Variable) -> Identifier {
-        Identifier { span, variable }
+    pub fn new(span: Span, symbol: Symbol) -> Identifier {
+        Identifier { span, symbol }
     }
 }
 
