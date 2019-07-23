@@ -14,5 +14,8 @@ ebb1(%2):
 
 ebb2():
     %10 = iconst 0
-    store %2, %0, %10
+    %11 = iconst 2
+    %12 = shl %10, %11
+    %13 = add %0, %12
+    store %2, %13
     ret

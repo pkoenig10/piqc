@@ -7,5 +7,8 @@ ebb0(%0, %1):
 ebb1(%3):
     %2 = iconst 42
     %5 = iconst 0
-    store %2, %3, %5
+    %6 = iconst 2
+    %7 = shl %5, %6
+    %8 = add %3, %7
+    store %2, %8
     ret

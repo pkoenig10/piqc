@@ -8,7 +8,6 @@ mod parser;
 
 pub fn compile(s: &str) -> String {
     let func = parser::parse(s);
-    ast::type_check(&func);
 
     let mut func = ast::generate_ir(&func);
 

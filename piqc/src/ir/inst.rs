@@ -250,12 +250,11 @@ impl fmt::Display for BinaryInst {
 pub struct FetchInst {
     pub dest: Value,
     pub addr: Value,
-    pub offset: Value,
 }
 
 impl FetchInst {
-    pub fn new(dest: Value, addr: Value, offset: Value) -> FetchInst {
-        FetchInst { dest, addr, offset }
+    pub fn new(dest: Value, addr: Value) -> FetchInst {
+        FetchInst { dest, addr }
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
@@ -266,7 +265,7 @@ impl FetchInst {
 
 impl fmt::Display for FetchInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} = fetch {}, {}", self.dest, self.addr, self.offset)
+        write!(f, "{} = fetch {}", self.dest, self.addr)
     }
 }
 
@@ -274,24 +273,22 @@ impl fmt::Display for FetchInst {
 pub struct StoreInst {
     pub src: Value,
     pub addr: Value,
-    pub offset: Value,
 }
 
 impl StoreInst {
-    pub fn new(src: Value, addr: Value, offset: Value) -> StoreInst {
-        StoreInst { src, addr, offset }
+    pub fn new(src: Value, addr: Value) -> StoreInst {
+        StoreInst { src, addr }
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.src, old, new);
         replace_value(&mut self.addr, old, new);
-        replace_value(&mut self.offset, old, new);
     }
 }
 
 impl fmt::Display for StoreInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "store {}, {}, {}", self.src, self.addr, self.offset)
+        write!(f, "store {}, {}", self.src, self.addr)
     }
 }
 

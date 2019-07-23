@@ -2,16 +2,8 @@ use enum_dispatch::enum_dispatch;
 use std::fmt;
 
 use crate::ast::*;
-use crate::ir;
-use crate::util::Id;
 
 id!(pub Symbol, "s");
-
-impl From<Symbol> for ir::Variable {
-    fn from(symbol: Symbol) -> ir::Variable {
-        ir::Variable::new(symbol.get())
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Identifier {
@@ -90,16 +82,14 @@ impl IdentifierExpr {
 #[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     Negate,
-    BitNot,
-    LogicalNot,
+    Not,
 }
 
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match self {
             UnaryOp::Negate => "-",
-            UnaryOp::BitNot => "~",
-            UnaryOp::LogicalNot => "!",
+            UnaryOp::Not => "!",
         };
         write!(f, "{}", op)
     }

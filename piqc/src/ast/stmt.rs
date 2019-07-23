@@ -53,15 +53,15 @@ impl ReturnStmt {
 
 #[derive(Debug)]
 pub struct IfStmt {
-    pub expr: Expr,
+    pub cond: Expr,
     pub if_stmt: Box<Stmt>,
     pub else_stmt: Option<Box<Stmt>>,
 }
 
 impl IfStmt {
-    pub fn new(expr: Expr, if_stmt: Stmt, else_stmt: Option<Stmt>) -> IfStmt {
+    pub fn new(cond: Expr, if_stmt: Stmt, else_stmt: Option<Stmt>) -> IfStmt {
         IfStmt {
-            expr,
+            cond,
             if_stmt: Box::new(if_stmt),
             else_stmt: else_stmt.map(Box::new),
         }
@@ -70,14 +70,14 @@ impl IfStmt {
 
 #[derive(Debug)]
 pub struct WhileStmt {
-    pub expr: Expr,
+    pub cond: Expr,
     pub stmt: Box<Stmt>,
 }
 
 impl WhileStmt {
-    pub fn new(expr: Expr, stmt: Stmt) -> WhileStmt {
+    pub fn new(cond: Expr, stmt: Stmt) -> WhileStmt {
         WhileStmt {
-            expr,
+            cond,
             stmt: Box::new(stmt),
         }
     }

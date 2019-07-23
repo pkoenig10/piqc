@@ -319,16 +319,16 @@ impl FuncBuilder {
         dest
     }
 
-    pub fn push_fetch_inst(&mut self, addr: Value, offset: Value) -> Value {
+    pub fn push_fetch_inst(&mut self, addr: Value) -> Value {
         let type_ = self.get_fetch_inst_type(addr);
         let dest = self.create_value(type_);
-        let inst = InstData::Fetch(FetchInst::new(dest, addr, offset));
+        let inst = InstData::Fetch(FetchInst::new(dest, addr));
         self.push_inst(inst);
         dest
     }
 
-    pub fn push_store_inst(&mut self, src: Value, addr: Value, offset: Value) {
-        let inst = InstData::Store(StoreInst::new(src, addr, offset));
+    pub fn push_store_inst(&mut self, src: Value, addr: Value) {
+        let inst = InstData::Store(StoreInst::new(src, addr));
         self.push_inst(inst);
     }
 
@@ -427,11 +427,11 @@ impl FuncBuilder {
     fn get_binary_inst_type(&self, op: BinaryOp, left: Value, right: Value) -> Type {
         let left_type = self.get_value_type(left);
         let right_type = self.get_value_type(right);
-        assert_eq!(
-            left_type.kind, right_type.kind,
-            "Invalid binary instruction '{}' with operand types '{}' and '{}'",
-            op, left_type, right_type
-        );
+        // assert_eq!(
+        //     left_type.kind, right_type.kind,
+        //     "Invalid binary instruction '{}' with operand types '{}' and '{}'",
+        //     op, left_type, right_type
+        // );
 
         let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
 

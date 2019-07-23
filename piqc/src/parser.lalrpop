@@ -22,8 +22,7 @@ Symbol: Symbol = {
 
 UnaryOp: UnaryOp = {
     "-" => UnaryOp::Negate,
-    "~" => UnaryOp::BitNot,
-    "!" => UnaryOp::LogicalNot,
+    "!" => UnaryOp::Not,
 };
 
 MultiplicativeOp: BinaryOp = {
@@ -259,7 +258,7 @@ Param: Param = {
 
 Params: Vec<Param> = {
     <params: (<Params> ",")?> <param: Param> => {
-        let mut params = params.unwrap_or_else(Vec::new);
+        let mut params = params.unwrap_or_default();
         params.push(param);
         params
     },

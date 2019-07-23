@@ -1,7 +1,11 @@
 fn if_return_uniform(uniform int *output) {
+    int foo = 0;
+
     if (@element < 8) {
         return;
     }
 
-    output[@element] = 42;
+    foo = 42;
+
+    output[@element] = foo;
 }

@@ -8,5 +8,8 @@ ebb0(%0):
     %5 = iconst 1
     %6 = select %4, %5, %1
     %7 = element
-    store %6, %0, %7
+    %8 = iconst 2
+    %9 = shl %7, %8
+    %10 = add %0, %9
+    store %6, %10
     ret

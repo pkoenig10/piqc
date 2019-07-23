@@ -1,13 +1,16 @@
 func(uniform int*):
 
 ebb0(%0):
-    %1 = element
-    %2 = iconst 8
-    %3 = icmp lt %1, %2
-    %4 = not %3
-    %5 = iconst 42
-    %6 = element
-    %7 = fetch %0, %6
-    %8 = select %4, %5, %7
-    store %8, %0, %6
+    %1 = iconst 0
+    %2 = element
+    %3 = iconst 8
+    %4 = icmp lt %2, %3
+    %5 = not %4
+    %6 = iconst 42
+    %7 = select %5, %6, %1
+    %8 = element
+    %9 = iconst 2
+    %10 = shl %8, %9
+    %11 = add %0, %10
+    store %7, %11
     ret

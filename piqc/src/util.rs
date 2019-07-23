@@ -9,7 +9,6 @@ pub trait Id: Copy {
     fn get(self) -> usize;
 }
 
-#[macro_export]
 macro_rules! id {
     ($vis:vis $id:ident, $prefix:expr) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -31,6 +30,36 @@ macro_rules! id {
             }
         }
     };
+}
+
+macro_rules! fn_block {
+    ($expr:expr) => {
+        (|| $expr)();
+    };
+}
+
+#[derive(Debug)]
+pub struct Generator<K> {
+    next: usize,
+    phantom: PhantomData<K>,
+}
+
+impl<K> Generator<K>
+where
+    K: Id,
+{
+    pub fn new() -> Generator<K> {
+        Generator {
+            next: 0,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn next(&mut self) -> K {
+        let id = K::new(self.next);
+        self.next += 1;
+        id
+    }
 }
 
 #[derive(Debug)]
