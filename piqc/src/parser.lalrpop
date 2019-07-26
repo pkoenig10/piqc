@@ -73,20 +73,24 @@ LogicalOrOp: BinaryOp = {
     "||" => BinaryOp::LogicalOr,
 };
 
-TypeQualifier: TypeQualifier = {
-    "uniform" => TypeQualifier::Uniform,
-    "varying" => TypeQualifier::Varying,
+Variability: Variability = {
+    "uniform" => Variability::Uniform,
+    "varying" => Variability::Varying,
+}
+
+PrimType: PrimType = {
+    "int" => PrimType::Int,
+    "float" => PrimType::Float,
+    "bool" => PrimType::Bool,
 }
 
 TypeKind: TypeKind = {
-    "int" => TypeKind::INT,
-    "float" => TypeKind::FLOAT,
-    "bool" => TypeKind::BOOL,
-    <TypeKind> "*" => TypeKind::new_ptr(<>),
+    PrimType => TypeKind::Prim(<>),
+    <PrimType> "*" => TypeKind::Ptr(<>),
 }
 
 Type: Type = {
-    <qualifier: TypeQualifier?> <kind: TypeKind> => Type::new(qualifier.unwrap_or(TypeQualifier::Varying), kind),
+    <variability: Variability?> <kind: TypeKind> => Type::new(variability.unwrap_or(Variability::Varying), kind),
 }
 
 Identifier: Identifier = {

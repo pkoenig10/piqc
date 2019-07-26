@@ -1,4 +1,4 @@
-func(uniform int*, uniform bool):
+func(uniform int, uniform bool):
 
 ebb0(%0, %1):
     br allf %1 ebb1(%0)

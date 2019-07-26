@@ -1,4 +1,4 @@
-func(uniform int*):
+func(uniform int):
 
 ebb0(%0):
     %1 = iconst 0

@@ -2,13 +2,13 @@ use crate::ast::*;
 
 #[derive(Debug)]
 pub struct Param {
-    pub type_: Type,
+    pub ty: Type,
     pub identifier: Identifier,
 }
 
 impl Param {
-    pub fn new(type_: Type, identifier: Identifier) -> Param {
-        Param { type_, identifier }
+    pub fn new(ty: Type, identifier: Identifier) -> Param {
+        Param { ty, identifier }
     }
 }
 

@@ -2,7 +2,7 @@ pub use self::builder::FuncBuilder;
 pub use self::func::Func;
 pub use self::inst::{BinaryOp, BranchOp, CompOp, UnaryOp};
 pub use self::pass::run_dead_code;
-pub use self::types::{Type, TypeKind, TypeQualifier};
+pub use self::types::{Type, TypeKind, Variability};
 pub use self::verifier::verify_ir;
 
 use std::fmt;

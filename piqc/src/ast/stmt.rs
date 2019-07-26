@@ -15,15 +15,15 @@ impl BlockStmt {
 
 #[derive(Debug)]
 pub struct DeclStmt {
-    pub type_: Type,
+    pub ty: Type,
     pub identifier: Identifier,
     pub expr: Expr,
 }
 
 impl DeclStmt {
-    pub fn new(type_: Type, identifier: Identifier, expr: Expr) -> DeclStmt {
+    pub fn new(ty: Type, identifier: Identifier, expr: Expr) -> DeclStmt {
         DeclStmt {
-            type_,
+            ty,
             identifier,
             expr,
         }
@@ -43,7 +43,7 @@ impl AssignStmt {
 }
 
 #[derive(Debug)]
-pub struct ReturnStmt {}
+pub struct ReturnStmt;
 
 impl ReturnStmt {
     pub fn new() -> ReturnStmt {

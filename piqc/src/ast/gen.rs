@@ -47,9 +47,9 @@ impl SymbolTable {
             .nth(0)
     }
 
-    fn insert_ok(&mut self, symbol: Symbol, type_: Type) -> ir::Variable {
+    fn insert_ok(&mut self, symbol: Symbol, ty: Type) -> ir::Variable {
         let variable = self.generator.next();
-        self.insert(symbol, Ok((type_, variable)));
+        self.insert(symbol, Ok((ty, variable)));
         variable
     }
 
@@ -91,9 +91,9 @@ impl IrGenerator {
         self.builder.set_position(entry_ebb);
 
         for param in &func.params {
-            if let Ok((type_, variable)) = self.param(param) {
-                self.builder.push_param(type_);
-                self.builder.push_ebb_param(variable, entry_ebb, type_);
+            if let Ok((ty, variable)) = self.param(param) {
+                self.builder.push_param(ty.into());
+                self.builder.push_ebb_param(variable, entry_ebb, ty.into());
             }
         }
 
@@ -114,15 +114,15 @@ impl IrGenerator {
     }
 
     fn param(&mut self, param: &Param) -> Result<(Type, ir::Variable), ()> {
-        match param.type_.qualifier {
-            TypeQualifier::Uniform => {
-                let variable = self.symbols.insert_ok(param.identifier.symbol, param.type_);
-                Ok((param.type_, variable))
+        match param.ty.variability {
+            Variability::Uniform => {
+                let variable = self.symbols.insert_ok(param.identifier.symbol, param.ty);
+                Ok((param.ty, variable))
             }
             _ => {
                 self.symbols.insert_err(param.identifier.symbol);
                 self.errors
-                    .push(format!("Invalid parameter with type '{}'", param.type_));
+                    .push(format!("Invalid parameter with type '{}'", param.ty));
                 Err(())
             }
         }
@@ -155,20 +155,20 @@ impl IrGenerator {
         let result = fn_block!({
             let (expr_type, expr_value) = expr_result?;
 
-            if !is_valid_assign(stmt.type_, expr_type) {
+            if !is_valid_assign(stmt.ty, expr_type) {
                 self.errors.push(format!(
                     "Mismatched types '{}' and '{}'",
-                    stmt.type_, expr_type
+                    stmt.ty, expr_type
                 ));
                 return Err(());
             }
 
-            Ok((stmt.type_, expr_value))
+            Ok((stmt.ty, expr_value))
         });
 
         match result {
-            Ok((type_, value)) => {
-                let variable = self.symbols.insert_ok(stmt.identifier.symbol, type_);
+            Ok((ty, value)) => {
+                let variable = self.symbols.insert_ok(stmt.identifier.symbol, ty);
                 self.builder.def_var(variable, value);
             }
             Err(_) => {
@@ -234,8 +234,8 @@ impl IrGenerator {
         });
 
         match result {
-            Ok((cond_type, cond_value)) => match cond_type.qualifier {
-                TypeQualifier::Uniform => {
+            Ok((cond_type, cond_value)) => match cond_type.variability {
+                Variability::Uniform => {
                     let else_ebb = self.builder.create_ebb();
                     let merge_ebb = match stmt.else_stmt {
                         Some(_) => self.builder.create_ebb(),
@@ -257,7 +257,7 @@ impl IrGenerator {
 
                     self.builder.set_position(merge_ebb);
                 }
-                TypeQualifier::Varying => {
+                Variability::Varying => {
                     let prev_predicate = self.set_predicate_and(cond_value);
 
                     self.stmt(&stmt.if_stmt);
@@ -299,8 +299,8 @@ impl IrGenerator {
         });
 
         match result {
-            Ok((cond_type, cond_value)) => match cond_type.qualifier {
-                TypeQualifier::Uniform => {
+            Ok((cond_type, cond_value)) => match cond_type.variability {
+                Variability::Uniform => {
                     self.builder
                         .push_branch_inst(ir::BranchOp::AllFalse, cond_value, after_ebb);
 
@@ -309,7 +309,7 @@ impl IrGenerator {
 
                     self.builder.set_position(after_ebb);
                 }
-                TypeQualifier::Varying => {
+                Variability::Varying => {
                     let prev_predicate = self.set_predicate_and(cond_value);
 
                     if let Some(predicate) = self.predicate {
@@ -403,15 +403,15 @@ impl IrGenerator {
     }
 
     fn identifier_expr_value(&mut self, expr: &IdentifierExpr) -> Result<(Type, ir::Value), ()> {
-        self.identifier_expr(expr).map(|(type_, variable)| {
+        self.identifier_expr(expr).map(|(ty, variable)| {
             let value = self.builder.use_var(variable);
-            (type_, value)
+            (ty, value)
         })
     }
 
     fn identifier_expr_place(&mut self, expr: &IdentifierExpr) -> Result<(Type, Place), ()> {
         self.identifier_expr(expr)
-            .map(|(type_, variable)| (type_, Place::Variable(variable)))
+            .map(|(ty, variable)| (ty, Place::Variable(variable)))
     }
 
     fn identifier_expr(&mut self, expr: &IdentifierExpr) -> Result<(Type, ir::Variable), ()> {
@@ -431,7 +431,7 @@ impl IrGenerator {
         let (expr_type, expr_value) = expr_result?;
 
         let result = fn_block!({
-            let (type_, value) = match (expr.op, expr_type.kind) {
+            let (ty, value) = match (expr.op, expr_type.kind) {
                 (UnaryOp::Negate, TypeKind::INT) => {
                     let zero = self.builder.push_int_const_inst(0);
                     let value = self
@@ -460,7 +460,7 @@ impl IrGenerator {
                 _ => return Err(()),
             };
 
-            Ok((type_, value))
+            Ok((ty, value))
         });
 
         if let Err(_) = result {
@@ -505,10 +505,10 @@ impl IrGenerator {
                 }
             };
 
-            let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
-            let type_ = Type::new(qualifier, kind);
+            let variability = variability(left_type.variability, right_type.variability);
+            let ty = Type::new(variability, kind);
 
-            Ok((type_, value))
+            Ok((ty, value))
         });
 
         if let Err(_) = result {
@@ -522,15 +522,15 @@ impl IrGenerator {
     }
 
     fn index_expr_value(&mut self, expr: &IndexExpr) -> Result<(Type, ir::Value), ()> {
-        self.index_expr(expr).map(|(type_, value)| {
-            let value = self.builder.push_fetch_inst(value);
-            (type_, value)
+        self.index_expr(expr).map(|(ty, value)| {
+            let value = self.builder.push_fetch_inst(value, ty.kind.into());
+            (ty, value)
         })
     }
 
     fn index_expr_place(&mut self, expr: &IndexExpr) -> Result<(Type, Place), ()> {
         self.index_expr(expr)
-            .map(|(type_, value)| (type_, Place::Addr(value)))
+            .map(|(ty, value)| (ty, Place::Addr(value)))
     }
 
     fn index_expr(&mut self, expr: &IndexExpr) -> Result<(Type, ir::Value), ()> {
@@ -542,7 +542,9 @@ impl IrGenerator {
 
         let result = fn_block!({
             let (kind, value) = match (expr_type.kind, index_type.kind) {
-                (TypeKind::Ptr(type_), TypeKind::INT) => {
+                (TypeKind::Ptr(prim), TypeKind::INT) => {
+                    let kind = TypeKind::Prim(prim);
+
                     let two = self.builder.push_int_const_inst(2);
                     let offset_value =
                         self.builder
@@ -551,17 +553,17 @@ impl IrGenerator {
                         self.builder
                             .push_binary_inst(ir::BinaryOp::Add, expr_value, offset_value);
 
-                    (type_.deref(), value)
+                    (kind, value)
                 }
                 _ => {
                     return Err(());
                 }
             };
 
-            let qualifier = TypeQualifier::get(expr_type.qualifier, index_type.qualifier);
-            let type_ = Type::new(qualifier, kind);
+            let variability = variability(expr_type.variability, index_type.variability);
+            let ty = Type::new(variability, kind);
 
-            Ok((type_, value))
+            Ok((ty, value))
         });
 
         if let Err(_) = result {
@@ -625,8 +627,8 @@ impl IrGenerator {
 }
 
 fn is_valid_assign(variable_type: Type, expr_type: Type) -> bool {
-    if let (TypeQualifier::Uniform, TypeQualifier::Varying) =
-        (variable_type.qualifier, expr_type.qualifier)
+    if let (Variability::Uniform, Variability::Varying) =
+        (variable_type.variability, expr_type.variability)
     {
         return false;
     }
@@ -676,5 +678,12 @@ fn binary_kind(op: BinaryOp, kind: TypeKind) -> BinaryKind {
         (BinaryOp::Ge, TypeKind::INT) => BinaryKind::IntComp(ir::CompOp::Ge),
         (BinaryOp::Ge, TypeKind::FLOAT) => BinaryKind::FloatComp(ir::CompOp::Ge),
         _ => BinaryKind::None,
+    }
+}
+
+pub fn variability(variability1: Variability, variability2: Variability) -> Variability {
+    match (variability1, variability2) {
+        (Variability::Uniform, Variability::Uniform) => Variability::Uniform,
+        _ => Variability::Varying,
     }
 }

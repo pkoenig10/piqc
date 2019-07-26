@@ -7,12 +7,13 @@ pub use self::gen::generate_ir;
 pub use self::stmt::{
     AssignStmt, BlockStmt, DeclStmt, IfStmt, ReturnStmt, Stmt, StmtKind, WhileStmt,
 };
-pub use crate::ir::{Type, TypeKind, TypeQualifier};
+pub use self::types::{PrimType, Type, TypeKind, Variability};
 
 mod expr;
 mod func;
 mod gen;
 mod stmt;
+mod types;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Span {

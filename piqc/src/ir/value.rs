@@ -2,15 +2,15 @@ use crate::ir::*;
 
 #[derive(Debug)]
 pub struct ValueData {
-    type_: Type,
+    ty: Type,
 }
 
 impl ValueData {
-    pub fn new(type_: Type) -> ValueData {
-        ValueData { type_ }
+    pub fn new(ty: Type) -> ValueData {
+        ValueData { ty }
     }
 
-    pub fn type_(&self) -> Type {
-        self.type_
+    pub fn ty(&self) -> Type {
+        self.ty
     }
 }

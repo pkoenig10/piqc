@@ -168,12 +168,12 @@ impl FuncBuilder {
         }
     }
 
-    pub fn push_param(&mut self, type_: Type) {
-        self.func.push_param(type_);
+    pub fn push_param(&mut self, ty: Type) {
+        self.func.push_param(ty);
     }
 
-    pub fn push_ebb_param(&mut self, variable: Variable, ebb: Ebb, type_: Type) -> Value {
-        let value = self.create_value(type_);
+    pub fn push_ebb_param(&mut self, variable: Variable, ebb: Ebb, ty: Type) -> Value {
+        let value = self.create_value(ty);
         self.func.push_ebb_param(ebb, value);
 
         let header_block = self.header_blocks[&ebb];
@@ -200,22 +200,22 @@ impl FuncBuilder {
             return value;
         }
 
-        let mut calls = Vec::new();
-        calls.push(block);
+        let mut blocks = Vec::new();
+        blocks.push(block);
 
         let mut ebbs = Vec::new();
         let mut predecessors = HashSet::new();
-        let mut type_ = None;
+        let mut var_type = None;
 
-        while let Some(block) = calls.pop() {
+        while let Some(block) = blocks.pop() {
             match self.use_var_in_ebb(block, variable) {
                 Ok(value) => {
                     let value_type = self.get_value_type(value);
-                    let type_ = *type_.get_or_insert(value_type);
+                    let var_type = *var_type.get_or_insert(value_type);
                     assert_eq!(
-                        type_, value_type,
+                        var_type, value_type,
                         "Variable defined with multiple types '{}' and '{}'",
-                        type_, value_type
+                        var_type, value_type
                     );
                 }
                 Err(data) => {
@@ -228,16 +228,16 @@ impl FuncBuilder {
 
                     for &predecessor in &data.predecessors {
                         predecessors.insert(predecessor);
-                        calls.push(predecessor.block);
+                        blocks.push(predecessor.block);
                     }
                 }
             };
         }
 
-        let type_ = type_.unwrap();
+        let var_type = var_type.unwrap();
 
         for ebb in ebbs {
-            self.push_ebb_param(variable, ebb, type_);
+            self.push_ebb_param(variable, ebb, var_type);
         }
         for predecessor in predecessors {
             let block = predecessor.block;
@@ -263,20 +263,20 @@ impl FuncBuilder {
     }
 
     pub fn get_value_type(&self, value: Value) -> Type {
-        self.func.value(value).type_()
+        self.func.value(value).ty()
     }
 
     pub fn push_int_const_inst(&mut self, value: i32) -> Value {
-        let type_ = Type::new(TypeQualifier::Uniform, TypeKind::INT);
-        let dest = self.create_value(type_);
+        let ty = Type::new(Variability::Uniform, TypeKind::Int);
+        let dest = self.create_value(ty);
         let inst = InstData::IntConst(IntConstInst::new(dest, value));
         self.push_inst(inst);
         dest
     }
 
     pub fn push_float_const_inst(&mut self, value: f32) -> Value {
-        let type_ = Type::new(TypeQualifier::Uniform, TypeKind::FLOAT);
-        let dest = self.create_value(type_);
+        let ty = Type::new(Variability::Uniform, TypeKind::Float);
+        let dest = self.create_value(ty);
         let inst = InstData::FloatConst(FloatConstInst::new(dest, value));
         self.push_inst(inst);
         dest
@@ -304,24 +304,24 @@ impl FuncBuilder {
     }
 
     pub fn push_unary_inst(&mut self, op: UnaryOp, src: Value) -> Value {
-        let type_ = self.get_unary_inst_type(src);
-        let dest = self.create_value(type_);
+        let ty = self.get_unary_inst_type(src);
+        let dest = self.create_value(ty);
         let inst = InstData::Unary(UnaryInst::new(op, dest, src));
         self.push_inst(inst);
         dest
     }
 
     pub fn push_binary_inst(&mut self, op: BinaryOp, left: Value, right: Value) -> Value {
-        let type_ = self.get_binary_inst_type(op, left, right);
-        let dest = self.create_value(type_);
+        let ty = self.get_binary_inst_type(op, left, right);
+        let dest = self.create_value(ty);
         let inst = InstData::Binary(BinaryInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
 
-    pub fn push_fetch_inst(&mut self, addr: Value) -> Value {
-        let type_ = self.get_fetch_inst_type(addr);
-        let dest = self.create_value(type_);
+    pub fn push_fetch_inst(&mut self, addr: Value, kind: TypeKind) -> Value {
+        let ty = self.get_fetch_inst_type(addr, kind);
+        let dest = self.create_value(ty);
         let inst = InstData::Fetch(FetchInst::new(dest, addr));
         self.push_inst(inst);
         dest
@@ -333,24 +333,24 @@ impl FuncBuilder {
     }
 
     pub fn push_int_comp_inst(&mut self, op: CompOp, left: Value, right: Value) -> Value {
-        let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.create_value(type_);
+        let ty = self.get_comp_inst_type(op, left, right);
+        let dest = self.create_value(ty);
         let inst = InstData::IntComp(IntCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
 
     pub fn push_float_comp_inst(&mut self, op: CompOp, left: Value, right: Value) -> Value {
-        let type_ = self.get_comp_inst_type(op, left, right);
-        let dest = self.create_value(type_);
+        let ty = self.get_comp_inst_type(op, left, right);
+        let dest = self.create_value(ty);
         let inst = InstData::FloatComp(FloatCompInst::new(op, dest, left, right));
         self.push_inst(inst);
         dest
     }
 
     pub fn push_select_inst(&mut self, cond: Value, left: Value, right: Value) -> Value {
-        let type_ = self.get_select_inst_type(left, right);
-        let dest = self.create_value(type_);
+        let ty = self.get_select_inst_type(left, right);
+        let dest = self.create_value(ty);
         let inst = InstData::Select(SelectInst::new(dest, cond, left, right));
         self.push_inst(inst);
         dest
@@ -388,8 +388,8 @@ impl FuncBuilder {
         }
     }
 
-    fn create_value(&mut self, type_: Type) -> Value {
-        self.func.create_value(ValueData::new(type_))
+    fn create_value(&mut self, ty: Type) -> Value {
+        self.func.create_value(ValueData::new(ty))
     }
 
     fn create_target(&mut self, ebb: Ebb) -> Target {
@@ -427,56 +427,65 @@ impl FuncBuilder {
     fn get_binary_inst_type(&self, op: BinaryOp, left: Value, right: Value) -> Type {
         let left_type = self.get_value_type(left);
         let right_type = self.get_value_type(right);
-        // assert_eq!(
-        //     left_type.kind, right_type.kind,
-        //     "Invalid binary instruction '{}' with operand types '{}' and '{}'",
-        //     op, left_type, right_type
-        // );
 
-        let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
+        assert_eq!(
+            left_type.kind, right_type.kind,
+            "Invalid binary instruction '{}' with operand types '{}' and '{}'",
+            op, left_type, right_type
+        );
 
-        Type::new(qualifier, left_type.kind)
+        let variability = variability(left_type.variability, right_type.variability);
+
+        Type::new(variability, left_type.kind)
     }
 
-    fn get_fetch_inst_type(&self, addr: Value) -> Type {
+    fn get_fetch_inst_type(&self, addr: Value, kind: TypeKind) -> Type {
         let addr_type = self.get_value_type(addr);
 
-        let kind = match addr_type.kind {
-            TypeKind::Ptr(ty) => ty.deref(),
-            _ => panic!(
-                "Invalid fetch instruction with operand type `{}`",
-                addr_type
-            ),
-        };
+        assert_eq!(
+            addr_type.kind,
+            TypeKind::Int,
+            "Invalid fetch instruction with operand type `{}`",
+            addr_type
+        );
 
-        Type::new(addr_type.qualifier, kind)
+        Type::new(addr_type.variability, kind)
     }
 
     fn get_comp_inst_type(&self, op: CompOp, left: Value, right: Value) -> Type {
         let left_type = self.get_value_type(left);
         let right_type = self.get_value_type(right);
+
         assert_eq!(
             left_type.kind, right_type.kind,
             "Invalid comparison instruction '{}' with operand types '{}' and '{}'",
             op, left_type, right_type
         );
 
-        let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
+        let variability = variability(left_type.variability, right_type.variability);
 
-        Type::new(qualifier, TypeKind::BOOL)
+        Type::new(variability, TypeKind::Bool)
     }
 
     fn get_select_inst_type(&self, left: Value, right: Value) -> Type {
         let left_type = self.get_value_type(left);
         let right_type = self.get_value_type(right);
+
         assert_eq!(
             left_type.kind, right_type.kind,
             "Invalid select instruction with operand types '{}' and '{}'",
             left_type, right_type
         );
 
-        let qualifier = TypeQualifier::get(left_type.qualifier, right_type.qualifier);
+        let variability = variability(left_type.variability, right_type.variability);
 
-        Type::new(qualifier, left_type.kind)
+        Type::new(variability, left_type.kind)
+    }
+}
+
+pub fn variability(variability1: Variability, variability2: Variability) -> Variability {
+    match (variability1, variability2) {
+        (Variability::Uniform, Variability::Uniform) => Variability::Uniform,
+        _ => Variability::Varying,
     }
 }

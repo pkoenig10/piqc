@@ -1,4 +1,4 @@
-func(uniform int*, uniform float*, uniform bool*):
+func(uniform int, uniform int, uniform int):
 
 ebb0(%0, %1, %2):
     %3 = iconst 0
