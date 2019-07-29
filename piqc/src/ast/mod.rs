@@ -17,12 +17,15 @@ mod types;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Span {
-    left: usize,
-    right: usize,
+    left: u32,
+    right: u32,
 }
 
 impl Span {
     pub fn new(left: usize, right: usize) -> Span {
-        Span { left, right }
+        Span {
+            left: left as u32,
+            right: right as u32,
+        }
     }
 }

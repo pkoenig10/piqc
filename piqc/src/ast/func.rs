@@ -2,13 +2,18 @@ use crate::ast::*;
 
 #[derive(Debug)]
 pub struct Param {
+    span: Span,
     pub ty: Type,
     pub identifier: Identifier,
 }
 
 impl Param {
-    pub fn new(ty: Type, identifier: Identifier) -> Param {
-        Param { ty, identifier }
+    pub fn new(span: Span, ty: Type, identifier: Identifier) -> Param {
+        Param {
+            span,
+            ty,
+            identifier,
+        }
     }
 }
 
@@ -17,7 +22,7 @@ pub struct Func {
     span: Span,
     pub identifier: Identifier,
     pub params: Vec<Param>,
-    pub stmt: Stmt,
+    pub stmt: Box<Stmt>,
 }
 
 impl Func {
@@ -26,7 +31,7 @@ impl Func {
             span,
             identifier,
             params,
-            stmt,
+            stmt: Box::new(stmt),
         }
     }
 }

@@ -257,7 +257,7 @@ Stmt: Stmt = {
 };
 
 Param: Param = {
-    Type Identifier => Param::new(<>),
+    <l: @L> <ty: Type> <identifier: Identifier> <r: @R> => Param::new(Span::new(l, r), ty, identifier),
 };
 
 Params: Vec<Param> = {

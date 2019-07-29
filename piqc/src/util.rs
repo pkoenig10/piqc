@@ -12,15 +12,15 @@ pub trait Id: Copy {
 macro_rules! id {
     ($vis:vis $id:ident, $prefix:expr) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        $vis struct $id(usize);
+        $vis struct $id(u32);
 
         impl $crate::util::Id for $id {
             fn new(id: usize) -> Self {
-                $id(id)
+                $id(id as u32)
             }
 
             fn get(self) -> usize {
-                self.0
+                self.0 as usize
             }
         }
 

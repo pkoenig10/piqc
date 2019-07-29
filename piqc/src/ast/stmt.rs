@@ -17,7 +17,7 @@ impl BlockStmt {
 pub struct DeclStmt {
     pub ty: Type,
     pub identifier: Identifier,
-    pub expr: Expr,
+    pub expr: Box<Expr>,
 }
 
 impl DeclStmt {
@@ -25,20 +25,23 @@ impl DeclStmt {
         DeclStmt {
             ty,
             identifier,
-            expr,
+            expr: Box::new(expr),
         }
     }
 }
 
 #[derive(Debug)]
 pub struct AssignStmt {
-    pub dest: Expr,
-    pub src: Expr,
+    pub dest: Box<Expr>,
+    pub src: Box<Expr>,
 }
 
 impl AssignStmt {
     pub fn new(dest: Expr, src: Expr) -> AssignStmt {
-        AssignStmt { dest, src }
+        AssignStmt {
+            dest: Box::new(dest),
+            src: Box::new(src),
+        }
     }
 }
 
@@ -53,7 +56,7 @@ impl ReturnStmt {
 
 #[derive(Debug)]
 pub struct IfStmt {
-    pub cond: Expr,
+    pub cond: Box<Expr>,
     pub if_stmt: Box<Stmt>,
     pub else_stmt: Option<Box<Stmt>>,
 }
@@ -61,7 +64,7 @@ pub struct IfStmt {
 impl IfStmt {
     pub fn new(cond: Expr, if_stmt: Stmt, else_stmt: Option<Stmt>) -> IfStmt {
         IfStmt {
-            cond,
+            cond: Box::new(cond),
             if_stmt: Box::new(if_stmt),
             else_stmt: else_stmt.map(Box::new),
         }
@@ -70,14 +73,14 @@ impl IfStmt {
 
 #[derive(Debug)]
 pub struct WhileStmt {
-    pub cond: Expr,
+    pub cond: Box<Expr>,
     pub stmt: Box<Stmt>,
 }
 
 impl WhileStmt {
     pub fn new(cond: Expr, stmt: Stmt) -> WhileStmt {
         WhileStmt {
-            cond,
+            cond: Box::new(cond),
             stmt: Box::new(stmt),
         }
     }
