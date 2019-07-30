@@ -51,7 +51,7 @@ impl BoolExpr {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ElementExpr;
+pub struct ElementExpr {}
 
 impl ElementExpr {
     pub fn new() -> ElementExpr {
@@ -60,7 +60,7 @@ impl ElementExpr {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct CountExpr;
+pub struct CountExpr {}
 
 impl CountExpr {
     pub fn new() -> CountExpr {

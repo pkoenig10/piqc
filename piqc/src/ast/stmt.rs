@@ -46,7 +46,7 @@ impl AssignStmt {
 }
 
 #[derive(Debug)]
-pub struct ReturnStmt;
+pub struct ReturnStmt {}
 
 impl ReturnStmt {
     pub fn new() -> ReturnStmt {

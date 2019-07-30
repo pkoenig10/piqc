@@ -269,7 +269,7 @@ impl FuncBuilder {
     pub fn push_int_const_inst(&mut self, value: i32) -> Value {
         let ty = Type::new(Variability::Uniform, TypeKind::Int);
         let dest = self.create_value(ty);
-        let inst = InstData::IntConst(IntConstInst::new(dest, value));
+        let inst = IntConstInst::new(dest, value).into();
         self.push_inst(inst);
         dest
     }
@@ -277,28 +277,28 @@ impl FuncBuilder {
     pub fn push_float_const_inst(&mut self, value: f32) -> Value {
         let ty = Type::new(Variability::Uniform, TypeKind::Float);
         let dest = self.create_value(ty);
-        let inst = InstData::FloatConst(FloatConstInst::new(dest, value));
+        let inst = FloatConstInst::new(dest, value).into();
         self.push_inst(inst);
         dest
     }
 
     pub fn push_bool_const_inst(&mut self, value: bool) -> Value {
         let dest = self.create_value(Type::UNIFORM_BOOL);
-        let inst = InstData::BoolConst(BoolConstInst::new(dest, value));
+        let inst = BoolConstInst::new(dest, value).into();
         self.push_inst(inst);
         dest
     }
 
     pub fn push_element_inst(&mut self) -> Value {
         let dest = self.create_value(Type::VARYING_INT);
-        let inst = InstData::Element(ElementInst::new(dest));
+        let inst = ElementInst::new(dest).into();
         self.push_inst(inst);
         dest
     }
 
     pub fn push_count_inst(&mut self) -> Value {
         let dest = self.create_value(Type::UNIFORM_INT);
-        let inst = InstData::Count(CountInst::new(dest));
+        let inst = CountInst::new(dest).into();
         self.push_inst(inst);
         dest
     }
@@ -306,7 +306,7 @@ impl FuncBuilder {
     pub fn push_unary_inst(&mut self, op: UnaryOp, src: Value) -> Value {
         let ty = self.get_unary_inst_type(src);
         let dest = self.create_value(ty);
-        let inst = InstData::Unary(UnaryInst::new(op, dest, src));
+        let inst = UnaryInst::new(op, dest, src).into();
         self.push_inst(inst);
         dest
     }
@@ -314,7 +314,7 @@ impl FuncBuilder {
     pub fn push_binary_inst(&mut self, op: BinaryOp, left: Value, right: Value) -> Value {
         let ty = self.get_binary_inst_type(op, left, right);
         let dest = self.create_value(ty);
-        let inst = InstData::Binary(BinaryInst::new(op, dest, left, right));
+        let inst = BinaryInst::new(op, dest, left, right).into();
         self.push_inst(inst);
         dest
     }
@@ -322,28 +322,28 @@ impl FuncBuilder {
     pub fn push_fetch_inst(&mut self, addr: Value, kind: TypeKind) -> Value {
         let ty = self.get_fetch_inst_type(addr, kind);
         let dest = self.create_value(ty);
-        let inst = InstData::Fetch(FetchInst::new(dest, addr));
+        let inst = FetchInst::new(dest, addr).into();
         self.push_inst(inst);
         dest
     }
 
     pub fn push_store_inst(&mut self, src: Value, addr: Value) {
-        let inst = InstData::Store(StoreInst::new(src, addr));
+        let inst = StoreInst::new(src, addr).into();
         self.push_inst(inst);
     }
 
-    pub fn push_int_comp_inst(&mut self, op: CompOp, left: Value, right: Value) -> Value {
-        let ty = self.get_comp_inst_type(op, left, right);
+    pub fn push_int_cmp_inst(&mut self, op: CmpOp, left: Value, right: Value) -> Value {
+        let ty = self.get_cmp_inst_type(op, left, right);
         let dest = self.create_value(ty);
-        let inst = InstData::IntComp(IntCompInst::new(op, dest, left, right));
+        let inst = IntCmpInst::new(op, dest, left, right).into();
         self.push_inst(inst);
         dest
     }
 
-    pub fn push_float_comp_inst(&mut self, op: CompOp, left: Value, right: Value) -> Value {
-        let ty = self.get_comp_inst_type(op, left, right);
+    pub fn push_float_cmp_inst(&mut self, op: CmpOp, left: Value, right: Value) -> Value {
+        let ty = self.get_cmp_inst_type(op, left, right);
         let dest = self.create_value(ty);
-        let inst = InstData::FloatComp(FloatCompInst::new(op, dest, left, right));
+        let inst = FloatCmpInst::new(op, dest, left, right).into();
         self.push_inst(inst);
         dest
     }
@@ -351,25 +351,25 @@ impl FuncBuilder {
     pub fn push_select_inst(&mut self, cond: Value, left: Value, right: Value) -> Value {
         let ty = self.get_select_inst_type(left, right);
         let dest = self.create_value(ty);
-        let inst = InstData::Select(SelectInst::new(dest, cond, left, right));
+        let inst = SelectInst::new(dest, cond, left, right).into();
         self.push_inst(inst);
         dest
     }
 
     pub fn push_jump_inst(&mut self, ebb: Ebb) {
         let target = self.create_target(ebb);
-        let inst = InstData::Jump(JumpInst::new(target));
+        let inst = JumpInst::new(target).into();
         self.push_inst(inst);
     }
 
     pub fn push_branch_inst(&mut self, op: BranchOp, cond: Value, ebb: Ebb) {
         let target = self.create_target(ebb);
-        let inst = InstData::Branch(BranchInst::new(op, cond, target));
+        let inst = BranchInst::new(op, cond, target).into();
         self.push_inst(inst);
     }
 
     pub fn push_return_inst(&mut self) {
-        let inst = InstData::Return(ReturnInst::new());
+        let inst = ReturnInst::new().into();
         self.push_inst(inst);
     }
 
@@ -452,13 +452,13 @@ impl FuncBuilder {
         Type::new(addr_type.variability, kind)
     }
 
-    fn get_comp_inst_type(&self, op: CompOp, left: Value, right: Value) -> Type {
+    fn get_cmp_inst_type(&self, op: CmpOp, left: Value, right: Value) -> Type {
         let left_type = self.get_value_type(left);
         let right_type = self.get_value_type(right);
 
         assert_eq!(
             left_type.kind, right_type.kind,
-            "Invalid comparison instruction '{}' with operand types '{}' and '{}'",
+            "Invalid cmparison instruction '{}' with operand types '{}' and '{}'",
             op, left_type, right_type
         );
 

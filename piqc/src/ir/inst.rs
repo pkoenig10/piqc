@@ -1,4 +1,7 @@
+use enum_dispatch::enum_dispatch;
+use enum_display_derive::Display;
 use std::fmt;
+use std::fmt::Display;
 
 use crate::ir::*;
 
@@ -57,6 +60,8 @@ impl IntConstInst {
     }
 }
 
+impl InstTrait for IntConstInst {}
+
 impl fmt::Display for IntConstInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} = iconst {}", self.dest, self.value)
@@ -74,6 +79,8 @@ impl FloatConstInst {
         FloatConstInst { dest, value }
     }
 }
+
+impl InstTrait for FloatConstInst {}
 
 impl fmt::Display for FloatConstInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -93,6 +100,8 @@ impl BoolConstInst {
     }
 }
 
+impl InstTrait for BoolConstInst {}
+
 impl fmt::Display for BoolConstInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} = bconst {}", self.dest, self.value)
@@ -110,6 +119,8 @@ impl ElementInst {
     }
 }
 
+impl InstTrait for ElementInst {}
+
 impl fmt::Display for ElementInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} = element", self.dest)
@@ -126,6 +137,8 @@ impl CountInst {
         CountInst { dest }
     }
 }
+
+impl InstTrait for CountInst {}
 
 impl fmt::Display for CountInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -160,6 +173,13 @@ impl UnaryInst {
     }
 
     pub fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+        replace_value(&mut self.src, old, new);
+    }
+}
+
+impl InstTrait for UnaryInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
         replace_value(&mut self.src, old, new);
     }
@@ -228,8 +248,10 @@ impl BinaryInst {
             right,
         }
     }
+}
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
+impl InstTrait for BinaryInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
         replace_value(&mut self.left, old, new);
         replace_value(&mut self.right, old, new);
@@ -256,8 +278,10 @@ impl FetchInst {
     pub fn new(dest: Value, addr: Value) -> FetchInst {
         FetchInst { dest, addr }
     }
+}
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
+impl InstTrait for FetchInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
         replace_value(&mut self.addr, old, new);
     }
@@ -279,8 +303,10 @@ impl StoreInst {
     pub fn new(src: Value, addr: Value) -> StoreInst {
         StoreInst { src, addr }
     }
+}
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
+impl InstTrait for StoreInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.src, old, new);
         replace_value(&mut self.addr, old, new);
     }
@@ -293,7 +319,7 @@ impl fmt::Display for StoreInst {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum CompOp {
+pub enum CmpOp {
     Eq,
     Ne,
     Lt,
@@ -302,46 +328,48 @@ pub enum CompOp {
     Ge,
 }
 
-impl fmt::Display for CompOp {
+impl fmt::Display for CmpOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match self {
-            CompOp::Eq => "eq",
-            CompOp::Ne => "ne",
-            CompOp::Lt => "lt",
-            CompOp::Gt => "gt",
-            CompOp::Le => "le",
-            CompOp::Ge => "ge",
+            CmpOp::Eq => "eq",
+            CmpOp::Ne => "ne",
+            CmpOp::Lt => "lt",
+            CmpOp::Gt => "gt",
+            CmpOp::Le => "le",
+            CmpOp::Ge => "ge",
         };
         write!(f, "{}", op)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct IntCompInst {
-    pub op: CompOp,
+pub struct IntCmpInst {
+    pub op: CmpOp,
     pub dest: Value,
     pub left: Value,
     pub right: Value,
 }
 
-impl IntCompInst {
-    pub fn new(op: CompOp, dest: Value, left: Value, right: Value) -> IntCompInst {
-        IntCompInst {
+impl IntCmpInst {
+    pub fn new(op: CmpOp, dest: Value, left: Value, right: Value) -> IntCmpInst {
+        IntCmpInst {
             op,
             dest,
             left,
             right,
         }
     }
+}
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
+impl InstTrait for IntCmpInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
         replace_value(&mut self.left, old, new);
         replace_value(&mut self.right, old, new);
     }
 }
 
-impl fmt::Display for IntCompInst {
+impl fmt::Display for IntCmpInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -352,31 +380,33 @@ impl fmt::Display for IntCompInst {
 }
 
 #[derive(Debug, Clone)]
-pub struct FloatCompInst {
-    pub op: CompOp,
+pub struct FloatCmpInst {
+    pub op: CmpOp,
     pub dest: Value,
     pub left: Value,
     pub right: Value,
 }
 
-impl FloatCompInst {
-    pub fn new(op: CompOp, dest: Value, left: Value, right: Value) -> FloatCompInst {
-        FloatCompInst {
+impl FloatCmpInst {
+    pub fn new(op: CmpOp, dest: Value, left: Value, right: Value) -> FloatCmpInst {
+        FloatCmpInst {
             op,
             dest,
             left,
             right,
         }
     }
+}
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
+impl InstTrait for FloatCmpInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
         replace_value(&mut self.left, old, new);
         replace_value(&mut self.right, old, new);
     }
 }
 
-impl fmt::Display for FloatCompInst {
+impl fmt::Display for FloatCmpInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -403,8 +433,10 @@ impl SelectInst {
             right,
         }
     }
+}
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
+impl InstTrait for SelectInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
         replace_value(&mut self.dest, old, new);
         replace_value(&mut self.cond, old, new);
         replace_value(&mut self.left, old, new);
@@ -431,8 +463,22 @@ impl JumpInst {
     pub fn new(target: Target) -> JumpInst {
         JumpInst { target }
     }
+}
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
+impl InstTrait for JumpInst {
+    fn is_terminator(&self) -> bool {
+        true
+    }
+
+    fn target(&self) -> Option<&Target> {
+        Some(&self.target)
+    }
+
+    fn target_mut(&mut self) -> Option<&mut Target> {
+        Some(&mut self.target)
+    }
+
+    fn replace_value(&mut self, old: Value, new: Value) {
         self.target.replace_arg(old, new);
     }
 }
@@ -474,8 +520,18 @@ impl BranchInst {
     pub fn new(op: BranchOp, cond: Value, target: Target) -> BranchInst {
         BranchInst { op, cond, target }
     }
+}
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
+impl InstTrait for BranchInst {
+    fn target(&self) -> Option<&Target> {
+        Some(&self.target)
+    }
+
+    fn target_mut(&mut self) -> Option<&mut Target> {
+        Some(&mut self.target)
+    }
+
+    fn replace_value(&mut self, old: Value, new: Value) {
         self.target.replace_arg(old, new);
     }
 }
@@ -495,13 +551,20 @@ impl ReturnInst {
     }
 }
 
+impl InstTrait for ReturnInst {
+    fn is_terminator(&self) -> bool {
+        true
+    }
+}
+
 impl fmt::Display for ReturnInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ret")
     }
 }
 
-#[derive(Debug, Clone)]
+#[enum_dispatch]
+#[derive(Debug, Display, Clone)]
 pub enum InstData {
     IntConst(IntConstInst),
     FloatConst(FloatConstInst),
@@ -512,79 +575,29 @@ pub enum InstData {
     Binary(BinaryInst),
     Fetch(FetchInst),
     Store(StoreInst),
-    IntComp(IntCompInst),
-    FloatComp(FloatCompInst),
+    IntCmp(IntCmpInst),
+    FloatCmp(FloatCmpInst),
     Select(SelectInst),
     Jump(JumpInst),
     Branch(BranchInst),
     Return(ReturnInst),
 }
 
-impl InstData {
-    pub fn is_terminator(&self) -> bool {
-        match self {
-            InstData::Jump(_) | InstData::Return(_) => true,
-            _ => false,
-        }
+#[enum_dispatch(InstData)]
+pub trait InstTrait: fmt::Display {
+    fn is_terminator(&self) -> bool {
+        false
     }
 
-    pub fn target(&self) -> Option<&Target> {
-        match self {
-            InstData::Jump(ref inst) => Some(&inst.target),
-            InstData::Branch(ref inst) => Some(&inst.target),
-            _ => None,
-        }
+    fn target(&self) -> Option<&Target> {
+        None
     }
 
-    pub fn target_mut(&mut self) -> Option<&mut Target> {
-        match self {
-            InstData::Jump(ref mut inst) => Some(&mut inst.target),
-            InstData::Branch(ref mut inst) => Some(&mut inst.target),
-            _ => None,
-        }
+    fn target_mut(&mut self) -> Option<&mut Target> {
+        None
     }
 
-    pub fn replace_value(&mut self, old: Value, new: Value) {
-        match self {
-            InstData::IntConst(_) => {}
-            InstData::FloatConst(_) => {}
-            InstData::BoolConst(_) => {}
-            InstData::Element(_) => {}
-            InstData::Count(_) => {}
-            InstData::Unary(ref mut inst) => inst.replace_value(old, new),
-            InstData::Binary(ref mut inst) => inst.replace_value(old, new),
-            InstData::Fetch(ref mut inst) => inst.replace_value(old, new),
-            InstData::Store(ref mut inst) => inst.replace_value(old, new),
-            InstData::IntComp(ref mut inst) => inst.replace_value(old, new),
-            InstData::FloatComp(ref mut inst) => inst.replace_value(old, new),
-            InstData::Select(ref mut inst) => inst.replace_value(old, new),
-            InstData::Jump(ref mut inst) => inst.replace_value(old, new),
-            InstData::Branch(ref mut inst) => inst.replace_value(old, new),
-            InstData::Return(_) => {}
-        }
-    }
-}
-
-impl fmt::Display for InstData {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            InstData::IntConst(ref inst) => write!(f, "{}", inst),
-            InstData::FloatConst(ref inst) => write!(f, "{}", inst),
-            InstData::BoolConst(ref inst) => write!(f, "{}", inst),
-            InstData::Element(ref inst) => write!(f, "{}", inst),
-            InstData::Count(ref inst) => write!(f, "{}", inst),
-            InstData::Unary(ref inst) => write!(f, "{}", inst),
-            InstData::Binary(ref inst) => write!(f, "{}", inst),
-            InstData::Fetch(ref inst) => write!(f, "{}", inst),
-            InstData::Store(ref inst) => write!(f, "{}", inst),
-            InstData::IntComp(ref inst) => write!(f, "{}", inst),
-            InstData::FloatComp(ref inst) => write!(f, "{}", inst),
-            InstData::Select(ref inst) => write!(f, "{}", inst),
-            InstData::Jump(ref inst) => write!(f, "{}", inst),
-            InstData::Branch(ref inst) => write!(f, "{}", inst),
-            InstData::Return(ref inst) => write!(f, "{}", inst),
-        }
-    }
+    fn replace_value(&mut self, _old: Value, _new: Value) {}
 }
 
 fn replace_value(value: &mut Value, old: Value, new: Value) {

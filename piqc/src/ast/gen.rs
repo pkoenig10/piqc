@@ -490,14 +490,14 @@ impl IrGenerator {
                     let value = self.builder.push_binary_inst(op, left_value, right_value);
                     (left_type.kind, value)
                 }
-                BinaryKind::IntComp(op) => {
-                    let value = self.builder.push_int_comp_inst(op, left_value, right_value);
+                BinaryKind::IntCmp(op) => {
+                    let value = self.builder.push_int_cmp_inst(op, left_value, right_value);
                     (TypeKind::BOOL, value)
                 }
-                BinaryKind::FloatComp(op) => {
+                BinaryKind::FloatCmp(op) => {
                     let value = self
                         .builder
-                        .push_float_comp_inst(op, left_value, right_value);
+                        .push_float_cmp_inst(op, left_value, right_value);
                     (TypeKind::BOOL, value)
                 }
                 BinaryKind::None => {
@@ -642,8 +642,8 @@ fn is_valid_assign(variable_type: Type, expr_type: Type) -> bool {
 
 enum BinaryKind {
     Binary(ir::BinaryOp),
-    IntComp(ir::CompOp),
-    FloatComp(ir::CompOp),
+    IntCmp(ir::CmpOp),
+    FloatCmp(ir::CmpOp),
     None,
 }
 
@@ -665,18 +665,18 @@ fn binary_kind(op: BinaryOp, kind: TypeKind) -> BinaryKind {
         (BinaryOp::BitOr, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Or),
         (BinaryOp::LogicalOr, TypeKind::BOOL) => BinaryKind::Binary(ir::BinaryOp::Or),
         (BinaryOp::BitXor, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Xor),
-        (BinaryOp::Eq, TypeKind::INT) => BinaryKind::IntComp(ir::CompOp::Eq),
-        (BinaryOp::Eq, TypeKind::FLOAT) => BinaryKind::FloatComp(ir::CompOp::Eq),
-        (BinaryOp::Ne, TypeKind::INT) => BinaryKind::IntComp(ir::CompOp::Ne),
-        (BinaryOp::Ne, TypeKind::FLOAT) => BinaryKind::FloatComp(ir::CompOp::Ne),
-        (BinaryOp::Lt, TypeKind::INT) => BinaryKind::IntComp(ir::CompOp::Lt),
-        (BinaryOp::Lt, TypeKind::FLOAT) => BinaryKind::FloatComp(ir::CompOp::Lt),
-        (BinaryOp::Gt, TypeKind::INT) => BinaryKind::IntComp(ir::CompOp::Gt),
-        (BinaryOp::Gt, TypeKind::FLOAT) => BinaryKind::FloatComp(ir::CompOp::Gt),
-        (BinaryOp::Le, TypeKind::INT) => BinaryKind::IntComp(ir::CompOp::Le),
-        (BinaryOp::Le, TypeKind::FLOAT) => BinaryKind::FloatComp(ir::CompOp::Le),
-        (BinaryOp::Ge, TypeKind::INT) => BinaryKind::IntComp(ir::CompOp::Ge),
-        (BinaryOp::Ge, TypeKind::FLOAT) => BinaryKind::FloatComp(ir::CompOp::Ge),
+        (BinaryOp::Eq, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Eq),
+        (BinaryOp::Eq, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Eq),
+        (BinaryOp::Ne, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Ne),
+        (BinaryOp::Ne, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Ne),
+        (BinaryOp::Lt, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Lt),
+        (BinaryOp::Lt, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Lt),
+        (BinaryOp::Gt, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Gt),
+        (BinaryOp::Gt, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Gt),
+        (BinaryOp::Le, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Le),
+        (BinaryOp::Le, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Le),
+        (BinaryOp::Ge, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Ge),
+        (BinaryOp::Ge, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Ge),
         _ => BinaryKind::None,
     }
 }

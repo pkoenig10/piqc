@@ -247,12 +247,12 @@ impl<'a> DeadCodePass<'a> {
                 analysis.insert_use(data.src, inst);
                 analysis.insert_use(data.addr, inst);
             }
-            InstData::IntComp(ref data) => {
+            InstData::IntCmp(ref data) => {
                 analysis.insert_use(data.left, inst);
                 analysis.insert_use(data.right, inst);
                 analysis.insert_def(data.dest, inst);
             }
-            InstData::FloatComp(ref data) => {
+            InstData::FloatCmp(ref data) => {
                 analysis.insert_use(data.left, inst);
                 analysis.insert_use(data.right, inst);
                 analysis.insert_def(data.dest, inst);
