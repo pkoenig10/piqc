@@ -8,16 +8,28 @@ pub fn generate_ir(func: &Func) -> ir::Func {
     IrGenerator::new().func(func).unwrap()
 }
 
-enum Place {
-    Variable(ir::Variable),
+enum Value {
+    Var(ir::Variable),
+    Val(ir::Value),
+    Idx(ir::Value),
     Addr(ir::Value),
 }
 
-type SymbolData = Result<(Type, ir::Variable), ()>;
+enum BinaryKind {
+    Binary(ir::BinaryOp),
+    IntCmp(ir::CmpOp),
+    FloatCmp(ir::CmpOp),
+}
+
+type ExprResult = Result<(Type, Value), ()>;
+
+type BinaryResult = Result<(Type, BinaryKind), ()>;
+
+type SymbolResult = Result<(Type, ir::Variable), ()>;
 
 #[derive(Debug)]
 struct SymbolTable {
-    scopes: Vec<HashMap<Symbol, SymbolData>>,
+    scopes: Vec<HashMap<Symbol, SymbolResult>>,
     generator: Generator<ir::Variable>,
 }
 
@@ -39,7 +51,7 @@ impl SymbolTable {
             .expect("Failed to pop scope from symbol table");
     }
 
-    fn get(&self, symbol: Symbol) -> Option<&SymbolData> {
+    fn get(&self, symbol: Symbol) -> Option<&SymbolResult> {
         self.scopes
             .iter()
             .rev()
@@ -57,11 +69,11 @@ impl SymbolTable {
         self.insert(symbol, Err(()));
     }
 
-    fn insert(&mut self, symbol: Symbol, data: SymbolData) {
+    fn insert(&mut self, symbol: Symbol, result: SymbolResult) {
         self.scopes
             .last_mut()
             .expect("Failed to get current scope from symbol")
-            .insert(symbol, data);
+            .insert(symbol, result);
     }
 }
 
@@ -91,9 +103,10 @@ impl IrGenerator {
         self.builder.set_position(entry_ebb);
 
         for param in &func.params {
-            if let Ok((ty, variable)) = self.param(param) {
-                self.builder.push_param(ty.into());
-                self.builder.push_ebb_param(variable, entry_ebb, ty.into());
+            if let Ok(variable) = self.param(param) {
+                self.builder.push_param(param.ty.into());
+                self.builder
+                    .push_ebb_param(variable, entry_ebb, param.ty.into());
             }
         }
 
@@ -113,11 +126,13 @@ impl IrGenerator {
         Ok(self.builder.build())
     }
 
-    fn param(&mut self, param: &Param) -> Result<(Type, ir::Variable), ()> {
-        match param.ty.variability {
-            Variability::Uniform => {
+    fn param(&mut self, param: &Param) -> Result<ir::Variable, ()> {
+        match param.ty {
+            Type::Prim(Variability::Uniform, _)
+            | Type::PrimRef(Variability::Uniform, _)
+            | Type::ArrayRef(Variability::Uniform, _) => {
                 let variable = self.symbols.insert_ok(param.identifier.symbol, param.ty);
-                Ok((param.ty, variable))
+                Ok(variable)
             }
             _ => {
                 self.symbols.insert_err(param.identifier.symbol);
@@ -136,7 +151,7 @@ impl IrGenerator {
             StmtKind::If(ref stmt) => self.if_stmt(stmt),
             StmtKind::While(ref stmt) => self.while_stmt(stmt),
             StmtKind::Return(ref stmt) => self.return_stmt(stmt),
-        }
+        };
     }
 
     fn block_stmt(&mut self, stmt: &BlockStmt) {
@@ -150,9 +165,9 @@ impl IrGenerator {
     }
 
     fn decl_stmt(&mut self, stmt: &DeclStmt) {
-        let expr_result = self.expr(&stmt.expr);
-
         let result = fn_block!({
+            let expr_result = self.expr_value(&stmt.expr);
+
             let (expr_type, expr_value) = expr_result?;
 
             if !is_valid_assign(stmt.ty, expr_type) {
@@ -163,15 +178,15 @@ impl IrGenerator {
                 return Err(());
             }
 
-            Ok((stmt.ty, expr_value))
+            Ok(expr_value)
         });
 
         match result {
-            Ok((ty, value)) => {
-                let variable = self.symbols.insert_ok(stmt.identifier.symbol, ty);
+            Ok(value) => {
+                let variable = self.symbols.insert_ok(stmt.identifier.symbol, stmt.ty);
                 self.builder.def_var(variable, value);
             }
-            Err(_) => {
+            Err(()) => {
                 self.symbols.insert_err(stmt.identifier.symbol);
             }
         };
@@ -179,99 +194,109 @@ impl IrGenerator {
 
     fn assign_stmt(&mut self, stmt: &AssignStmt) {
         let src_result = self.expr(&stmt.src);
-        let dest_result = self.expr_place(&stmt.dest);
+        let dest_result = self.expr(&stmt.dest);
 
-        let result = fn_block!({
-            let (src_type, src_value) = src_result?;
-            let (dest_type, dest_place) = dest_result?;
+        let (src_type, src_value) = unwrap_or_return!(src_result);
+        let (dest_type, dest_value) = unwrap_or_return!(dest_result);
 
-            if !is_valid_assign(dest_type, src_type) {
-                self.errors.push(format!(
-                    "Mismatched types '{}' and '{}'",
-                    dest_type, src_type
-                ));
-                return Err(());
-            }
+        if !is_valid_assign(dest_type, src_type) {
+            self.errors.push(format!(
+                "Mismatched types '{}' and '{}'",
+                dest_type, src_type
+            ));
+            return;
+        }
 
-            Ok((dest_place, src_value))
-        });
+        match dest_value {
+            Value::Var(dest_variable) => {
+                let src_value = self.resolve_value(src_type, src_value);
 
-        match result {
-            Ok((Place::Variable(variable), src_value)) => {
                 let src_value = match self.predicate {
                     Some(predicate) => {
-                        let prev_value = self.builder.use_var(variable);
+                        let prev_value = self.builder.use_var(dest_variable);
                         self.builder
                             .push_select_inst(predicate, src_value, prev_value)
                     }
                     None => src_value,
                 };
 
-                self.builder.def_var(variable, src_value);
+                self.builder.def_var(dest_variable, src_value);
             }
-            Ok((Place::Addr(addr_value), src_value)) => {
-                self.builder.push_store_inst(src_value, addr_value);
+            Value::Idx(dest_idx) => {
+                let src_value = self.resolve_value(src_type, src_value);
+
+                self.builder
+                    .push_write_inst(self.predicate, src_value, dest_idx);
             }
-            Err(_) => {}
+            Value::Addr(dest_addr) => {
+                let src_idx = match src_value {
+                    Value::Idx(src_idx) => src_idx,
+                    _ => {
+                        let src_value = self.resolve_value(src_type, src_value);
+                        let tmp_idx = self.builder.push_alloc_inst(1);
+                        self.builder
+                            .push_write_inst(self.predicate, src_value, tmp_idx);
+                        tmp_idx
+                    }
+                };
+
+                self.builder.push_store_inst(src_idx, dest_addr)
+            }
+            _ => {
+                self.errors.push(format!("Invalid place expression"));
+                return;
+            }
         };
     }
 
     fn if_stmt(&mut self, stmt: &IfStmt) {
-        let cond_result = self.expr(&stmt.cond);
+        let cond_result = self.expr_value(&stmt.cond);
 
-        let result = fn_block!({
-            let (cond_type, cond_value) = cond_result?;
+        let (cond_type, cond_value) = unwrap_or_return!(cond_result);
 
-            if cond_type.kind != TypeKind::BOOL {
+        match cond_type {
+            Type::UNIFORM_BOOL => {
+                let else_ebb = self.builder.create_ebb();
+                let merge_ebb = match stmt.else_stmt {
+                    Some(_) => self.builder.create_ebb(),
+                    None => else_ebb,
+                };
+
+                self.builder
+                    .push_branch_inst(ir::BranchOp::AllFalse, cond_value, else_ebb);
+
+                self.stmt(&stmt.if_stmt);
+                self.builder.push_jump_inst(merge_ebb);
+
+                if let Some(ref else_stmt) = stmt.else_stmt {
+                    self.builder.set_position(else_ebb);
+
+                    self.stmt(else_stmt);
+                    self.builder.push_jump_inst(merge_ebb);
+                }
+
+                self.builder.set_position(merge_ebb);
+            }
+            Type::VARYING_BOOL => {
+                let prev_predicate = self.set_predicate_and(cond_value);
+
+                self.stmt(&stmt.if_stmt);
+                self.reset_predicate(prev_predicate);
+
+                if let Some(ref else_stmt) = stmt.else_stmt {
+                    self.set_predicate_and_not(cond_value);
+
+                    self.stmt(else_stmt);
+                    self.reset_predicate(prev_predicate);
+                }
+            }
+            _ => {
                 self.errors.push(format!(
-                    "Invalid if statement condition with type '{}'",
+                    "Invalid while statement condition with type '{}'",
                     cond_type
                 ));
-                return Err(());
+                return;
             }
-
-            Ok((cond_type, cond_value))
-        });
-
-        match result {
-            Ok((cond_type, cond_value)) => match cond_type.variability {
-                Variability::Uniform => {
-                    let else_ebb = self.builder.create_ebb();
-                    let merge_ebb = match stmt.else_stmt {
-                        Some(_) => self.builder.create_ebb(),
-                        None => else_ebb,
-                    };
-
-                    self.builder
-                        .push_branch_inst(ir::BranchOp::AllFalse, cond_value, else_ebb);
-
-                    self.stmt(&stmt.if_stmt);
-                    self.builder.push_jump_inst(merge_ebb);
-
-                    if let Some(ref else_stmt) = stmt.else_stmt {
-                        self.builder.set_position(else_ebb);
-
-                        self.stmt(else_stmt);
-                        self.builder.push_jump_inst(merge_ebb);
-                    }
-
-                    self.builder.set_position(merge_ebb);
-                }
-                Variability::Varying => {
-                    let prev_predicate = self.set_predicate_and(cond_value);
-
-                    self.stmt(&stmt.if_stmt);
-                    self.reset_predicate(prev_predicate);
-
-                    if let Some(ref else_stmt) = stmt.else_stmt {
-                        self.set_predicate_and_not(cond_value);
-
-                        self.stmt(else_stmt);
-                        self.reset_predicate(prev_predicate);
-                    }
-                }
-            },
-            Err(_) => {}
         };
     }
 
@@ -282,49 +307,41 @@ impl IrGenerator {
         self.builder.push_jump_inst(header_ebb);
         self.builder.set_position(header_ebb);
 
-        let cond_result = self.expr(&stmt.cond);
+        let cond_result = self.expr_value(&stmt.cond);
 
-        let result = fn_block!({
-            let (cond_type, cond_value) = cond_result?;
+        let (cond_type, cond_value) = unwrap_or_return!(cond_result);
 
-            if cond_type.kind != TypeKind::BOOL {
+        match cond_type {
+            Type::UNIFORM_BOOL => {
+                self.builder
+                    .push_branch_inst(ir::BranchOp::AllFalse, cond_value, after_ebb);
+
+                self.stmt(&stmt.stmt);
+                self.builder.push_jump_inst(header_ebb);
+
+                self.builder.set_position(after_ebb);
+            }
+            Type::VARYING_BOOL => {
+                let prev_predicate = self.set_predicate_and(cond_value);
+
+                if let Some(predicate) = self.predicate {
+                    self.builder
+                        .push_branch_inst(ir::BranchOp::AnyFalse, predicate, after_ebb);
+                }
+
+                self.stmt(&stmt.stmt);
+                self.builder.push_jump_inst(header_ebb);
+                self.builder.set_position(after_ebb);
+
+                self.reset_predicate(prev_predicate);
+            }
+            _ => {
                 self.errors.push(format!(
                     "Invalid while statement condition with type '{}'",
                     cond_type
                 ));
-                return Err(());
+                return;
             }
-
-            Ok((cond_type, cond_value))
-        });
-
-        match result {
-            Ok((cond_type, cond_value)) => match cond_type.variability {
-                Variability::Uniform => {
-                    self.builder
-                        .push_branch_inst(ir::BranchOp::AllFalse, cond_value, after_ebb);
-
-                    self.stmt(&stmt.stmt);
-                    self.builder.push_jump_inst(header_ebb);
-
-                    self.builder.set_position(after_ebb);
-                }
-                Variability::Varying => {
-                    let prev_predicate = self.set_predicate_and(cond_value);
-
-                    if let Some(predicate) = self.predicate {
-                        self.builder
-                            .push_branch_inst(ir::BranchOp::AnyFalse, predicate, after_ebb);
-                    }
-
-                    self.stmt(&stmt.stmt);
-                    self.builder.push_jump_inst(header_ebb);
-                    self.builder.set_position(after_ebb);
-
-                    self.reset_predicate(prev_predicate);
-                }
-            },
-            Err(_) => {}
         };
     }
 
@@ -351,72 +368,71 @@ impl IrGenerator {
         };
     }
 
-    fn expr(&mut self, expr: &Expr) -> Result<(Type, ir::Value), ()> {
+    fn expr_value(&mut self, expr: &Expr) -> Result<(Type, ir::Value), ()> {
+        self.expr(expr).map(|(ty, value)| {
+            let value = self.resolve_value(ty, value);
+            (ty, value)
+        })
+    }
+
+    fn resolve_value(&mut self, ty: Type, value: Value) -> ir::Value {
+        match value {
+            Value::Var(variable) => self.builder.use_var(variable),
+            Value::Val(value) => value,
+            Value::Idx(value) => self.builder.push_read_inst(value, ty.into()),
+            Value::Addr(value) => self.builder.push_fetch_inst(value, ty.into()),
+        }
+    }
+
+    fn expr(&mut self, expr: &Expr) -> ExprResult {
         match expr.kind {
             ExprKind::Int(ref expr) => self.int_expr(expr),
             ExprKind::Float(ref expr) => self.float_expr(expr),
             ExprKind::Bool(ref expr) => self.bool_expr(expr),
             ExprKind::Element(_) => self.element_expr(),
             ExprKind::Count(_) => self.count_expr(),
-            ExprKind::Identifier(ref expr) => self.identifier_expr_value(expr),
+            ExprKind::Identifier(ref expr) => self.identifier_expr(expr),
             ExprKind::Unary(ref expr) => self.unary_expr(expr),
             ExprKind::Binary(ref expr) => self.binary_expr(expr),
-            ExprKind::Index(ref expr) => self.index_expr_value(expr),
+            ExprKind::Index(ref expr) => self.index_expr(expr),
             ExprKind::Paren(ref expr) => self.paren_expr(expr),
         }
     }
 
-    fn expr_place(&mut self, expr: &Expr) -> Result<(Type, Place), ()> {
-        match expr.kind {
-            ExprKind::Identifier(ref expr) => self.identifier_expr_place(expr),
-            ExprKind::Index(ref expr) => self.index_expr_place(expr),
-            _ => {
-                self.errors.push(format!("Invalid place expression"));
-                Err(())
-            }
-        }
-    }
-
-    fn int_expr(&mut self, expr: &IntExpr) -> Result<(Type, ir::Value), ()> {
+    fn int_expr(&mut self, expr: &IntExpr) -> ExprResult {
         let value = self.builder.push_int_const_inst(expr.value);
-        Ok((Type::UNIFORM_INT, value))
+
+        Ok((Type::UNIFORM_INT, Value::Val(value)))
     }
 
-    fn float_expr(&mut self, expr: &FloatExpr) -> Result<(Type, ir::Value), ()> {
+    fn float_expr(&mut self, expr: &FloatExpr) -> ExprResult {
         let value = self.builder.push_float_const_inst(expr.value);
-        Ok((Type::UNIFORM_FLOAT, value))
+
+        Ok((Type::UNIFORM_FLOAT, Value::Val(value)))
     }
 
-    fn bool_expr(&mut self, expr: &BoolExpr) -> Result<(Type, ir::Value), ()> {
+    fn bool_expr(&mut self, expr: &BoolExpr) -> ExprResult {
         let value = self.builder.push_bool_const_inst(expr.value);
-        Ok((Type::UNIFORM_BOOL, value))
+
+        Ok((Type::UNIFORM_BOOL, Value::Val(value)))
     }
 
-    fn element_expr(&mut self) -> Result<(Type, ir::Value), ()> {
+    fn element_expr(&mut self) -> ExprResult {
         let value = self.builder.push_element_inst();
-        Ok((Type::VARYING_INT, value))
+
+        Ok((Type::VARYING_INT, Value::Val(value)))
     }
 
-    fn count_expr(&mut self) -> Result<(Type, ir::Value), ()> {
+    fn count_expr(&mut self) -> ExprResult {
         let value = self.builder.push_count_inst();
-        Ok((Type::UNIFORM_INT, value))
+
+        Ok((Type::UNIFORM_INT, Value::Val(value)))
     }
 
-    fn identifier_expr_value(&mut self, expr: &IdentifierExpr) -> Result<(Type, ir::Value), ()> {
-        self.identifier_expr(expr).map(|(ty, variable)| {
-            let value = self.builder.use_var(variable);
-            (ty, value)
-        })
-    }
-
-    fn identifier_expr_place(&mut self, expr: &IdentifierExpr) -> Result<(Type, Place), ()> {
-        self.identifier_expr(expr)
-            .map(|(ty, variable)| (ty, Place::Variable(variable)))
-    }
-
-    fn identifier_expr(&mut self, expr: &IdentifierExpr) -> Result<(Type, ir::Variable), ()> {
+    fn identifier_expr(&mut self, expr: &IdentifierExpr) -> ExprResult {
         match self.symbols.get(expr.identifier.symbol) {
-            Some(&result) => result,
+            Some(&Ok((ty, variable))) => Ok((ty, Value::Var(variable))),
+            Some(&Err(_)) => Err(()),
             None => {
                 self.errors
                     .push(format!("Cannot find variable '{}'", expr.identifier.symbol));
@@ -425,158 +441,133 @@ impl IrGenerator {
         }
     }
 
-    fn unary_expr(&mut self, expr: &UnaryExpr) -> Result<(Type, ir::Value), ()> {
-        let expr_result = self.expr(&expr.expr);
+    fn unary_expr(&mut self, expr: &UnaryExpr) -> ExprResult {
+        let expr_result = self.expr_value(&expr.expr);
 
         let (expr_type, expr_value) = expr_result?;
 
-        let result = fn_block!({
-            let (ty, value) = match (expr.op, expr_type.kind) {
-                (UnaryOp::Negate, TypeKind::INT) => {
-                    let zero = self.builder.push_int_const_inst(0);
-                    let value = self
-                        .builder
-                        .push_binary_inst(ir::BinaryOp::Sub, zero, expr_value);
-                    (expr_type, value)
-                }
-                (UnaryOp::Negate, TypeKind::FLOAT) => {
-                    let zero = self.builder.push_float_const_inst(0.);
-                    let value = self
-                        .builder
-                        .push_binary_inst(ir::BinaryOp::Fsub, zero, expr_value);
-                    (expr_type, value)
-                }
-                (UnaryOp::Not, TypeKind::INT) => {
-                    let value = self.builder.push_unary_inst(ir::UnaryOp::Not, expr_value);
-                    (expr_type, value)
-                }
-                (UnaryOp::Not, TypeKind::BOOL) => {
-                    let one = self.builder.push_bool_const_inst(true);
-                    let value = self
-                        .builder
-                        .push_binary_inst(ir::BinaryOp::Xor, one, expr_value);
-                    (expr_type, value)
-                }
-                _ => return Err(()),
-            };
+        match (expr.op, expr_type) {
+            (UnaryOp::Deref, Type::PrimRef(var, prim)) => {
+                let ty = Type::Prim(var, prim);
 
-            Ok((ty, value))
-        });
+                Ok((ty, Value::Addr(expr_value)))
+            }
+            (UnaryOp::Negate, Type::Prim(_, Primitive::Int)) => {
+                let zero = self.builder.push_int_const_inst(0);
+                let value = self
+                    .builder
+                    .push_binary_inst(ir::BinaryOp::Sub, zero, expr_value);
 
-        if let Err(_) = result {
-            self.errors.push(format!(
-                "Invalid unary expression '{}' with operand type '{}'",
-                expr.op, expr_type
-            ));
+                Ok((expr_type, Value::Val(value)))
+            }
+            (UnaryOp::Negate, Type::Prim(_, Primitive::Float)) => {
+                let zero = self.builder.push_float_const_inst(0.);
+                let value = self
+                    .builder
+                    .push_binary_inst(ir::BinaryOp::Fsub, zero, expr_value);
+
+                Ok((expr_type, Value::Val(value)))
+            }
+            (UnaryOp::Not, Type::Prim(_, Primitive::Int)) => {
+                let value = self.builder.push_unary_inst(ir::UnaryOp::Not, expr_value);
+
+                Ok((expr_type, Value::Val(value)))
+            }
+            (UnaryOp::Not, Type::Prim(_, Primitive::Bool)) => {
+                let one = self.builder.push_bool_const_inst(true);
+                let value = self
+                    .builder
+                    .push_binary_inst(ir::BinaryOp::Xor, one, expr_value);
+
+                Ok((expr_type, Value::Val(value)))
+            }
+            _ => {
+                self.errors.push(format!(
+                    "Invalid unary expression '{}' with operand type '{}'",
+                    expr.op, expr_type
+                ));
+                Err(())
+            }
         }
-
-        result
     }
 
-    fn binary_expr(&mut self, expr: &BinaryExpr) -> Result<(Type, ir::Value), ()> {
-        let left_result = self.expr(&expr.left);
-        let right_result = self.expr(&expr.right);
+    fn binary_expr(&mut self, expr: &BinaryExpr) -> ExprResult {
+        let left_result = self.expr_value(&expr.left);
+        let right_result = self.expr_value(&expr.right);
 
         let (left_type, left_value) = left_result?;
         let (right_type, right_value) = right_result?;
 
-        let result = fn_block!({
-            if left_type.kind != right_type.kind {
-                return Err(());
+        match binary_kind(expr.op, left_type, right_type) {
+            Ok((ty, BinaryKind::Binary(op))) => {
+                let value = self.builder.push_binary_inst(op, left_value, right_value);
+
+                Ok((ty, Value::Val(value)))
             }
+            Ok((ty, BinaryKind::IntCmp(op))) => {
+                let value = self.builder.push_int_cmp_inst(op, left_value, right_value);
 
-            let (kind, value) = match binary_kind(expr.op, left_type.kind) {
-                BinaryKind::Binary(op) => {
-                    let value = self.builder.push_binary_inst(op, left_value, right_value);
-                    (left_type.kind, value)
-                }
-                BinaryKind::IntCmp(op) => {
-                    let value = self.builder.push_int_cmp_inst(op, left_value, right_value);
-                    (TypeKind::BOOL, value)
-                }
-                BinaryKind::FloatCmp(op) => {
-                    let value = self
-                        .builder
-                        .push_float_cmp_inst(op, left_value, right_value);
-                    (TypeKind::BOOL, value)
-                }
-                BinaryKind::None => {
-                    return Err(());
-                }
-            };
+                Ok((ty, Value::Val(value)))
+            }
+            Ok((ty, BinaryKind::FloatCmp(op))) => {
+                let value = self
+                    .builder
+                    .push_float_cmp_inst(op, left_value, right_value);
 
-            let variability = variability(left_type.variability, right_type.variability);
-            let ty = Type::new(variability, kind);
-
-            Ok((ty, value))
-        });
-
-        if let Err(_) = result {
-            self.errors.push(format!(
-                "Invalid binary expression '{}' with operand types '{}' and '{}'",
-                expr.op, left_type, right_type
-            ));
+                Ok((ty, Value::Val(value)))
+            }
+            Err(()) => {
+                self.errors.push(format!(
+                    "Invalid binary expression '{}' with operand types '{}' and '{}'",
+                    expr.op, left_type, right_type
+                ));
+                Err(())
+            }
         }
-
-        result
     }
 
-    fn index_expr_value(&mut self, expr: &IndexExpr) -> Result<(Type, ir::Value), ()> {
-        self.index_expr(expr).map(|(ty, value)| {
-            let value = self.builder.push_fetch_inst(value, ty.kind.into());
-            (ty, value)
-        })
-    }
-
-    fn index_expr_place(&mut self, expr: &IndexExpr) -> Result<(Type, Place), ()> {
-        self.index_expr(expr)
-            .map(|(ty, value)| (ty, Place::Addr(value)))
-    }
-
-    fn index_expr(&mut self, expr: &IndexExpr) -> Result<(Type, ir::Value), ()> {
-        let expr_result = self.expr(&expr.expr);
-        let index_result = self.expr(&expr.index);
+    fn index_expr(&mut self, expr: &IndexExpr) -> ExprResult {
+        let expr_result = self.expr_value(&expr.expr);
+        let index_result = self.expr_value(&expr.index);
 
         let (expr_type, expr_value) = expr_result?;
         let (index_type, index_value) = index_result?;
 
-        let result = fn_block!({
-            let (kind, value) = match (expr_type.kind, index_type.kind) {
-                (TypeKind::Ptr(prim), TypeKind::INT) => {
-                    let kind = TypeKind::Prim(prim);
+        match (expr_type, index_type) {
+            (Type::Array(expr_vari, expr_prim), Type::UNIFORM_INT) => {
+                let ty = Type::Prim(expr_vari, expr_prim);
 
-                    let two = self.builder.push_int_const_inst(2);
-                    let offset_value =
-                        self.builder
-                            .push_binary_inst(ir::BinaryOp::Shl, index_value, two);
-                    let value =
-                        self.builder
-                            .push_binary_inst(ir::BinaryOp::Add, expr_value, offset_value);
+                let value =
+                    self.builder
+                        .push_binary_inst(ir::BinaryOp::Add, expr_value, index_value);
 
-                    (kind, value)
-                }
-                _ => {
-                    return Err(());
-                }
-            };
+                Ok((ty, Value::Idx(value)))
+            }
+            (Type::ArrayRef(expr_vari, expr_prim), Type::Prim(index_vari, Primitive::Int)) => {
+                let var = variability(expr_vari, index_vari);
+                let ty = Type::Prim(var, expr_prim);
 
-            let variability = variability(expr_type.variability, index_type.variability);
-            let ty = Type::new(variability, kind);
+                let two = self.builder.push_int_const_inst(2);
+                let offset_value =
+                    self.builder
+                        .push_binary_inst(ir::BinaryOp::Shl, index_value, two);
+                let value =
+                    self.builder
+                        .push_binary_inst(ir::BinaryOp::Add, expr_value, offset_value);
 
-            Ok((ty, value))
-        });
-
-        if let Err(_) = result {
-            self.errors.push(format!(
-                "Invalid index expression with value type '{}' and index type '{}'",
-                expr_type, index_type
-            ));
+                Ok((ty, Value::Addr(value)))
+            }
+            _ => {
+                self.errors.push(format!(
+                    "Invalid index expression with value type '{}' and index type '{}'",
+                    expr_type, index_type
+                ));
+                Err(())
+            }
         }
-
-        result
     }
 
-    fn paren_expr(&mut self, expr: &ParenExpr) -> Result<(Type, ir::Value), ()> {
+    fn paren_expr(&mut self, expr: &ParenExpr) -> ExprResult {
         self.expr(&expr.expr)
     }
 
@@ -626,59 +617,77 @@ impl IrGenerator {
     }
 }
 
-fn is_valid_assign(variable_type: Type, expr_type: Type) -> bool {
-    if let (Variability::Uniform, Variability::Varying) =
-        (variable_type.variability, expr_type.variability)
-    {
-        return false;
-    }
+fn is_valid_assign(place_type: Type, value_type: Type) -> bool {
+    match (place_type, value_type) {
+        (Type::Prim(place_var, place_prim), Type::Prim(value_var, value_prim)) => {
+            if place_prim != value_prim {
+                return false;
+            }
 
-    if variable_type.kind != expr_type.kind {
-        return false;
-    }
+            if (Variability::Uniform, Variability::Varying) == (place_var, value_var) {
+                return false;
+            }
 
-    true
+            true
+        }
+        _ => false,
+    }
 }
 
-enum BinaryKind {
-    Binary(ir::BinaryOp),
-    IntCmp(ir::CmpOp),
-    FloatCmp(ir::CmpOp),
-    None,
-}
+fn binary_kind(op: BinaryOp, left_type: Type, right_type: Type) -> BinaryResult {
+    let (var, prim) = match (left_type, right_type) {
+        (Type::Prim(left_var, left_prim), Type::Prim(right_var, right_prim)) => {
+            if left_prim != right_prim {
+                return Err(());
+            }
 
-fn binary_kind(op: BinaryOp, kind: TypeKind) -> BinaryKind {
-    match (op, kind) {
-        (BinaryOp::Mul, TypeKind::FLOAT) => BinaryKind::Binary(ir::BinaryOp::Fmul),
-        (BinaryOp::Add, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Add),
-        (BinaryOp::Add, TypeKind::FLOAT) => BinaryKind::Binary(ir::BinaryOp::Fadd),
-        (BinaryOp::Sub, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Sub),
-        (BinaryOp::Sub, TypeKind::FLOAT) => BinaryKind::Binary(ir::BinaryOp::Fsub),
-        (BinaryOp::Shl, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Shl),
-        (BinaryOp::Shr, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Asr),
-        (BinaryOp::Min, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Min),
-        (BinaryOp::Min, TypeKind::FLOAT) => BinaryKind::Binary(ir::BinaryOp::Fmin),
-        (BinaryOp::Max, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Max),
-        (BinaryOp::Max, TypeKind::FLOAT) => BinaryKind::Binary(ir::BinaryOp::Fmax),
-        (BinaryOp::BitAnd, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::And),
-        (BinaryOp::LogicalAnd, TypeKind::BOOL) => BinaryKind::Binary(ir::BinaryOp::And),
-        (BinaryOp::BitOr, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Or),
-        (BinaryOp::LogicalOr, TypeKind::BOOL) => BinaryKind::Binary(ir::BinaryOp::Or),
-        (BinaryOp::BitXor, TypeKind::INT) => BinaryKind::Binary(ir::BinaryOp::Xor),
-        (BinaryOp::Eq, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Eq),
-        (BinaryOp::Eq, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Eq),
-        (BinaryOp::Ne, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Ne),
-        (BinaryOp::Ne, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Ne),
-        (BinaryOp::Lt, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Lt),
-        (BinaryOp::Lt, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Lt),
-        (BinaryOp::Gt, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Gt),
-        (BinaryOp::Gt, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Gt),
-        (BinaryOp::Le, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Le),
-        (BinaryOp::Le, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Le),
-        (BinaryOp::Ge, TypeKind::INT) => BinaryKind::IntCmp(ir::CmpOp::Ge),
-        (BinaryOp::Ge, TypeKind::FLOAT) => BinaryKind::FloatCmp(ir::CmpOp::Ge),
-        _ => BinaryKind::None,
-    }
+            let var = variability(left_var, right_var);
+            (var, left_prim)
+        }
+        _ => return Err(()),
+    };
+
+    let kind = match (op, prim) {
+        (BinaryOp::Mul, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fmul),
+        (BinaryOp::Add, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Add),
+        (BinaryOp::Add, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fadd),
+        (BinaryOp::Sub, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Sub),
+        (BinaryOp::Sub, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fsub),
+        (BinaryOp::Shl, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Shl),
+        (BinaryOp::Shr, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Asr),
+        (BinaryOp::Min, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Min),
+        (BinaryOp::Min, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fmin),
+        (BinaryOp::Max, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Max),
+        (BinaryOp::Max, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fmax),
+        (BinaryOp::BitAnd, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::And),
+        (BinaryOp::LogicalAnd, Primitive::Bool) => BinaryKind::Binary(ir::BinaryOp::And),
+        (BinaryOp::BitOr, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Or),
+        (BinaryOp::LogicalOr, Primitive::Bool) => BinaryKind::Binary(ir::BinaryOp::Or),
+        (BinaryOp::BitXor, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Xor),
+        (BinaryOp::Eq, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Eq),
+        (BinaryOp::Eq, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Eq),
+        (BinaryOp::Ne, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Ne),
+        (BinaryOp::Ne, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Ne),
+        (BinaryOp::Lt, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Lt),
+        (BinaryOp::Lt, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Lt),
+        (BinaryOp::Gt, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Gt),
+        (BinaryOp::Gt, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Gt),
+        (BinaryOp::Le, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Le),
+        (BinaryOp::Le, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Le),
+        (BinaryOp::Ge, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Ge),
+        (BinaryOp::Ge, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Ge),
+        _ => return Err(()),
+    };
+
+    let prim = match kind {
+        BinaryKind::Binary(_) => prim,
+        BinaryKind::IntCmp(_) => Primitive::Bool,
+        BinaryKind::FloatCmp(_) => Primitive::Bool,
+    };
+
+    let ty = Type::Prim(var, prim);
+
+    Ok((ty, kind))
 }
 
 pub fn variability(variability1: Variability, variability2: Variability) -> Variability {

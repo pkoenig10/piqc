@@ -81,6 +81,7 @@ impl IdentifierExpr {
 
 #[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
+    Deref,
     Negate,
     Not,
 }
@@ -88,6 +89,7 @@ pub enum UnaryOp {
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op = match self {
+            UnaryOp::Deref => "*",
             UnaryOp::Negate => "-",
             UnaryOp::Not => "!",
         };

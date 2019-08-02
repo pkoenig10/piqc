@@ -8,7 +8,7 @@ Int: i32 = {
 };
 
 Float: f32 = {
-    r"\d*\.\d*" => <>.parse().unwrap(),
+    r"\d+\.\d*" => <>.parse().unwrap(),
 };
 
 Bool: bool = {
@@ -21,6 +21,7 @@ Symbol: Symbol = {
 };
 
 UnaryOp: UnaryOp = {
+    "*" => UnaryOp::Deref,
     "-" => UnaryOp::Negate,
     "!" => UnaryOp::Not,
 };
@@ -75,22 +76,20 @@ LogicalOrOp: BinaryOp = {
 
 Variability: Variability = {
     "uniform" => Variability::Uniform,
-    "varying" => Variability::Varying,
+    "varying"? => Variability::Varying,
 }
 
-PrimType: PrimType = {
-    "int" => PrimType::Int,
-    "float" => PrimType::Float,
-    "bool" => PrimType::Bool,
-}
-
-TypeKind: TypeKind = {
-    PrimType => TypeKind::Prim(<>),
-    <PrimType> "*" => TypeKind::Ptr(<>),
+Primitive: Primitive = {
+    "int" => Primitive::Int,
+    "float" => Primitive::Float,
+    "bool" => Primitive::Bool,
 }
 
 Type: Type = {
-    <variability: Variability?> <kind: TypeKind> => Type::new(variability.unwrap_or(Variability::Varying), kind),
+    <Variability> <Primitive> => Type::Prim(<>),
+    "[" <Variability> <Primitive> "]" => Type::Array(<>),
+    <Variability> "&" <Primitive> => Type::PrimRef(<>),
+    <Variability> "&" "[" <Primitive> "]" => Type::ArrayRef(<>),
 }
 
 Identifier: Identifier = {
@@ -211,7 +210,7 @@ DeclStmtKind: StmtKind = {
 DeclStmt = BaseStmt<DeclStmtKind>;
 
 AssignStmtKind: StmtKind = {
-    <PostfixExpr> "=" <Expr> ";" => AssignStmt::new(<>).into(),
+    <Expr> "=" <Expr> ";" => AssignStmt::new(<>).into(),
 };
 
 AssignStmt = BaseStmt<AssignStmtKind>;

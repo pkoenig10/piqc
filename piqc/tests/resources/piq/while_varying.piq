@@ -1,4 +1,4 @@
-fn while_varying(uniform int *output) {
+fn while_varying(uniform &[int] output) {
     int foo = 0;
 
     while (foo < @element) {

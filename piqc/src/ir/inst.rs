@@ -269,6 +269,30 @@ impl fmt::Display for BinaryInst {
 }
 
 #[derive(Debug, Clone)]
+pub struct AllocInst {
+    pub dest: Value,
+    pub len: u8,
+}
+
+impl AllocInst {
+    pub fn new(dest: Value, len: u8) -> AllocInst {
+        AllocInst { dest, len }
+    }
+}
+
+impl InstTrait for AllocInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+    }
+}
+
+impl fmt::Display for AllocInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} = alloc {}", self.dest, self.len)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct FetchInst {
     pub dest: Value,
     pub addr: Value,
@@ -294,27 +318,84 @@ impl fmt::Display for FetchInst {
 }
 
 #[derive(Debug, Clone)]
-pub struct StoreInst {
+pub struct ReadInst {
+    pub dest: Value,
+    pub index: Value,
+}
+
+impl ReadInst {
+    pub fn new(dest: Value, index: Value) -> ReadInst {
+        ReadInst { dest, index }
+    }
+}
+
+impl InstTrait for ReadInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
+        replace_value(&mut self.dest, old, new);
+        replace_value(&mut self.index, old, new);
+    }
+}
+
+impl fmt::Display for ReadInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} = read {}", self.dest, self.index)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WriteInst {
+    pub cond: Option<Value>,
     pub src: Value,
+    pub index: Value,
+}
+
+impl WriteInst {
+    pub fn new(cond: Option<Value>, src: Value, index: Value) -> WriteInst {
+        WriteInst { cond, src, index }
+    }
+}
+
+impl InstTrait for WriteInst {
+    fn replace_value(&mut self, old: Value, new: Value) {
+        if let Some(ref mut cond) = self.cond {
+            replace_value(cond, old, new);
+        }
+        replace_value(&mut self.src, old, new);
+        replace_value(&mut self.index, old, new);
+    }
+}
+
+impl fmt::Display for WriteInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.cond {
+            Some(cond) => write!(f, "write {}, {}, {}", cond, self.src, self.index),
+            None => write!(f, "write _, {}, {}", self.src, self.index),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StoreInst {
+    pub index: Value,
     pub addr: Value,
 }
 
 impl StoreInst {
-    pub fn new(src: Value, addr: Value) -> StoreInst {
-        StoreInst { src, addr }
+    pub fn new(index: Value, addr: Value) -> StoreInst {
+        StoreInst { index, addr }
     }
 }
 
 impl InstTrait for StoreInst {
     fn replace_value(&mut self, old: Value, new: Value) {
-        replace_value(&mut self.src, old, new);
+        replace_value(&mut self.index, old, new);
         replace_value(&mut self.addr, old, new);
     }
 }
 
 impl fmt::Display for StoreInst {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "store {}, {}", self.src, self.addr)
+        write!(f, "store {}, {}", self.index, self.addr)
     }
 }
 
@@ -573,7 +654,10 @@ pub enum InstData {
     Count(CountInst),
     Unary(UnaryInst),
     Binary(BinaryInst),
+    Alloc(AllocInst),
     Fetch(FetchInst),
+    Read(ReadInst),
+    Write(WriteInst),
     Store(StoreInst),
     IntCmp(IntCmpInst),
     FloatCmp(FloatCmpInst),

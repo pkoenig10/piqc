@@ -1,4 +1,4 @@
-fn if_else_uniform(uniform int *output, uniform bool bar) {
+fn if_else_uniform(uniform &int output, uniform bool bar) {
     uniform int foo = 0;
 
     if (bar) {
@@ -7,5 +7,5 @@ fn if_else_uniform(uniform int *output, uniform bool bar) {
         foo = 2;
     }
 
-    output[0] = foo;
+    *output = foo;
 }

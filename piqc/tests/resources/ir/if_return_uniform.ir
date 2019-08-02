@@ -6,9 +6,7 @@ ebb0(%0, %1):
 
 ebb1(%3):
     %2 = iconst 42
-    %5 = iconst 0
-    %6 = iconst 2
-    %7 = shl %5, %6
-    %8 = add %3, %7
-    store %2, %8
+    %5 = alloc 1
+    write _, %2, %5
+    store %5, %3
     ret

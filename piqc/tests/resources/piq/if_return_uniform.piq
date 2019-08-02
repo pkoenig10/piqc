@@ -1,7 +1,7 @@
-fn if_return_uniform(uniform int *output, uniform bool bar) {
+fn if_return_uniform(uniform &int output, uniform bool bar) {
     if (bar) {
         return;
     }
 
-    output[0] = 42;
+    *output = 42;
 }

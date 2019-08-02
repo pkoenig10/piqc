@@ -12,5 +12,7 @@ ebb0(%0):
     %9 = iconst 2
     %10 = shl %8, %9
     %11 = add %0, %10
-    store %7, %11
+    %12 = alloc 1
+    write %5, %7, %12
+    store %12, %11
     ret

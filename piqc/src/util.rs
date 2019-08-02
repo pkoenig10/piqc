@@ -31,10 +31,18 @@ macro_rules! id {
         }
     };
 }
-
 macro_rules! fn_block {
     ($expr:expr) => {
         (|| $expr)();
+    };
+}
+
+macro_rules! unwrap_or_return {
+    ($result:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(_) => return,
+        }
     };
 }
 

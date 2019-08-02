@@ -28,100 +28,65 @@ impl From<Variability> for ir::Variability {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrimType {
+pub enum Primitive {
     Int,
     Float,
     Bool,
 }
 
-impl fmt::Display for PrimType {
+impl fmt::Display for Primitive {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let prim = match self {
-            PrimType::Int => "int",
-            PrimType::Float => "float",
-            PrimType::Bool => "bool",
+            Primitive::Int => "int",
+            Primitive::Float => "float",
+            Primitive::Bool => "bool",
         };
         write!(f, "{}", prim)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TypeKind {
-    Prim(PrimType),
-    Ptr(PrimType),
-}
-
-impl TypeKind {
-    pub const INT: TypeKind = TypeKind::Prim(PrimType::Int);
-    pub const FLOAT: TypeKind = TypeKind::Prim(PrimType::Float);
-    pub const BOOL: TypeKind = TypeKind::Prim(PrimType::Bool);
-}
-
-impl fmt::Display for TypeKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            TypeKind::Prim(prim) => write!(f, "{}", prim),
-            TypeKind::Ptr(prim) => write!(f, "{}*", prim),
-        }
-    }
-}
-
-impl From<TypeKind> for ir::TypeKind {
-    fn from(kind: TypeKind) -> ir::TypeKind {
-        match kind {
-            TypeKind::INT => ir::TypeKind::Int,
-            TypeKind::FLOAT => ir::TypeKind::Float,
-            TypeKind::BOOL => ir::TypeKind::Bool,
-            TypeKind::Ptr(_) => ir::TypeKind::Int,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Type {
-    pub variability: Variability,
-    pub kind: TypeKind,
+pub enum Type {
+    Prim(Variability, Primitive),
+    Array(Variability, Primitive),
+    PrimRef(Variability, Primitive),
+    ArrayRef(Variability, Primitive),
 }
 
 impl Type {
-    pub const UNIFORM_INT: Type = Type {
-        variability: Variability::Uniform,
-        kind: TypeKind::INT,
-    };
-    pub const UNIFORM_FLOAT: Type = Type {
-        variability: Variability::Uniform,
-        kind: TypeKind::FLOAT,
-    };
-    pub const UNIFORM_BOOL: Type = Type {
-        variability: Variability::Uniform,
-        kind: TypeKind::BOOL,
-    };
-    pub const VARYING_INT: Type = Type {
-        variability: Variability::Varying,
-        kind: TypeKind::INT,
-    };
-    pub const VARYING_FLOAT: Type = Type {
-        variability: Variability::Varying,
-        kind: TypeKind::FLOAT,
-    };
-    pub const VARYING_BOOL: Type = Type {
-        variability: Variability::Varying,
-        kind: TypeKind::BOOL,
-    };
-
-    pub fn new(variability: Variability, kind: TypeKind) -> Type {
-        Type { variability, kind }
-    }
+    pub const UNIFORM_INT: Type = Type::Prim(Variability::Uniform, Primitive::Int);
+    pub const UNIFORM_FLOAT: Type = Type::Prim(Variability::Uniform, Primitive::Float);
+    pub const UNIFORM_BOOL: Type = Type::Prim(Variability::Uniform, Primitive::Bool);
+    pub const VARYING_INT: Type = Type::Prim(Variability::Varying, Primitive::Int);
+    pub const VARYING_FLOAT: Type = Type::Prim(Variability::Varying, Primitive::Float);
+    pub const VARYING_BOOL: Type = Type::Prim(Variability::Varying, Primitive::Bool);
 }
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.variability, self.kind)
+        match self {
+            Type::Prim(variability, prim) => write!(f, "{} {}", variability, prim),
+            Type::Array(variability, prim) => write!(f, "[{} {}]", variability, prim),
+            Type::PrimRef(variability, prim) => write!(f, "{} &{}", variability, prim),
+            Type::ArrayRef(variability, prim) => write!(f, "{} &[{}]", variability, prim),
+        }
     }
 }
 
 impl From<Type> for ir::Type {
     fn from(ty: Type) -> ir::Type {
-        ir::Type::new(ty.variability.into(), ty.kind.into())
+        match ty {
+            Type::UNIFORM_INT => ir::Type::UNIFORM_INT,
+            Type::UNIFORM_FLOAT => ir::Type::UNIFORM_FLOAT,
+            Type::UNIFORM_BOOL => ir::Type::UNIFORM_BOOL,
+            Type::VARYING_INT => ir::Type::VARYING_INT,
+            Type::VARYING_FLOAT => ir::Type::VARYING_FLOAT,
+            Type::VARYING_BOOL => ir::Type::VARYING_BOOL,
+            Type::Array(_, _) => ir::Type::UNIFORM_INT,
+            Type::PrimRef(Variability::Uniform, _) => ir::Type::UNIFORM_INT,
+            Type::PrimRef(Variability::Varying, _) => ir::Type::VARYING_INT,
+            Type::ArrayRef(Variability::Uniform, _) => ir::Type::UNIFORM_INT,
+            Type::ArrayRef(Variability::Varying, _) => ir::Type::VARYING_INT,
+        }
     }
 }

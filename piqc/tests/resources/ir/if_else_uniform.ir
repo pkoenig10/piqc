@@ -9,10 +9,8 @@ ebb1():
     %4 = iconst 2
     jmp ebb2(%4)
 
-ebb2(%5):
-    %8 = iconst 0
-    %9 = iconst 2
-    %10 = shl %8, %9
-    %11 = add %0, %10
-    store %5, %11
+ebb2(%7):
+    %8 = alloc 1
+    write _, %7, %8
+    store %8, %0
     ret

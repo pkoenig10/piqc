@@ -239,12 +239,26 @@ impl<'a> DeadCodePass<'a> {
                 analysis.insert_use(data.right, inst);
                 analysis.insert_def(data.dest, inst);
             }
+            InstData::Alloc(ref data) => {
+                analysis.insert_def(data.dest, inst);
+            }
             InstData::Fetch(ref data) => {
                 analysis.insert_use(data.addr, inst);
                 analysis.insert_def(data.dest, inst);
             }
-            InstData::Store(ref data) => {
+            InstData::Read(ref data) => {
+                analysis.insert_use(data.index, inst);
+                analysis.insert_def(data.dest, inst);
+            }
+            InstData::Write(ref data) => {
+                if let Some(cond) = data.cond {
+                    analysis.insert_use(cond, inst);
+                }
                 analysis.insert_use(data.src, inst);
+                analysis.insert_use(data.index, inst);
+            }
+            InstData::Store(ref data) => {
+                analysis.insert_use(data.index, inst);
                 analysis.insert_use(data.addr, inst);
             }
             InstData::IntCmp(ref data) => {

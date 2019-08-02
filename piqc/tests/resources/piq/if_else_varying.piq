@@ -1,4 +1,4 @@
-fn if_else_varying(uniform int *output) {
+fn if_else_varying(uniform &[int] output) {
     int foo = 0;
 
     if (@element < 8) {

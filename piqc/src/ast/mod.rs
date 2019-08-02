@@ -7,7 +7,7 @@ pub use self::gen::generate_ir;
 pub use self::stmt::{
     AssignStmt, BlockStmt, DeclStmt, IfStmt, ReturnStmt, Stmt, StmtKind, WhileStmt,
 };
-pub use self::types::{PrimType, Type, TypeKind, Variability};
+pub use self::types::{Primitive, Type, Variability};
 
 mod expr;
 mod func;

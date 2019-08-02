@@ -14,9 +14,11 @@ ebb1(%2):
     jmp ebb1(%7)
 
 ebb2():
-    %11 = element
-    %12 = iconst 2
-    %13 = shl %11, %12
-    %14 = add %0, %13
-    store %2, %14
+    %10 = element
+    %11 = iconst 2
+    %12 = shl %10, %11
+    %13 = add %0, %12
+    %15 = alloc 1
+    write _, %2, %15
+    store %15, %13
     ret

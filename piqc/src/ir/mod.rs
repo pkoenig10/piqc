@@ -8,9 +8,9 @@ pub use self::verifier::verify_ir;
 use std::fmt;
 
 use self::inst::{
-    BinaryInst, BoolConstInst, BranchInst, CountInst, ElementInst, FetchInst, FloatCmpInst,
-    FloatConstInst, InstData, InstTrait, IntCmpInst, IntConstInst, JumpInst, ReturnInst,
-    SelectInst, StoreInst, Target, UnaryInst,
+    AllocInst, BinaryInst, BoolConstInst, BranchInst, CountInst, ElementInst, FetchInst,
+    FloatCmpInst, FloatConstInst, InstData, InstTrait, IntCmpInst, IntConstInst, JumpInst,
+    ReadInst, ReturnInst, SelectInst, StoreInst, Target, UnaryInst, WriteInst,
 };
 use self::value::ValueData;
 

@@ -319,16 +319,36 @@ impl FuncBuilder {
         dest
     }
 
-    pub fn push_fetch_inst(&mut self, addr: Value, kind: TypeKind) -> Value {
-        let ty = self.get_fetch_inst_type(addr, kind);
+    pub fn push_alloc_inst(&mut self, len: u8) -> Value {
+        let dest = self.create_value(Type::UNIFORM_INT);
+        let inst = AllocInst::new(dest, len).into();
+        self.push_inst(inst);
+        dest
+    }
+
+    pub fn push_fetch_inst(&mut self, addr: Value, ty: Type) -> Value {
+        let ty = self.get_fetch_inst_type(addr, ty);
         let dest = self.create_value(ty);
         let inst = FetchInst::new(dest, addr).into();
         self.push_inst(inst);
         dest
     }
 
-    pub fn push_store_inst(&mut self, src: Value, addr: Value) {
-        let inst = StoreInst::new(src, addr).into();
+    pub fn push_read_inst(&mut self, index: Value, ty: Type) -> Value {
+        let ty = self.get_read_inst_type(index, ty);
+        let dest = self.create_value(ty);
+        let inst = ReadInst::new(dest, index).into();
+        self.push_inst(inst);
+        dest
+    }
+
+    pub fn push_write_inst(&mut self, cond: Option<Value>, src: Value, index: Value) {
+        let inst = WriteInst::new(cond, src, index).into();
+        self.push_inst(inst);
+    }
+
+    pub fn push_store_inst(&mut self, index: Value, addr: Value) {
+        let inst = StoreInst::new(index, addr).into();
         self.push_inst(inst);
     }
 
@@ -439,17 +459,32 @@ impl FuncBuilder {
         Type::new(variability, left_type.kind)
     }
 
-    fn get_fetch_inst_type(&self, addr: Value, kind: TypeKind) -> Type {
+    fn get_fetch_inst_type(&self, addr: Value, ty: Type) -> Type {
         let addr_type = self.get_value_type(addr);
 
         assert_eq!(
-            addr_type.kind,
-            TypeKind::Int,
-            "Invalid fetch instruction with operand type `{}`",
-            addr_type
+            addr_type,
+            Type::new(ty.variability, TypeKind::Int),
+            "Invalid fetch instruction with operand type `{}` and value type {}",
+            addr_type,
+            ty
         );
 
-        Type::new(addr_type.variability, kind)
+        ty
+    }
+
+    fn get_read_inst_type(&self, index: Value, ty: Type) -> Type {
+        let index_type = self.get_value_type(index);
+
+        assert_eq!(
+            index_type,
+            Type::new(ty.variability, TypeKind::Int),
+            "Invalid read instruction with operand type `{}` and value type {}",
+            index_type,
+            ty
+        );
+
+        ty
     }
 
     fn get_cmp_inst_type(&self, op: CmpOp, left: Value, right: Value) -> Type {

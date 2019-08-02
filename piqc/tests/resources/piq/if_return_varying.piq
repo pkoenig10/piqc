@@ -1,4 +1,4 @@
-fn if_return_uniform(uniform int *output) {
+fn if_return_uniform(uniform &[int] output) {
     int foo = 0;
 
     if (@element < 8) {
