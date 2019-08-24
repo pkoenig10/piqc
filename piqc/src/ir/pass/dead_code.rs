@@ -72,13 +72,13 @@ impl Analysis {
         self.predecessors.get(&ebb)
     }
 
-    fn insert_predecessor(&mut self, target: &Target, inst: Inst) {
-        for &arg in target.args() {
+    fn insert_predecessor(&mut self, ebb: Ebb, args: &[Value], inst: Inst) {
+        for &arg in args {
             self.insert_use(arg, inst)
         }
 
         self.predecessors
-            .entry(target.ebb())
+            .entry(ebb)
             .or_insert_with(HashSet::new)
             .insert(inst);
     }
@@ -134,8 +134,7 @@ impl<'a> DeadCodePass<'a> {
                     match analysis.predecessors(ebb) {
                         Some(predecessors) => {
                             for &inst in predecessors {
-                                let target = self.func.inst(inst).target().unwrap();
-                                let arg = target.args()[i];
+                                let arg = self.func.inst(inst).target().unwrap().1[i];
                                 if param != arg {
                                     args = args.insert(arg);
                                 }
@@ -175,8 +174,7 @@ impl<'a> DeadCodePass<'a> {
                 }
 
                 for &inst in analysis.predecessors(ebb).unwrap() {
-                    let target = self.func.inst_mut(inst).target_mut().unwrap();
-                    target.swap_remove_arg(index);
+                    self.func.inst_mut(inst).swap_remove_arg(index);
                 }
 
                 replaced_params.insert(param, arg);
@@ -212,79 +210,18 @@ impl<'a> DeadCodePass<'a> {
     }
 
     fn analyze_inst(&self, analysis: &mut Analysis, inst: Inst) {
-        let inst_data = self.func.inst(inst);
+        let data = self.func.inst(inst);
 
-        match *inst_data {
-            InstData::IntConst(ref data) => {
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::FloatConst(ref data) => {
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::BoolConst(ref data) => {
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Element(ref data) => {
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Count(ref data) => {
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Unary(ref data) => {
-                analysis.insert_use(data.src, inst);
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Binary(ref data) => {
-                analysis.insert_use(data.left, inst);
-                analysis.insert_use(data.right, inst);
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Alloc(ref data) => {
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Fetch(ref data) => {
-                analysis.insert_use(data.addr, inst);
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Read(ref data) => {
-                analysis.insert_use(data.index, inst);
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Write(ref data) => {
-                if let Some(cond) = data.cond {
-                    analysis.insert_use(cond, inst);
-                }
-                analysis.insert_use(data.src, inst);
-                analysis.insert_use(data.index, inst);
-            }
-            InstData::Store(ref data) => {
-                analysis.insert_use(data.index, inst);
-                analysis.insert_use(data.addr, inst);
-            }
-            InstData::IntCmp(ref data) => {
-                analysis.insert_use(data.left, inst);
-                analysis.insert_use(data.right, inst);
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::FloatCmp(ref data) => {
-                analysis.insert_use(data.left, inst);
-                analysis.insert_use(data.right, inst);
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Select(ref data) => {
-                analysis.insert_use(data.cond, inst);
-                analysis.insert_use(data.left, inst);
-                analysis.insert_use(data.right, inst);
-                analysis.insert_def(data.dest, inst);
-            }
-            InstData::Jump(ref data) => {
-                analysis.insert_predecessor(&data.target, inst);
-            }
-            InstData::Branch(ref data) => {
-                analysis.insert_use(data.cond, inst);
-                analysis.insert_predecessor(&data.target, inst);
-            }
-            InstData::Return(_) => {}
+        for arg in data.args() {
+            analysis.insert_use(*arg, inst)
+        }
+
+        if let Some(result) = self.func.result_opt(inst) {
+            analysis.insert_def(*result, inst);
+        }
+
+        if let Some((ebb, args)) = data.target() {
+            analysis.insert_predecessor(ebb, args, inst);
         }
     }
 }

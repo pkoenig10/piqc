@@ -1,9 +1,21 @@
 use std::fmt;
+use std::ops::BitOr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Variability {
     Uniform,
     Varying,
+}
+
+impl BitOr for Variability {
+    type Output = Self;
+
+    fn bitor(self, variability: Variability) -> Self {
+        match (self, variability) {
+            (Variability::Uniform, Variability::Uniform) => Variability::Uniform,
+            _ => Variability::Varying,
+        }
+    }
 }
 
 impl fmt::Display for Variability {
@@ -68,6 +80,14 @@ impl Type {
 
     pub fn new(variability: Variability, kind: TypeKind) -> Type {
         Type { variability, kind }
+    }
+
+    pub fn or_variability(&self, ty: Type) -> Type {
+        Type::new(self.variability | ty.variability, self.kind)
+    }
+
+    pub fn with_kind(&self, kind: TypeKind) -> Type {
+        Type::new(self.variability, kind)
     }
 }
 

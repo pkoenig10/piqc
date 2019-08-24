@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::ir::*;
@@ -49,6 +50,7 @@ pub struct Func {
     ebbs: Map<Ebb, EbbNode>,
     insts: Map<Inst, InstNode>,
     values: Map<Value, ValueData>,
+    results: HashMap<Inst, Value>,
     first_ebb: Option<Ebb>,
     last_ebb: Option<Ebb>,
 }
@@ -57,9 +59,10 @@ impl Func {
     pub fn new() -> Func {
         Func {
             params: Vec::new(),
-            values: Map::new(),
             ebbs: Map::new(),
             insts: Map::new(),
+            values: Map::new(),
+            results: HashMap::new(),
             first_ebb: None,
             last_ebb: None,
         }
@@ -207,17 +210,108 @@ impl Func {
             }
         }
     }
+
+    pub fn create_result(&mut self, inst: Inst, kind: Option<TypeKind>) {
+        if let Some(ty) = self.result_type(inst, kind) {
+            let value = self.create_value(ValueData::new(ty));
+            self.results.insert(inst, value);
+        }
+    }
+
+    pub fn result_type(&self, inst: Inst, kind: Option<TypeKind>) -> Option<Type> {
+        let ty = match self.inst(inst) {
+            InstData::Element() => Type::VARYING_INT,
+            InstData::Count() => Type::UNIFORM_INT,
+            InstData::Iconst(_) => Type::UNIFORM_INT,
+            InstData::Fconst(_) => Type::UNIFORM_FLOAT,
+            InstData::Bconst(_) => Type::UNIFORM_BOOL,
+            InstData::Ftoi(arg) => {
+                let ty = self.value(*arg).ty;
+                ty.with_kind(TypeKind::Int)
+            }
+            InstData::Itof(arg) => {
+                let ty = self.value(*arg).ty;
+                ty.with_kind(TypeKind::Float)
+            }
+            InstData::Not(arg) => self.value(*arg).ty,
+            InstData::Clz(arg) => {
+                let ty = self.value(*arg).ty;
+                ty.with_kind(TypeKind::Int)
+            }
+            InstData::Add(args)
+            | InstData::Sub(args)
+            | InstData::Shl(args)
+            | InstData::Shr(args)
+            | InstData::Asr(args)
+            | InstData::Ror(args)
+            | InstData::Min(args)
+            | InstData::Max(args)
+            | InstData::And(args)
+            | InstData::Or(args)
+            | InstData::Xor(args)
+            | InstData::Fadd(args)
+            | InstData::Fsub(args)
+            | InstData::Fmul(args)
+            | InstData::Fmin(args)
+            | InstData::Fmax(args)
+            | InstData::Fminabs(args)
+            | InstData::Fmaxabs(args) => {
+                let ty0 = self.value(args[0]).ty;
+                let ty1 = self.value(args[1]).ty;
+                ty0.or_variability(ty1)
+            }
+            InstData::Select(args) => {
+                let ty0 = self.value(args[1]).ty;
+                let ty1 = self.value(args[2]).ty;
+                ty0.or_variability(ty1)
+            }
+            InstData::Icmp(_, args) | InstData::Fcmp(_, args) => {
+                let ty0 = self.value(args[0]).ty;
+                let ty1 = self.value(args[1]).ty;
+                Type::new(ty0.variability | ty1.variability, TypeKind::Bool)
+            }
+            InstData::Alloc(_) => Type::UNIFORM_INT,
+            InstData::Fetch(arg) | InstData::Read(arg) => {
+                let ty = self.value(*arg).ty;
+                ty.with_kind(kind.unwrap())
+            }
+            InstData::Nop()
+            | InstData::Write(_)
+            | InstData::Load(_)
+            | InstData::Store(_)
+            | InstData::Jump(_, _)
+            | InstData::Brallz(_, _)
+            | InstData::Brallnz(_, _)
+            | InstData::Branyz(_, _)
+            | InstData::Branynz(_, _)
+            | InstData::Return() => return None,
+        };
+
+        Some(ty)
+    }
+
+    pub fn result(&self, inst: Inst) -> Value {
+        self.results[&inst]
+    }
+
+    pub fn result_opt(&self, inst: Inst) -> Option<&Value> {
+        self.results.get(&inst)
+    }
 }
 
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "func({}):", DisplayList::new(&self.params))?;
+        writeln!(f, "func({}):", DisplaySlice(&self.params))?;
         for ebb in self.ebbs() {
             writeln!(f)?;
-            writeln!(f, "{}({}):", ebb, DisplayList::new(self.ebb_params(ebb)))?;
+            writeln!(f, "{}({}):", ebb, DisplaySlice(self.ebb_params(ebb)))?;
             for inst in self.insts(ebb) {
-                let inst_node = self.inst(inst);
-                writeln!(f, "    {}", inst_node)?;
+                write!(f, "    ")?;
+                if let Some(result) = self.result_opt(inst) {
+                    write!(f, "{} = ", result)?;
+                }
+                let data = self.inst(inst);
+                writeln!(f, "{}", data)?;
             }
         }
         Ok(())

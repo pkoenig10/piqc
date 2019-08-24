@@ -15,6 +15,6 @@ ebb0(%0):
     %12 = shl %10, %11
     %13 = add %0, %12
     %14 = alloc 1
-    write _, %9, %14
+    write %9, %14
     store %14, %13
     ret

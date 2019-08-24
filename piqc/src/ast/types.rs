@@ -1,4 +1,5 @@
 use std::fmt;
+use std::ops::BitOr;
 
 use crate::ir;
 
@@ -6,6 +7,17 @@ use crate::ir;
 pub enum Variability {
     Uniform,
     Varying,
+}
+
+impl BitOr for Variability {
+    type Output = Self;
+
+    fn bitor(self, variability: Variability) -> Self {
+        match (self, variability) {
+            (Variability::Uniform, Variability::Uniform) => Variability::Uniform,
+            _ => Variability::Varying,
+        }
+    }
 }
 
 impl fmt::Display for Variability {

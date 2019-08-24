@@ -210,7 +210,7 @@ impl FuncBuilder {
         while let Some(block) = blocks.pop() {
             match self.use_var_in_ebb(block, variable) {
                 Ok(value) => {
-                    let value_type = self.get_value_type(value);
+                    let value_type = self.func.value(value).ty;
                     let var_type = *var_type.get_or_insert(value_type);
                     assert_eq!(
                         var_type, value_type,
@@ -262,174 +262,294 @@ impl FuncBuilder {
         }
     }
 
-    pub fn get_value_type(&self, value: Value) -> Type {
-        self.func.value(value).ty()
+    pub fn nop(&mut self) {
+        let data = InstData::Nop();
+        self.push_inst(data, None);
     }
 
-    pub fn push_int_const_inst(&mut self, value: i32) -> Value {
-        let ty = Type::new(Variability::Uniform, TypeKind::Int);
-        let dest = self.create_value(ty);
-        let inst = IntConstInst::new(dest, value).into();
-        self.push_inst(inst);
-        dest
+    pub fn element(&mut self) -> Value {
+        let data = InstData::Element();
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_float_const_inst(&mut self, value: f32) -> Value {
-        let ty = Type::new(Variability::Uniform, TypeKind::Float);
-        let dest = self.create_value(ty);
-        let inst = FloatConstInst::new(dest, value).into();
-        self.push_inst(inst);
-        dest
+    pub fn count(&mut self) -> Value {
+        let data = InstData::Count();
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_bool_const_inst(&mut self, value: bool) -> Value {
-        let dest = self.create_value(Type::UNIFORM_BOOL);
-        let inst = BoolConstInst::new(dest, value).into();
-        self.push_inst(inst);
-        dest
+    pub fn iconst(&mut self, imm: i32) -> Value {
+        let data = InstData::Iconst(imm);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_element_inst(&mut self) -> Value {
-        let dest = self.create_value(Type::VARYING_INT);
-        let inst = ElementInst::new(dest).into();
-        self.push_inst(inst);
-        dest
+    pub fn fconst(&mut self, imm: f32) -> Value {
+        let data = InstData::Fconst(imm);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_count_inst(&mut self) -> Value {
-        let dest = self.create_value(Type::UNIFORM_INT);
-        let inst = CountInst::new(dest).into();
-        self.push_inst(inst);
-        dest
+    pub fn bconst(&mut self, imm: bool) -> Value {
+        let data = InstData::Bconst(imm);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_unary_inst(&mut self, op: UnaryOp, src: Value) -> Value {
-        let ty = self.get_unary_inst_type(src);
-        let dest = self.create_value(ty);
-        let inst = UnaryInst::new(op, dest, src).into();
-        self.push_inst(inst);
-        dest
+    pub fn ftoi(&mut self, arg: Value) -> Value {
+        let data = InstData::Ftoi(arg);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_binary_inst(&mut self, op: BinaryOp, left: Value, right: Value) -> Value {
-        let ty = self.get_binary_inst_type(op, left, right);
-        let dest = self.create_value(ty);
-        let inst = BinaryInst::new(op, dest, left, right).into();
-        self.push_inst(inst);
-        dest
+    pub fn itof(&mut self, arg: Value) -> Value {
+        let data = InstData::Itof(arg);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_alloc_inst(&mut self, len: u8) -> Value {
-        let dest = self.create_value(Type::UNIFORM_INT);
-        let inst = AllocInst::new(dest, len).into();
-        self.push_inst(inst);
-        dest
+    pub fn not(&mut self, arg: Value) -> Value {
+        let data = InstData::Not(arg);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_fetch_inst(&mut self, addr: Value, ty: Type) -> Value {
-        let ty = self.get_fetch_inst_type(addr, ty);
-        let dest = self.create_value(ty);
-        let inst = FetchInst::new(dest, addr).into();
-        self.push_inst(inst);
-        dest
+    pub fn clz(&mut self, arg: Value) -> Value {
+        let data = InstData::Clz(arg);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_read_inst(&mut self, index: Value, ty: Type) -> Value {
-        let ty = self.get_read_inst_type(index, ty);
-        let dest = self.create_value(ty);
-        let inst = ReadInst::new(dest, index).into();
-        self.push_inst(inst);
-        dest
+    pub fn add(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Add([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_write_inst(&mut self, cond: Option<Value>, src: Value, index: Value) {
-        let inst = WriteInst::new(cond, src, index).into();
-        self.push_inst(inst);
+    pub fn sub(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Sub([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_store_inst(&mut self, index: Value, addr: Value) {
-        let inst = StoreInst::new(index, addr).into();
-        self.push_inst(inst);
+    pub fn shl(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Shl([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_int_cmp_inst(&mut self, op: CmpOp, left: Value, right: Value) -> Value {
-        let ty = self.get_cmp_inst_type(op, left, right);
-        let dest = self.create_value(ty);
-        let inst = IntCmpInst::new(op, dest, left, right).into();
-        self.push_inst(inst);
-        dest
+    pub fn shr(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Shr([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_float_cmp_inst(&mut self, op: CmpOp, left: Value, right: Value) -> Value {
-        let ty = self.get_cmp_inst_type(op, left, right);
-        let dest = self.create_value(ty);
-        let inst = FloatCmpInst::new(op, dest, left, right).into();
-        self.push_inst(inst);
-        dest
+    pub fn asr(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Asr([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_select_inst(&mut self, cond: Value, left: Value, right: Value) -> Value {
-        let ty = self.get_select_inst_type(left, right);
-        let dest = self.create_value(ty);
-        let inst = SelectInst::new(dest, cond, left, right).into();
-        self.push_inst(inst);
-        dest
+    pub fn ror(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Ror([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_jump_inst(&mut self, ebb: Ebb) {
-        let target = self.create_target(ebb);
-        let inst = JumpInst::new(target).into();
-        self.push_inst(inst);
+    pub fn min(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Min([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_branch_inst(&mut self, op: BranchOp, cond: Value, ebb: Ebb) {
-        let target = self.create_target(ebb);
-        let inst = BranchInst::new(op, cond, target).into();
-        self.push_inst(inst);
+    pub fn max(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Max([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    pub fn push_return_inst(&mut self) {
-        let inst = ReturnInst::new().into();
-        self.push_inst(inst);
+    pub fn and(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::And([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
     }
 
-    fn push_inst(&mut self, data: InstData) {
+    pub fn or(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Or([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn xor(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Xor([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn fadd(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Fadd([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn fsub(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Fsub([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn fmul(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Fmul([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn fmin(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Fmin([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn fmax(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Fmax([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn fminabs(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Fminabs([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn fmaxabs(&mut self, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Fmaxabs([arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn select(&mut self, arg0: Value, arg1: Value, arg2: Value) -> Value {
+        let data = InstData::Select([arg0, arg1, arg2]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn icmp(&mut self, cond: Cond, arg0: Value, arg1: Value) -> Value {
+        let data = InstData::Icmp(cond, [arg0, arg1]);
+        let inst = self.push_inst(data, None);
+        self.func.result(inst)
+    }
+
+    pub fn fcmp(&mut self, cond: Cond, arg0: Value, arg1: Value) -> Value {
+        let inst = self.push_inst(InstData::Fcmp(cond, [arg0, arg1]), None);
+        self.func.result(inst)
+    }
+
+    pub fn alloc(&mut self, len: u8) -> Value {
+        let inst = self.push_inst(InstData::Alloc(len), None);
+        self.func.result(inst)
+    }
+
+    pub fn fetch(&mut self, ty: Type, arg: Value) -> Value {
+        let inst = self.push_inst(InstData::Fetch(arg), Some(ty.kind));
+        self.func.result(inst)
+    }
+
+    pub fn read(&mut self, ty: Type, arg: Value) -> Value {
+        let data = InstData::Read(arg);
+        let inst = self.push_inst(data, Some(ty.kind));
+        self.func.result(inst)
+    }
+
+    pub fn write(&mut self, arg0: Value, arg1: Value) {
+        let data = InstData::Write([arg0, arg1]);
+        self.push_inst(data, None);
+    }
+
+    pub fn load(&mut self, ty: Type, arg0: Value, arg1: Value) {
+        let data = InstData::Load([arg0, arg1]);
+        self.push_inst(data, Some(ty.kind));
+    }
+
+    pub fn store(&mut self, arg0: Value, arg1: Value) {
+        let data = InstData::Store([arg0, arg1]);
+        self.push_inst(data, None);
+    }
+
+    pub fn jump(&mut self, ebb: Ebb) {
+        let args = self.create_args(ebb, vec![]);
+        let data = InstData::Jump(ebb, args);
+        self.push_inst(data, None);
+    }
+
+    pub fn brallz(&mut self, arg: Value, ebb: Ebb) {
+        let args = self.create_args(ebb, vec![arg]);
+        let data = InstData::Brallz(ebb, args);
+        self.push_inst(data, None);
+    }
+
+    pub fn brallnz(&mut self, arg: Value, ebb: Ebb) {
+        let args = self.create_args(ebb, vec![arg]);
+        let data = InstData::Brallnz(ebb, args);
+        self.push_inst(data, None);
+    }
+
+    pub fn branyz(&mut self, arg: Value, ebb: Ebb) {
+        let args = self.create_args(ebb, vec![arg]);
+        let data = InstData::Branyz(ebb, args);
+        self.push_inst(data, None);
+    }
+
+    pub fn branynz(&mut self, arg: Value, ebb: Ebb) {
+        let args = self.create_args(ebb, vec![arg]);
+        let data = InstData::Branynz(ebb, args);
+        self.push_inst(data, None);
+    }
+
+    pub fn ret(&mut self) {
+        let data = InstData::Return();
+        self.push_inst(data, None);
+    }
+
+    fn push_inst(&mut self, data: InstData, kind: Option<TypeKind>) -> Inst {
         let ebb = self.position.unwrap().ebb;
         let inst = self.func.create_inst(data.clone());
         self.func.push_inst(ebb, inst);
 
-        if let Some(target) = data.target() {
+        self.func.create_result(inst, kind);
+
+        if let Some((ebb, _)) = data.target() {
             let block = self.position.unwrap().block;
             let predecessor = Predecessor::new(block, inst);
-            self.push_predecessor(target.ebb(), predecessor);
+            self.push_predecessor(ebb, predecessor);
 
             self.position.as_mut().unwrap().block =
                 self.blocks.create(BlockData::Body(BodyBlock::new(block)))
         }
+
+        inst
     }
 
     fn create_value(&mut self, ty: Type) -> Value {
         self.func.create_value(ValueData::new(ty))
     }
 
-    fn create_target(&mut self, ebb: Ebb) -> Target {
+    fn create_args(&mut self, ebb: Ebb, mut args: Vec<Value>) -> Vec<Value> {
         let block = self.header_blocks[&ebb];
-        let mut target = Target::new(ebb);
 
         for i in 0..self.func.ebb_params(ebb).len() {
             let param = self.func.ebb_params(ebb)[i];
             let variable = self.values.get_param(block, param).unwrap();
             let value = self.use_var(variable);
-            target.push_arg(value);
+            args.push(value);
         }
 
-        target
+        args
     }
 
     fn push_target_arg(&mut self, inst: Inst, value: Value) {
-        if let Some(target) = self.func.inst_mut(inst).target_mut() {
-            target.push_arg(value);
-        }
+        self.func.inst_mut(inst).push_target_arg(value);
     }
 
     fn push_predecessor(&mut self, ebb: Ebb, predecessor: Predecessor) {
@@ -438,89 +558,5 @@ impl FuncBuilder {
             BlockData::Header(ref mut data) => data.predecessors.push(predecessor),
             _ => panic!(),
         }
-    }
-
-    fn get_unary_inst_type(&self, src: Value) -> Type {
-        self.get_value_type(src)
-    }
-
-    fn get_binary_inst_type(&self, op: BinaryOp, left: Value, right: Value) -> Type {
-        let left_type = self.get_value_type(left);
-        let right_type = self.get_value_type(right);
-
-        assert_eq!(
-            left_type.kind, right_type.kind,
-            "Invalid binary instruction '{}' with operand types '{}' and '{}'",
-            op, left_type, right_type
-        );
-
-        let variability = variability(left_type.variability, right_type.variability);
-
-        Type::new(variability, left_type.kind)
-    }
-
-    fn get_fetch_inst_type(&self, addr: Value, ty: Type) -> Type {
-        let addr_type = self.get_value_type(addr);
-
-        assert_eq!(
-            addr_type,
-            Type::new(ty.variability, TypeKind::Int),
-            "Invalid fetch instruction with operand type `{}` and value type {}",
-            addr_type,
-            ty
-        );
-
-        ty
-    }
-
-    fn get_read_inst_type(&self, index: Value, ty: Type) -> Type {
-        let index_type = self.get_value_type(index);
-
-        assert_eq!(
-            index_type,
-            Type::new(ty.variability, TypeKind::Int),
-            "Invalid read instruction with operand type `{}` and value type {}",
-            index_type,
-            ty
-        );
-
-        ty
-    }
-
-    fn get_cmp_inst_type(&self, op: CmpOp, left: Value, right: Value) -> Type {
-        let left_type = self.get_value_type(left);
-        let right_type = self.get_value_type(right);
-
-        assert_eq!(
-            left_type.kind, right_type.kind,
-            "Invalid cmparison instruction '{}' with operand types '{}' and '{}'",
-            op, left_type, right_type
-        );
-
-        let variability = variability(left_type.variability, right_type.variability);
-
-        Type::new(variability, TypeKind::Bool)
-    }
-
-    fn get_select_inst_type(&self, left: Value, right: Value) -> Type {
-        let left_type = self.get_value_type(left);
-        let right_type = self.get_value_type(right);
-
-        assert_eq!(
-            left_type.kind, right_type.kind,
-            "Invalid select instruction with operand types '{}' and '{}'",
-            left_type, right_type
-        );
-
-        let variability = variability(left_type.variability, right_type.variability);
-
-        Type::new(variability, left_type.kind)
-    }
-}
-
-pub fn variability(variability1: Variability, variability2: Variability) -> Variability {
-    match (variability1, variability2) {
-        (Variability::Uniform, Variability::Uniform) => Variability::Uniform,
-        _ => Variability::Varying,
     }
 }

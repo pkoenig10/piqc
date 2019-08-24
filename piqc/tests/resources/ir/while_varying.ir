@@ -7,7 +7,7 @@ ebb0(%0):
 ebb1(%2):
     %3 = element
     %4 = icmp lt %2, %3
-    br anyf %4 ebb2()
+    brallz %4 ebb2()
     %5 = iconst 1
     %6 = add %2, %5
     %7 = select %4, %6, %2
@@ -19,6 +19,6 @@ ebb2():
     %12 = shl %10, %11
     %13 = add %0, %12
     %15 = alloc 1
-    write _, %2, %15
+    write %2, %15
     store %15, %13
     ret

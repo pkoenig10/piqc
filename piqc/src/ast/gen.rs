@@ -15,15 +15,7 @@ enum Value {
     Addr(ir::Value),
 }
 
-enum BinaryKind {
-    Binary(ir::BinaryOp),
-    IntCmp(ir::CmpOp),
-    FloatCmp(ir::CmpOp),
-}
-
 type ExprResult = Result<(Type, Value), ()>;
-
-type BinaryResult = Result<(Type, BinaryKind), ()>;
 
 type SymbolResult = Result<(Type, ir::Variable), ()>;
 
@@ -113,7 +105,7 @@ impl IrGenerator {
         self.stmt(&func.stmt);
 
         if !self.builder.is_filled() {
-            self.builder.push_return_inst();
+            self.builder.ret();
         }
 
         if !self.errors.is_empty() {
@@ -214,8 +206,7 @@ impl IrGenerator {
                 let src_value = match self.predicate {
                     Some(predicate) => {
                         let prev_value = self.builder.use_var(dest_variable);
-                        self.builder
-                            .push_select_inst(predicate, src_value, prev_value)
+                        self.builder.select(predicate, src_value, prev_value)
                     }
                     None => src_value,
                 };
@@ -225,22 +216,20 @@ impl IrGenerator {
             Value::Idx(dest_idx) => {
                 let src_value = self.resolve_value(src_type, src_value);
 
-                self.builder
-                    .push_write_inst(self.predicate, src_value, dest_idx);
+                self.builder.write(src_value, dest_idx);
             }
             Value::Addr(dest_addr) => {
                 let src_idx = match src_value {
                     Value::Idx(src_idx) => src_idx,
                     _ => {
                         let src_value = self.resolve_value(src_type, src_value);
-                        let tmp_idx = self.builder.push_alloc_inst(1);
-                        self.builder
-                            .push_write_inst(self.predicate, src_value, tmp_idx);
+                        let tmp_idx = self.builder.alloc(1);
+                        self.builder.write(src_value, tmp_idx);
                         tmp_idx
                     }
                 };
 
-                self.builder.push_store_inst(src_idx, dest_addr)
+                self.builder.store(src_idx, dest_addr)
             }
             _ => {
                 self.errors.push(format!("Invalid place expression"));
@@ -262,17 +251,16 @@ impl IrGenerator {
                     None => else_ebb,
                 };
 
-                self.builder
-                    .push_branch_inst(ir::BranchOp::AllFalse, cond_value, else_ebb);
+                self.builder.brallz(cond_value, else_ebb);
 
                 self.stmt(&stmt.if_stmt);
-                self.builder.push_jump_inst(merge_ebb);
+                self.builder.jump(merge_ebb);
 
                 if let Some(ref else_stmt) = stmt.else_stmt {
                     self.builder.set_position(else_ebb);
 
                     self.stmt(else_stmt);
-                    self.builder.push_jump_inst(merge_ebb);
+                    self.builder.jump(merge_ebb);
                 }
 
                 self.builder.set_position(merge_ebb);
@@ -304,7 +292,7 @@ impl IrGenerator {
         let header_ebb = self.builder.create_ebb();
         let after_ebb = self.builder.create_ebb();
 
-        self.builder.push_jump_inst(header_ebb);
+        self.builder.jump(header_ebb);
         self.builder.set_position(header_ebb);
 
         let cond_result = self.expr_value(&stmt.cond);
@@ -313,11 +301,10 @@ impl IrGenerator {
 
         match cond_type {
             Type::UNIFORM_BOOL => {
-                self.builder
-                    .push_branch_inst(ir::BranchOp::AllFalse, cond_value, after_ebb);
+                self.builder.brallz(cond_value, after_ebb);
 
                 self.stmt(&stmt.stmt);
-                self.builder.push_jump_inst(header_ebb);
+                self.builder.jump(header_ebb);
 
                 self.builder.set_position(after_ebb);
             }
@@ -325,12 +312,11 @@ impl IrGenerator {
                 let prev_predicate = self.set_predicate_and(cond_value);
 
                 if let Some(predicate) = self.predicate {
-                    self.builder
-                        .push_branch_inst(ir::BranchOp::AnyFalse, predicate, after_ebb);
+                    self.builder.brallz(predicate, after_ebb);
                 }
 
                 self.stmt(&stmt.stmt);
-                self.builder.push_jump_inst(header_ebb);
+                self.builder.jump(header_ebb);
                 self.builder.set_position(after_ebb);
 
                 self.reset_predicate(prev_predicate);
@@ -348,19 +334,15 @@ impl IrGenerator {
     fn return_stmt(&mut self, _stmt: &ReturnStmt) {
         match self.predicate {
             Some(predicate) => {
-                let not_predicate = self.builder.push_unary_inst(ir::UnaryOp::Not, predicate);
+                let not_predicate = self.builder.not(predicate);
                 let not_returned = match self.not_returned {
-                    Some(not_returned) => self.builder.push_binary_inst(
-                        ir::BinaryOp::Add,
-                        not_returned,
-                        not_predicate,
-                    ),
+                    Some(not_returned) => self.builder.add(not_returned, not_predicate),
                     None => not_predicate,
                 };
                 self.not_returned = Some(not_returned);
             }
             None => {
-                self.builder.push_return_inst();
+                self.builder.ret();
 
                 let ebb = self.builder.create_ebb();
                 self.builder.set_position(ebb);
@@ -379,8 +361,8 @@ impl IrGenerator {
         match value {
             Value::Var(variable) => self.builder.use_var(variable),
             Value::Val(value) => value,
-            Value::Idx(value) => self.builder.push_read_inst(value, ty.into()),
-            Value::Addr(value) => self.builder.push_fetch_inst(value, ty.into()),
+            Value::Idx(value) => self.builder.read(ty.into(), value),
+            Value::Addr(value) => self.builder.fetch(ty.into(), value),
         }
     }
 
@@ -400,31 +382,31 @@ impl IrGenerator {
     }
 
     fn int_expr(&mut self, expr: &IntExpr) -> ExprResult {
-        let value = self.builder.push_int_const_inst(expr.value);
+        let value = self.builder.iconst(expr.value);
 
         Ok((Type::UNIFORM_INT, Value::Val(value)))
     }
 
     fn float_expr(&mut self, expr: &FloatExpr) -> ExprResult {
-        let value = self.builder.push_float_const_inst(expr.value);
+        let value = self.builder.fconst(expr.value);
 
         Ok((Type::UNIFORM_FLOAT, Value::Val(value)))
     }
 
     fn bool_expr(&mut self, expr: &BoolExpr) -> ExprResult {
-        let value = self.builder.push_bool_const_inst(expr.value);
+        let value = self.builder.bconst(expr.value);
 
         Ok((Type::UNIFORM_BOOL, Value::Val(value)))
     }
 
     fn element_expr(&mut self) -> ExprResult {
-        let value = self.builder.push_element_inst();
+        let value = self.builder.element();
 
         Ok((Type::VARYING_INT, Value::Val(value)))
     }
 
     fn count_expr(&mut self) -> ExprResult {
-        let value = self.builder.push_count_inst();
+        let value = self.builder.count();
 
         Ok((Type::UNIFORM_INT, Value::Val(value)))
     }
@@ -446,49 +428,45 @@ impl IrGenerator {
 
         let (expr_type, expr_value) = expr_result?;
 
-        match (expr.op, expr_type) {
+        let (ty, value) = match (expr.op, expr_type) {
             (UnaryOp::Deref, Type::PrimRef(var, prim)) => {
                 let ty = Type::Prim(var, prim);
 
-                Ok((ty, Value::Addr(expr_value)))
+                (ty, Value::Addr(expr_value))
             }
             (UnaryOp::Negate, Type::Prim(_, Primitive::Int)) => {
-                let zero = self.builder.push_int_const_inst(0);
-                let value = self
-                    .builder
-                    .push_binary_inst(ir::BinaryOp::Sub, zero, expr_value);
+                let zero = self.builder.iconst(0);
+                let value = self.builder.sub(zero, expr_value);
 
-                Ok((expr_type, Value::Val(value)))
+                (expr_type, Value::Val(value))
             }
             (UnaryOp::Negate, Type::Prim(_, Primitive::Float)) => {
-                let zero = self.builder.push_float_const_inst(0.);
-                let value = self
-                    .builder
-                    .push_binary_inst(ir::BinaryOp::Fsub, zero, expr_value);
+                let zero = self.builder.fconst(0.);
+                let value = self.builder.fsub(zero, expr_value);
 
-                Ok((expr_type, Value::Val(value)))
+                (expr_type, Value::Val(value))
             }
             (UnaryOp::Not, Type::Prim(_, Primitive::Int)) => {
-                let value = self.builder.push_unary_inst(ir::UnaryOp::Not, expr_value);
+                let value = self.builder.not(expr_value);
 
-                Ok((expr_type, Value::Val(value)))
+                (expr_type, Value::Val(value))
             }
             (UnaryOp::Not, Type::Prim(_, Primitive::Bool)) => {
-                let one = self.builder.push_bool_const_inst(true);
-                let value = self
-                    .builder
-                    .push_binary_inst(ir::BinaryOp::Xor, one, expr_value);
+                let one = self.builder.bconst(true);
+                let value = self.builder.xor(one, expr_value);
 
-                Ok((expr_type, Value::Val(value)))
+                (expr_type, Value::Val(value))
             }
             _ => {
                 self.errors.push(format!(
                     "Invalid unary expression '{}' with operand type '{}'",
                     expr.op, expr_type
                 ));
-                Err(())
+                return Err(());
             }
-        }
+        };
+
+        Ok((ty, value))
     }
 
     fn binary_expr(&mut self, expr: &BinaryExpr) -> ExprResult {
@@ -498,32 +476,145 @@ impl IrGenerator {
         let (left_type, left_value) = left_result?;
         let (right_type, right_value) = right_result?;
 
-        match binary_kind(expr.op, left_type, right_type) {
-            Ok((ty, BinaryKind::Binary(op))) => {
-                let value = self.builder.push_binary_inst(op, left_value, right_value);
+        let result = fn_block!({
+            let (var, prim) = match (left_type, right_type) {
+                (Type::Prim(left_vari, left_prim), Type::Prim(right_vari, right_prim)) => {
+                    if left_prim != right_prim {
+                        return Err(());
+                    }
 
-                Ok((ty, Value::Val(value)))
-            }
-            Ok((ty, BinaryKind::IntCmp(op))) => {
-                let value = self.builder.push_int_cmp_inst(op, left_value, right_value);
+                    (left_vari | right_vari, left_prim)
+                }
+                _ => return Err(()),
+            };
 
-                Ok((ty, Value::Val(value)))
-            }
-            Ok((ty, BinaryKind::FloatCmp(op))) => {
-                let value = self
-                    .builder
-                    .push_float_cmp_inst(op, left_value, right_value);
+            let (ty, value) = match (expr.op, prim) {
+                (BinaryOp::Mul, Primitive::Float) => {
+                    let value = self.builder.fmul(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Add, Primitive::Int) => {
+                    let value = self.builder.add(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Add, Primitive::Float) => {
+                    let value = self.builder.fadd(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Sub, Primitive::Int) => {
+                    let value = self.builder.sub(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Sub, Primitive::Float) => {
+                    let value = self.builder.fsub(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Shl, Primitive::Int) => {
+                    let value = self.builder.shl(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Shr, Primitive::Int) => {
+                    let value = self.builder.shr(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Min, Primitive::Int) => {
+                    let value = self.builder.min(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Min, Primitive::Float) => {
+                    let value = self.builder.fmin(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Max, Primitive::Int) => {
+                    let value = self.builder.max(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Max, Primitive::Float) => {
+                    let value = self.builder.fmax(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::BitAnd, Primitive::Int) => {
+                    let value = self.builder.and(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::LogicalAnd, Primitive::Bool) => {
+                    let value = self.builder.and(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::BitOr, Primitive::Int) => {
+                    let value = self.builder.or(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::LogicalOr, Primitive::Bool) => {
+                    let value = self.builder.or(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::BitXor, Primitive::Int) => {
+                    let value = self.builder.xor(left_value, right_value);
+                    (Type::Prim(var, prim), value)
+                }
+                (BinaryOp::Eq, Primitive::Int) => {
+                    let value = self.builder.icmp(ir::Cond::Eq, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Eq, Primitive::Float) => {
+                    let value = self.builder.fcmp(ir::Cond::Eq, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Ne, Primitive::Int) => {
+                    let value = self.builder.icmp(ir::Cond::Ne, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Ne, Primitive::Float) => {
+                    let value = self.builder.fcmp(ir::Cond::Ne, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Lt, Primitive::Int) => {
+                    let value = self.builder.icmp(ir::Cond::Lt, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Lt, Primitive::Float) => {
+                    let value = self.builder.fcmp(ir::Cond::Lt, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Gt, Primitive::Int) => {
+                    let value = self.builder.icmp(ir::Cond::Gt, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Gt, Primitive::Float) => {
+                    let value = self.builder.fcmp(ir::Cond::Gt, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Le, Primitive::Int) => {
+                    let value = self.builder.icmp(ir::Cond::Le, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Le, Primitive::Float) => {
+                    let value = self.builder.fcmp(ir::Cond::Le, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Ge, Primitive::Int) => {
+                    let value = self.builder.icmp(ir::Cond::Ge, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                (BinaryOp::Ge, Primitive::Float) => {
+                    let value = self.builder.fcmp(ir::Cond::Ge, left_value, right_value);
+                    (Type::Prim(var, Primitive::Bool), value)
+                }
+                _ => return Err(()),
+            };
 
-                Ok((ty, Value::Val(value)))
-            }
-            Err(()) => {
-                self.errors.push(format!(
-                    "Invalid binary expression '{}' with operand types '{}' and '{}'",
-                    expr.op, left_type, right_type
-                ));
-                Err(())
-            }
-        }
+            Ok((ty, Value::Val(value)))
+        });
+
+        if let Err(()) = result {
+            self.errors.push(format!(
+                "Invalid binary expression '{}' with operand types '{}' and '{}'",
+                expr.op, left_type, right_type
+            ));
+        };
+
+        result
     }
 
     fn index_expr(&mut self, expr: &IndexExpr) -> ExprResult {
@@ -533,38 +624,33 @@ impl IrGenerator {
         let (expr_type, expr_value) = expr_result?;
         let (index_type, index_value) = index_result?;
 
-        match (expr_type, index_type) {
+        let (ty, value) = match (expr_type, index_type) {
             (Type::Array(expr_vari, expr_prim), Type::UNIFORM_INT) => {
                 let ty = Type::Prim(expr_vari, expr_prim);
 
-                let value =
-                    self.builder
-                        .push_binary_inst(ir::BinaryOp::Add, expr_value, index_value);
+                let value = self.builder.add(expr_value, index_value);
 
-                Ok((ty, Value::Idx(value)))
+                (ty, Value::Idx(value))
             }
             (Type::ArrayRef(expr_vari, expr_prim), Type::Prim(index_vari, Primitive::Int)) => {
-                let var = variability(expr_vari, index_vari);
-                let ty = Type::Prim(var, expr_prim);
+                let ty = Type::Prim(expr_vari | index_vari, expr_prim);
 
-                let two = self.builder.push_int_const_inst(2);
-                let offset_value =
-                    self.builder
-                        .push_binary_inst(ir::BinaryOp::Shl, index_value, two);
-                let value =
-                    self.builder
-                        .push_binary_inst(ir::BinaryOp::Add, expr_value, offset_value);
+                let two = self.builder.iconst(2);
+                let offset_value = self.builder.shl(index_value, two);
+                let value = self.builder.add(expr_value, offset_value);
 
-                Ok((ty, Value::Addr(value)))
+                (ty, Value::Addr(value))
             }
             _ => {
                 self.errors.push(format!(
                     "Invalid index expression with value type '{}' and index type '{}'",
                     expr_type, index_type
                 ));
-                Err(())
+                return Err(());
             }
-        }
+        };
+
+        Ok((ty, value))
     }
 
     fn paren_expr(&mut self, expr: &ParenExpr) -> ExprResult {
@@ -573,22 +659,17 @@ impl IrGenerator {
 
     fn set_predicate_and(&mut self, value: ir::Value) -> Option<ir::Value> {
         let predicate = match self.predicate {
-            Some(predicate) => self
-                .builder
-                .push_binary_inst(ir::BinaryOp::And, predicate, value),
+            Some(predicate) => self.builder.and(predicate, value),
             None => value,
         };
         self.set_predicate(predicate)
     }
 
     fn set_predicate_and_not(&mut self, value: ir::Value) -> Option<ir::Value> {
-        let not_value = self.builder.push_unary_inst(ir::UnaryOp::Not, value);
+        let not_value = self.builder.not(value);
 
         let predicate = match self.predicate {
-            Some(predicate) => {
-                self.builder
-                    .push_binary_inst(ir::BinaryOp::Add, predicate, not_value)
-            }
+            Some(predicate) => self.builder.add(predicate, not_value),
             None => not_value,
         };
         self.set_predicate(predicate)
@@ -604,10 +685,7 @@ impl IrGenerator {
         self.predicate = match self.not_returned {
             Some(not_returned) => {
                 let predicate = match predicate {
-                    Some(predicate) => {
-                        self.builder
-                            .push_binary_inst(ir::BinaryOp::And, predicate, not_returned)
-                    }
+                    Some(predicate) => self.builder.add(predicate, not_returned),
                     None => not_returned,
                 };
                 Some(predicate)
@@ -619,80 +697,17 @@ impl IrGenerator {
 
 fn is_valid_assign(place_type: Type, value_type: Type) -> bool {
     match (place_type, value_type) {
-        (Type::Prim(place_var, place_prim), Type::Prim(value_var, value_prim)) => {
+        (Type::Prim(place_vari, place_prim), Type::Prim(value_vari, value_prim)) => {
             if place_prim != value_prim {
                 return false;
             }
 
-            if (Variability::Uniform, Variability::Varying) == (place_var, value_var) {
+            if (Variability::Uniform, Variability::Varying) == (place_vari, value_vari) {
                 return false;
             }
 
             true
         }
         _ => false,
-    }
-}
-
-fn binary_kind(op: BinaryOp, left_type: Type, right_type: Type) -> BinaryResult {
-    let (var, prim) = match (left_type, right_type) {
-        (Type::Prim(left_var, left_prim), Type::Prim(right_var, right_prim)) => {
-            if left_prim != right_prim {
-                return Err(());
-            }
-
-            let var = variability(left_var, right_var);
-            (var, left_prim)
-        }
-        _ => return Err(()),
-    };
-
-    let kind = match (op, prim) {
-        (BinaryOp::Mul, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fmul),
-        (BinaryOp::Add, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Add),
-        (BinaryOp::Add, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fadd),
-        (BinaryOp::Sub, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Sub),
-        (BinaryOp::Sub, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fsub),
-        (BinaryOp::Shl, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Shl),
-        (BinaryOp::Shr, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Asr),
-        (BinaryOp::Min, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Min),
-        (BinaryOp::Min, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fmin),
-        (BinaryOp::Max, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Max),
-        (BinaryOp::Max, Primitive::Float) => BinaryKind::Binary(ir::BinaryOp::Fmax),
-        (BinaryOp::BitAnd, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::And),
-        (BinaryOp::LogicalAnd, Primitive::Bool) => BinaryKind::Binary(ir::BinaryOp::And),
-        (BinaryOp::BitOr, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Or),
-        (BinaryOp::LogicalOr, Primitive::Bool) => BinaryKind::Binary(ir::BinaryOp::Or),
-        (BinaryOp::BitXor, Primitive::Int) => BinaryKind::Binary(ir::BinaryOp::Xor),
-        (BinaryOp::Eq, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Eq),
-        (BinaryOp::Eq, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Eq),
-        (BinaryOp::Ne, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Ne),
-        (BinaryOp::Ne, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Ne),
-        (BinaryOp::Lt, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Lt),
-        (BinaryOp::Lt, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Lt),
-        (BinaryOp::Gt, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Gt),
-        (BinaryOp::Gt, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Gt),
-        (BinaryOp::Le, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Le),
-        (BinaryOp::Le, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Le),
-        (BinaryOp::Ge, Primitive::Int) => BinaryKind::IntCmp(ir::CmpOp::Ge),
-        (BinaryOp::Ge, Primitive::Float) => BinaryKind::FloatCmp(ir::CmpOp::Ge),
-        _ => return Err(()),
-    };
-
-    let prim = match kind {
-        BinaryKind::Binary(_) => prim,
-        BinaryKind::IntCmp(_) => Primitive::Bool,
-        BinaryKind::FloatCmp(_) => Primitive::Bool,
-    };
-
-    let ty = Type::Prim(var, prim);
-
-    Ok((ty, kind))
-}
-
-pub fn variability(variability1: Variability, variability2: Variability) -> Variability {
-    match (variability1, variability2) {
-        (Variability::Uniform, Variability::Uniform) => Variability::Uniform,
-        _ => Variability::Varying,
     }
 }

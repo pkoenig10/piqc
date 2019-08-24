@@ -7,13 +7,13 @@ ebb0(%0):
 ebb1(%2):
     %3 = iconst 42
     %4 = icmp lt %2, %3
-    br allf %4 ebb2()
+    brallz %4 ebb2()
     %5 = iconst 1
     %6 = add %2, %5
     jmp ebb1(%6)
 
 ebb2():
     %10 = alloc 1
-    write _, %2, %10
+    write %2, %10
     store %10, %0
     ret
