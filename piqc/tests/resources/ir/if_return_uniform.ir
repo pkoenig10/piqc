@@ -1,12 +1,12 @@
 func(uniform int, uniform bool):
 
 ebb0(%0, %1):
-    brallz %1 ebb1(%0)
+    brallz %1 ebb1()
     ret
 
-ebb1(%3):
+ebb1():
     %2 = iconst 42
-    %5 = alloc 1
-    write %2, %5
-    store %5, %3
+    %3 = alloc 1
+    write %2, %3
+    store %3, %0
     ret

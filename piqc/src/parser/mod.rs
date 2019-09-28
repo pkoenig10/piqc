@@ -1,7 +1,7 @@
 use lalrpop_util::lalrpop_mod;
 
 use crate::ast;
-use crate::util::InternMap;
+use crate::collections::InternMap;
 
 lalrpop_mod!(
     #[allow(warnings)]

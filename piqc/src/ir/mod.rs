@@ -1,21 +1,17 @@
 pub use self::builder::FuncBuilder;
 pub use self::func::Func;
 pub use self::inst::Cond;
-pub use self::pass::run_dead_code;
 pub use self::types::{Type, TypeKind, Variability};
 pub use self::verifier::verify_ir;
 
 use std::fmt;
 
 use self::inst::InstData;
-use self::value::ValueData;
 
 mod builder;
 mod func;
 mod inst;
-mod pass;
 mod types;
-mod value;
 mod verifier;
 
 id!(pub Ebb, "ebb");

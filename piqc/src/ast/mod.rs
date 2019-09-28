@@ -9,6 +9,21 @@ pub use self::stmt::{
 };
 pub use self::types::{Primitive, Type, Variability};
 
+macro_rules! fn_block {
+    ($expr:expr) => {
+        (|| $expr)();
+    };
+}
+
+macro_rules! unwrap_or_return {
+    ($result:expr) => {
+        match $result {
+            Ok(value) => value,
+            Err(_) => return,
+        }
+    };
+}
+
 mod expr;
 mod func;
 mod gen;

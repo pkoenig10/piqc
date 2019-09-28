@@ -27,7 +27,7 @@ impl fmt::Display for Cond {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum InstData {
     Nop(),
     Element(),
@@ -178,28 +178,13 @@ impl InstData {
         }
     }
 
-    pub fn swap_remove_arg(&mut self, index: usize) {
-        match self {
-            InstData::Jump(_, args) => {
-                args.swap_remove(index);
-            }
-            InstData::Brallz(_, args)
-            | InstData::Brallnz(_, args)
-            | InstData::Branyz(_, args)
-            | InstData::Branynz(_, args) => {
-                args.swap_remove(index + 1);
-            }
-            _ => panic!("Instruction is not a jump or branch"),
-        };
-    }
-
-    pub fn target(&self) -> Option<(Ebb, &[Value])> {
-        match self {
-            InstData::Jump(ebb, args) => Some((*ebb, args)),
-            InstData::Brallz(ebb, args)
-            | InstData::Brallnz(ebb, args)
-            | InstData::Branyz(ebb, args)
-            | InstData::Branynz(ebb, args) => Some((*ebb, &args[1..])),
+    pub fn target(&self) -> Option<Ebb> {
+        match *self {
+            InstData::Jump(ebb, _)
+            | InstData::Brallz(ebb, _)
+            | InstData::Brallnz(ebb, _)
+            | InstData::Branyz(ebb, _)
+            | InstData::Branynz(ebb, _) => Some(ebb),
             _ => None,
         }
     }
@@ -214,14 +199,6 @@ impl InstData {
                 args.push(arg);
             }
             _ => {}
-        }
-    }
-
-    pub fn replace_value(&mut self, old: Value, new: Value) {
-        for arg in self.args_mut() {
-            if *arg == old {
-                *arg = new;
-            }
         }
     }
 }

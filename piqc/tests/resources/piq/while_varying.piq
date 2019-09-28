@@ -1,8 +1,8 @@
-fn while_varying(uniform &[int] output) {
+fn while_varying(uniform &[int] output, uniform int bar) {
     int foo = 0;
 
     while (foo < @element) {
-        foo = foo + 1;
+        foo = foo + bar;
     }
 
     output[@element] = foo;

@@ -14,16 +14,16 @@ impl<'a> Verifier<'a> {
     }
 
     pub fn verify_func(self) {
-        for ebb in self.func.ebbs() {
-            for inst in self.func.insts(ebb) {
+        for ebb in self.func.layout.ebbs() {
+            for inst in self.func.layout.insts(ebb) {
                 self.verify_inst(ebb, inst);
             }
         }
     }
 
     pub fn verify_inst(&self, ebb: Ebb, inst: Inst) {
-        let is_last_inst = self.func.last_inst(ebb).unwrap() == inst;
-        let is_terminator = self.func.inst(inst).is_terminator();
+        let is_last_inst = self.func.layout.last_inst(ebb).unwrap() == inst;
+        let is_terminator = self.func.data.inst(inst).is_terminator();
 
         if !is_last_inst && is_terminator {
             panic!(

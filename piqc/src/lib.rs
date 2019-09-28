@@ -1,5 +1,5 @@
 #[macro_use]
-mod util;
+mod collections;
 
 pub mod ast;
 pub mod ir;
@@ -13,7 +13,7 @@ pub fn compile(s: &str) -> String {
 
     ir::verify_ir(&func);
 
-    ir::run_dead_code(&mut func);
+    func.resolve_aliases();
 
     format!("{}", func)
 }

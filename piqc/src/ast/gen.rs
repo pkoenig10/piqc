@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::ast::*;
+use crate::collections::Generator;
 use crate::ir;
-use crate::util::Generator;
 
 pub fn generate_ir(func: &Func) -> ir::Func {
     IrGenerator::new().func(func).unwrap()
@@ -20,14 +20,14 @@ type ExprResult = Result<(Type, Value), ()>;
 type SymbolResult = Result<(Type, ir::Variable), ()>;
 
 #[derive(Debug)]
-struct SymbolTable {
+struct Symbols {
     scopes: Vec<HashMap<Symbol, SymbolResult>>,
     generator: Generator<ir::Variable>,
 }
 
-impl SymbolTable {
-    fn new() -> SymbolTable {
-        SymbolTable {
+impl Symbols {
+    fn new() -> Symbols {
+        Symbols {
             scopes: Vec::new(),
             generator: Generator::new(),
         }
@@ -71,7 +71,7 @@ impl SymbolTable {
 
 struct IrGenerator {
     builder: ir::FuncBuilder,
-    symbols: SymbolTable,
+    symbols: Symbols,
     predicate: Option<ir::Value>,
     not_returned: Option<ir::Value>,
     errors: Vec<String>,
@@ -81,7 +81,7 @@ impl IrGenerator {
     fn new() -> IrGenerator {
         IrGenerator {
             builder: ir::FuncBuilder::new(),
-            symbols: SymbolTable::new(),
+            symbols: Symbols::new(),
             predicate: None,
             not_returned: None,
             errors: Vec::new(),
@@ -92,14 +92,11 @@ impl IrGenerator {
         self.symbols.push_scope();
 
         let entry_ebb = self.builder.create_ebb();
-        self.builder.set_position(entry_ebb);
+        self.builder.switch_to_ebb(entry_ebb);
+        self.builder.seal_ebb(entry_ebb);
 
         for param in &func.params {
-            if let Ok(variable) = self.param(param) {
-                self.builder.push_param(param.ty.into());
-                self.builder
-                    .push_ebb_param(variable, entry_ebb, param.ty.into());
-            }
+            self.param(entry_ebb, param);
         }
 
         self.stmt(&func.stmt);
@@ -115,24 +112,26 @@ impl IrGenerator {
             return Err(());
         }
 
-        Ok(self.builder.build())
+        Ok(self.builder.finalize())
     }
 
-    fn param(&mut self, param: &Param) -> Result<ir::Variable, ()> {
+    fn param(&mut self, ebb: ir::Ebb, param: &Param) {
         match param.ty {
             Type::Prim(Variability::Uniform, _)
             | Type::PrimRef(Variability::Uniform, _)
             | Type::ArrayRef(Variability::Uniform, _) => {
+                let value = self.builder.push_param(ebb, param.ty.into());
+
                 let variable = self.symbols.insert_ok(param.identifier.symbol, param.ty);
-                Ok(variable)
+                self.builder.declare_var(variable, param.ty.into());
+                self.builder.def_var(variable, value);
             }
             _ => {
                 self.symbols.insert_err(param.identifier.symbol);
                 self.errors
                     .push(format!("Invalid parameter with type '{}'", param.ty));
-                Err(())
             }
-        }
+        };
     }
 
     fn stmt(&mut self, stmt: &Stmt) {
@@ -150,6 +149,10 @@ impl IrGenerator {
         self.symbols.push_scope();
 
         for stmt in &stmt.stmts {
+            if self.builder.is_filled() {
+                break;
+            }
+
             self.stmt(stmt);
         }
 
@@ -162,7 +165,7 @@ impl IrGenerator {
 
             let (expr_type, expr_value) = expr_result?;
 
-            if !is_valid_assign(stmt.ty, expr_type) {
+            if !stmt.ty.is_assignable_from(expr_type) {
                 self.errors.push(format!(
                     "Mismatched types '{}' and '{}'",
                     stmt.ty, expr_type
@@ -176,6 +179,7 @@ impl IrGenerator {
         match result {
             Ok(value) => {
                 let variable = self.symbols.insert_ok(stmt.identifier.symbol, stmt.ty);
+                self.builder.declare_var(variable, stmt.ty.into());
                 self.builder.def_var(variable, value);
             }
             Err(()) => {
@@ -191,7 +195,7 @@ impl IrGenerator {
         let (src_type, src_value) = unwrap_or_return!(src_result);
         let (dest_type, dest_value) = unwrap_or_return!(dest_result);
 
-        if !is_valid_assign(dest_type, src_type) {
+        if !dest_type.is_assignable_from(src_type) {
             self.errors.push(format!(
                 "Mismatched types '{}' and '{}'",
                 dest_type, src_type
@@ -252,18 +256,27 @@ impl IrGenerator {
                 };
 
                 self.builder.brallz(cond_value, else_ebb);
+                self.builder.seal_ebb(else_ebb);
 
                 self.stmt(&stmt.if_stmt);
-                self.builder.jump(merge_ebb);
 
-                if let Some(ref else_stmt) = stmt.else_stmt {
-                    self.builder.set_position(else_ebb);
-
-                    self.stmt(else_stmt);
+                if !self.builder.is_filled() {
                     self.builder.jump(merge_ebb);
                 }
 
-                self.builder.set_position(merge_ebb);
+                if let Some(ref else_stmt) = stmt.else_stmt {
+                    self.builder.switch_to_ebb(else_ebb);
+
+                    self.stmt(else_stmt);
+
+                    if !self.builder.is_filled() {
+                        self.builder.jump(merge_ebb);
+                    }
+                }
+
+                self.builder.seal_ebb(merge_ebb);
+
+                self.builder.switch_to_ebb(merge_ebb);
             }
             Type::VARYING_BOOL => {
                 let prev_predicate = self.set_predicate_and(cond_value);
@@ -280,7 +293,7 @@ impl IrGenerator {
             }
             _ => {
                 self.errors.push(format!(
-                    "Invalid while statement condition with type '{}'",
+                    "Invalid if statement condition with type '{}'",
                     cond_type
                 ));
                 return;
@@ -293,7 +306,7 @@ impl IrGenerator {
         let after_ebb = self.builder.create_ebb();
 
         self.builder.jump(header_ebb);
-        self.builder.set_position(header_ebb);
+        self.builder.switch_to_ebb(header_ebb);
 
         let cond_result = self.expr_value(&stmt.cond);
 
@@ -302,22 +315,34 @@ impl IrGenerator {
         match cond_type {
             Type::UNIFORM_BOOL => {
                 self.builder.brallz(cond_value, after_ebb);
+                self.builder.seal_ebb(after_ebb);
 
                 self.stmt(&stmt.stmt);
-                self.builder.jump(header_ebb);
 
-                self.builder.set_position(after_ebb);
+                if !self.builder.is_filled() {
+                    self.builder.jump(header_ebb);
+                }
+                self.builder.seal_ebb(header_ebb);
+
+                self.builder.switch_to_ebb(after_ebb);
             }
             Type::VARYING_BOOL => {
                 let prev_predicate = self.set_predicate_and(cond_value);
 
-                if let Some(predicate) = self.predicate {
-                    self.builder.brallz(predicate, after_ebb);
-                }
+                let predicate = self
+                    .predicate
+                    .expect("Predicate is none after while condition");
+                self.builder.brallz(predicate, after_ebb);
+                self.builder.seal_ebb(after_ebb);
 
                 self.stmt(&stmt.stmt);
-                self.builder.jump(header_ebb);
-                self.builder.set_position(after_ebb);
+
+                if !self.builder.is_filled() {
+                    self.builder.jump(header_ebb);
+                }
+                self.builder.seal_ebb(header_ebb);
+
+                self.builder.switch_to_ebb(after_ebb);
 
                 self.reset_predicate(prev_predicate);
             }
@@ -343,9 +368,6 @@ impl IrGenerator {
             }
             None => {
                 self.builder.ret();
-
-                let ebb = self.builder.create_ebb();
-                self.builder.set_position(ebb);
             }
         };
     }
@@ -692,22 +714,5 @@ impl IrGenerator {
             }
             None => predicate,
         };
-    }
-}
-
-fn is_valid_assign(place_type: Type, value_type: Type) -> bool {
-    match (place_type, value_type) {
-        (Type::Prim(place_vari, place_prim), Type::Prim(value_vari, value_prim)) => {
-            if place_prim != value_prim {
-                return false;
-            }
-
-            if (Variability::Uniform, Variability::Varying) == (place_vari, value_vari) {
-                return false;
-            }
-
-            true
-        }
-        _ => false,
     }
 }

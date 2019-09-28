@@ -72,6 +72,23 @@ impl Type {
     pub const VARYING_INT: Type = Type::Prim(Variability::Varying, Primitive::Int);
     pub const VARYING_FLOAT: Type = Type::Prim(Variability::Varying, Primitive::Float);
     pub const VARYING_BOOL: Type = Type::Prim(Variability::Varying, Primitive::Bool);
+
+    pub fn is_assignable_from(&self, ty: Type) -> bool {
+        match (*self, ty) {
+            (Type::Prim(variability, kind), Type::Prim(ty_variability, ty_kind)) => {
+                if kind != ty_kind {
+                    return false;
+                }
+
+                if (Variability::Uniform, Variability::Varying) == (variability, ty_variability) {
+                    return false;
+                }
+
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for Type {

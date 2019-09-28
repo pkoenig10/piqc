@@ -89,6 +89,18 @@ impl Type {
     pub fn with_kind(&self, kind: TypeKind) -> Type {
         Type::new(self.variability, kind)
     }
+
+    pub fn is_assignable_from(&self, ty: Type) -> bool {
+        if self.kind != ty.kind {
+            return false;
+        }
+
+        if (self.variability, ty.variability) == (Variability::Uniform, Variability::Varying) {
+            return false;
+        }
+
+        true
+    }
 }
 
 impl fmt::Display for Type {

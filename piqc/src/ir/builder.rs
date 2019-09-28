@@ -1,562 +1,830 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
+use std::mem;
 
+use crate::collections::PrimaryMap;
 use crate::ir::*;
-use crate::util::Map;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug)]
 struct Predecessor {
     block: Block,
     inst: Inst,
 }
 
-impl Predecessor {
-    pub fn new(block: Block, inst: Inst) -> Predecessor {
-        Predecessor { block, inst }
-    }
+#[derive(Debug)]
+struct Param {
+    variable: Variable,
+    value: Value,
 }
 
-#[derive(Debug, Clone)]
-struct HeaderBlock {
+#[derive(Debug)]
+struct HeaderBlockData {
     ebb: Ebb,
+    sealed: bool,
+    filled: bool,
     predecessors: Vec<Predecessor>,
+    params: Vec<Param>,
 }
 
-impl HeaderBlock {
-    pub fn new(ebb: Ebb) -> HeaderBlock {
-        HeaderBlock {
-            ebb,
-            predecessors: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct BodyBlock {
+#[derive(Debug)]
+struct BodyBlockData {
     predecessor: Block,
-}
-
-impl BodyBlock {
-    pub fn new(predecessor: Block) -> BodyBlock {
-        BodyBlock { predecessor }
-    }
 }
 
 #[derive(Debug)]
 enum BlockData {
-    Header(HeaderBlock),
-    Body(BodyBlock),
+    Header(HeaderBlockData),
+    Body(BodyBlockData),
 }
 
-#[derive(Debug)]
-struct BlockValues {
-    params: HashMap<Value, Variable>,
-    values: HashMap<Variable, Value>,
+impl From<HeaderBlockData> for BlockData {
+    fn from(data: HeaderBlockData) -> BlockData {
+        BlockData::Header(data)
+    }
 }
 
-impl BlockValues {
-    fn new() -> BlockValues {
-        BlockValues {
-            params: HashMap::new(),
-            values: HashMap::new(),
-        }
-    }
-
-    fn get_param(&self, value: Value) -> Option<Variable> {
-        self.params.get(&value).cloned()
-    }
-
-    fn insert_param(&mut self, variable: Variable, value: Value) {
-        self.params.insert(value, variable);
-        self.insert_value(variable, value);
-    }
-
-    fn get_value(&self, variable: Variable) -> Option<Value> {
-        self.values.get(&variable).cloned()
-    }
-
-    fn insert_value(&mut self, variable: Variable, value: Value) {
-        self.values.insert(variable, value);
+impl From<BodyBlockData> for BlockData {
+    fn from(data: BodyBlockData) -> BlockData {
+        BlockData::Body(data)
     }
 }
 
 #[derive(Debug)]
-struct ValueTable {
-    values: HashMap<Block, BlockValues>,
+struct Blocks {
+    blocks: PrimaryMap<Block, BlockData>,
+    headers: HashMap<Ebb, Block>,
 }
 
-impl ValueTable {
-    fn new() -> ValueTable {
-        ValueTable {
+impl Blocks {
+    fn new() -> Blocks {
+        Blocks {
+            blocks: PrimaryMap::new(),
+            headers: HashMap::new(),
+        }
+    }
+
+    fn create_header(&mut self, ebb: Ebb) -> Block {
+        let data = HeaderBlockData {
+            ebb,
+            sealed: false,
+            filled: false,
+            predecessors: Vec::new(),
+            params: Vec::new(),
+        };
+        let block = self.blocks.create(data.into());
+        self.headers.insert(ebb, block);
+        block
+    }
+
+    fn create_body(&mut self, predecessor: Block) -> Block {
+        self.blocks.create(BlockData::Body(BodyBlockData {
+            predecessor: predecessor,
+        }))
+    }
+
+    fn header(&self, ebb: Ebb) -> Block {
+        self.headers[&ebb]
+    }
+
+    fn block(&self, block: Block) -> &BlockData {
+        &self.blocks[block]
+    }
+
+    fn header_block(&self, ebb: Ebb) -> &HeaderBlockData {
+        let block = self.header(ebb);
+        match &self.blocks[block] {
+            BlockData::Header(data) => data,
+            _ => panic!("Header block for {} is not a header block"),
+        }
+    }
+
+    fn header_block_mut(&mut self, ebb: Ebb) -> &mut HeaderBlockData {
+        let block = self.header(ebb);
+        match &mut self.blocks[block] {
+            BlockData::Header(data) => data,
+            _ => panic!("Header block for {} is not a header block"),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Values {
+    values: HashMap<(Block, Variable), Value>,
+}
+
+impl Values {
+    fn new() -> Values {
+        Values {
             values: HashMap::new(),
         }
     }
 
-    fn insert_param(&mut self, block: Block, variable: Variable, value: Value) {
-        self.get_values_mut(block).insert_param(variable, value);
+    fn insert(&mut self, block: Block, variable: Variable, value: Value) {
+        self.values.insert((block, variable), value);
     }
 
-    fn get_param(&self, block: Block, value: Value) -> Option<Variable> {
-        self.get_values(block)
-            .and_then(|values| values.get_param(value))
-    }
-
-    fn insert_value(&mut self, block: Block, variable: Variable, value: Value) {
-        self.get_values_mut(block).insert_value(variable, value);
-    }
-
-    fn get_value(&self, block: Block, variable: Variable) -> Option<Value> {
-        self.get_values(block)
-            .and_then(|values| values.get_value(variable))
-    }
-
-    fn get_values(&self, block: Block) -> Option<&BlockValues> {
-        self.values.get(&block)
-    }
-
-    fn get_values_mut(&mut self, block: Block) -> &mut BlockValues {
-        self.values.entry(block).or_insert_with(BlockValues::new)
+    fn get(&self, block: Block, variable: Variable) -> Option<Value> {
+        self.values.get(&(block, variable)).copied()
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Default)]
 struct Position {
-    pub ebb: Ebb,
-    pub block: Block,
+    pub ebb: Option<Ebb>,
+    pub block: Option<Block>,
 }
 
 impl Position {
-    fn new(ebb: Ebb, block: Block) -> Position {
-        Position { ebb, block }
+    fn set(&mut self, ebb: Ebb, block: Block) {
+        self.ebb = Some(ebb);
+        self.block = Some(block);
     }
+
+    fn set_block(&mut self, block: Block) {
+        self.block = Some(block);
+    }
+}
+
+#[derive(Debug)]
+enum Call {
+    UseVar(Block),
+    FinishOnePredecessor(Block),
+    FinishMultiplePredecessors(Ebb, Value),
 }
 
 pub struct FuncBuilder {
     func: Func,
-    values: ValueTable,
-    blocks: Map<Block, BlockData>,
-    header_blocks: HashMap<Ebb, Block>,
-    position: Option<Position>,
+    blocks: Blocks,
+    values: Values,
+    types: HashMap<Variable, Type>,
+    position: Position,
+    calls: Vec<Call>,
+    results: Vec<Value>,
 }
 
 impl FuncBuilder {
     pub fn new() -> FuncBuilder {
         FuncBuilder {
             func: Func::new(),
-            values: ValueTable::new(),
-            blocks: Map::new(),
-            header_blocks: HashMap::new(),
-            position: None,
+            blocks: Blocks::new(),
+            values: Values::new(),
+            types: HashMap::new(),
+            position: Position::default(),
+            calls: Vec::new(),
+            results: Vec::new(),
         }
     }
 
-    pub fn build(self) -> Func {
+    pub fn finalize(self) -> Func {
+        debug_assert!(
+            self.blocks
+                .headers
+                .keys()
+                .all(|ebb| self.blocks.header_block(*ebb).sealed),
+            "All blocks must be sealed before finalize"
+        );
+        debug_assert!(
+            self.blocks
+                .headers
+                .keys()
+                .all(|ebb| self.blocks.header_block(*ebb).filled),
+            "All blocks must be filled before finalize"
+        );
+
         self.func
     }
 
-    pub fn set_position(&mut self, ebb: Ebb) {
-        self.func.push_ebb(ebb);
-        let block = self.header_blocks[&ebb];
-        self.position = Some(Position::new(ebb, block));
+    pub fn switch_to_ebb(&mut self, ebb: Ebb) {
+        if let Some(current_ebb) = self.position.ebb {
+            debug_assert!(
+                self.is_filled(),
+                "Switched to block {} before current block {} is filled",
+                ebb,
+                current_ebb
+            );
+        }
+
+        debug_assert!(
+            !self.blocks.header_block(ebb).filled,
+            "Switched to block {} which is already filled",
+            ebb
+        );
+
+        let block = self.blocks.header(ebb);
+        self.position.set(ebb, block);
     }
 
     pub fn is_filled(&self) -> bool {
-        let ebb = self.position.unwrap().ebb;
-        match self.func.last_inst(ebb) {
-            Some(inst) => self.func.inst(inst).is_terminator(),
-            None => false,
-        }
+        let ebb = self.position.ebb.unwrap();
+        self.blocks.header_block(ebb).filled
     }
 
-    pub fn push_param(&mut self, ty: Type) {
-        self.func.push_param(ty);
-    }
+    pub fn push_param(&mut self, ebb: Ebb, ty: Type) -> Value {
+        debug_assert!(
+            self.blocks.header_block(ebb).sealed,
+            "Parameter added to block {} which is not sealed",
+            ebb
+        );
+        debug_assert!(
+            self.func.layout.first_inst(ebb).is_none(),
+            "Parameter added to block {} which already has instructions",
+            ebb
+        );
 
-    pub fn push_ebb_param(&mut self, variable: Variable, ebb: Ebb, ty: Type) -> Value {
-        let value = self.create_value(ty);
-        self.func.push_ebb_param(ebb, value);
-
-        let header_block = self.header_blocks[&ebb];
-        self.values.insert_param(header_block, variable, value);
-
-        value
+        self.func.data.push_param(ty);
+        self.func.data.push_ebb_param(ebb, ty)
     }
 
     pub fn create_ebb(&mut self) -> Ebb {
-        let ebb = self.func.create_ebb();
-        let block = self.blocks.create(BlockData::Header(HeaderBlock::new(ebb)));
-        self.header_blocks.insert(ebb, block);
+        let ebb = self.func.data.create_ebb();
+        self.blocks.create_header(ebb);
         ebb
     }
 
+    pub fn seal_ebb(&mut self, ebb: Ebb) {
+        let data = self.blocks.header_block_mut(ebb);
+        if data.sealed {
+            return;
+        }
+
+        let params = mem::replace(&mut data.params, Vec::new());
+        for param in params {
+            self.start_multiple_predecessors(ebb, param.value);
+            self.run_use_var(param.variable);
+        }
+
+        self.blocks.header_block_mut(ebb).sealed = true;
+    }
+
+    pub fn declare_var(&mut self, variable: Variable, ty: Type) {
+        self.types.insert(variable, ty);
+    }
+
     pub fn def_var(&mut self, variable: Variable, value: Value) {
-        let block = self.position.unwrap().block;
-        self.values.insert_value(block, variable, value);
+        let block = self.position.block.unwrap();
+        self.def_var_in_block(variable, value, block)
+    }
+
+    fn def_var_in_block(&mut self, variable: Variable, value: Value, block: Block) {
+        let variable_type = self
+            .types
+            .get(&variable)
+            .unwrap_or_else(|| panic!("Variable {} defined but not declared", variable));
+        let value_type = self.func.data.value_type(value);
+
+        debug_assert!(
+            variable_type.is_assignable_from(value_type),
+            "Variable {} with type {} cannot be defined as value {} with type {}",
+            variable,
+            variable_type,
+            value,
+            value_type
+        );
+
+        self.values.insert(block, variable, value);
     }
 
     pub fn use_var(&mut self, variable: Variable) -> Value {
-        let block = self.position.unwrap().block;
-        if let Ok(value) = self.use_var_in_ebb(block, variable) {
+        let block = self.position.block.unwrap();
+        if let Some(value) = self.values.get(block, variable) {
             return value;
         }
 
-        let mut blocks = Vec::new();
-        blocks.push(block);
+        self.calls.push(Call::UseVar(block));
+        self.run_use_var(variable)
+    }
 
-        let mut ebbs = Vec::new();
-        let mut predecessors = HashSet::new();
-        let mut var_type = None;
+    fn run_use_var(&mut self, variable: Variable) -> Value {
+        let ty = *self
+            .types
+            .get(&variable)
+            .unwrap_or_else(|| panic!("Variable {} used but not declared", variable));
 
-        while let Some(block) = blocks.pop() {
-            match self.use_var_in_ebb(block, variable) {
-                Ok(value) => {
-                    let value_type = self.func.value(value).ty;
-                    let var_type = *var_type.get_or_insert(value_type);
-                    assert_eq!(
-                        var_type, value_type,
-                        "Variable defined with multiple types '{}' and '{}'",
-                        var_type, value_type
-                    );
+        while let Some(call) = self.calls.pop() {
+            match call {
+                Call::UseVar(block) => {
+                    self.use_var_in_block(variable, ty, block);
                 }
-                Err(data) => {
-                    let ebb = data.ebb;
-                    if ebbs.contains(&ebb) {
-                        continue;
-                    }
+                Call::FinishOnePredecessor(block) => {
+                    self.finish_one_predecessor(variable, block);
+                }
+                Call::FinishMultiplePredecessors(ebb, value) => {
+                    self.finish_multiple_predecessors(variable, ebb, value);
+                }
+            }
+        }
 
-                    ebbs.push(ebb);
+        self.results.pop().unwrap()
+    }
 
-                    for &predecessor in &data.predecessors {
-                        predecessors.insert(predecessor);
-                        blocks.push(predecessor.block);
+    fn use_var_in_block(&mut self, variable: Variable, ty: Type, block: Block) {
+        if let Some(value) = self.values.get(block, variable) {
+            self.results.push(value);
+            return;
+        }
+
+        enum State {
+            Unsealed(Ebb),
+            SealedOnePredecessor(Block),
+            SealedMultiplePredecessors(Ebb),
+        };
+
+        let state = match &self.blocks.block(block) {
+            BlockData::Header(data) => match (data.sealed, data.predecessors.len()) {
+                (false, _) => State::Unsealed(data.ebb),
+                (true, 1) => State::SealedOnePredecessor(data.predecessors[0].block),
+                (true, _) => State::SealedMultiplePredecessors(data.ebb),
+            },
+            BlockData::Body(data) => State::SealedOnePredecessor(data.predecessor),
+        };
+        match state {
+            State::Unsealed(ebb) => {
+                let value = self.func.data.push_ebb_param(ebb, ty);
+                self.def_var_in_block(variable, value, block);
+
+                let param = Param { variable, value };
+                self.blocks.header_block_mut(ebb).params.push(param);
+
+                self.results.push(value);
+            }
+            State::SealedOnePredecessor(predecessor) => {
+                self.start_one_predecessor(block, predecessor);
+            }
+            State::SealedMultiplePredecessors(ebb) => {
+                let value = self.func.data.push_ebb_param(ebb, ty);
+                self.def_var_in_block(variable, value, block);
+
+                self.start_multiple_predecessors(ebb, value);
+            }
+        };
+    }
+
+    fn start_one_predecessor(&mut self, block: Block, predecessor: Block) {
+        self.calls.push(Call::FinishOnePredecessor(block));
+        self.calls.push(Call::UseVar(predecessor));
+    }
+
+    fn finish_one_predecessor(&mut self, variable: Variable, block: Block) {
+        let value = *self.results.last().unwrap();
+        self.def_var_in_block(variable, value, block)
+    }
+
+    fn start_multiple_predecessors(&mut self, ebb: Ebb, param_value: Value) {
+        self.calls
+            .push(Call::FinishMultiplePredecessors(ebb, param_value));
+
+        for predecessor in &self.blocks.header_block(ebb).predecessors {
+            self.calls.push(Call::UseVar(predecessor.block))
+        }
+    }
+
+    fn finish_multiple_predecessors(&mut self, variable: Variable, ebb: Ebb, param_value: Value) {
+        let predecessors = &self.blocks.header_block(ebb).predecessors;
+
+        enum Results<T> {
+            Zero,
+            One(T),
+            More,
+        }
+
+        let mut results = Results::Zero;
+
+        for _ in 0..predecessors.len() {
+            let result = self.results.pop().unwrap();
+            let pred_value = self.func.data.resolve_alias(result);
+            match results {
+                Results::Zero => {
+                    if pred_value != param_value {
+                        results = Results::One(pred_value);
                     }
+                }
+                Results::One(value) => {
+                    if pred_value != param_value && pred_value != value {
+                        results = Results::More;
+                    }
+                }
+                Results::More => {
+                    break;
                 }
             };
         }
 
-        let var_type = var_type.unwrap();
-
-        for ebb in ebbs {
-            self.push_ebb_param(variable, ebb, var_type);
-        }
-        for predecessor in predecessors {
-            let block = predecessor.block;
-            let inst = predecessor.inst;
-            let value = self.use_var_in_ebb(block, variable).unwrap();
-            self.push_target_arg(inst, value);
-        }
-
-        self.use_var_in_ebb(block, variable).unwrap()
-    }
-
-    fn use_var_in_ebb(&self, block: Block, variable: Variable) -> Result<Value, &HeaderBlock> {
-        let mut block = block;
-        loop {
-            match self.values.get_value(block, variable) {
-                Some(value) => return Ok(value),
-                None => match self.blocks[block] {
-                    BlockData::Header(ref data) => return Err(data),
-                    BlockData::Body(ref data) => block = data.predecessor,
-                },
+        let result = match results {
+            Results::Zero => {
+                panic!("Variable {} used but not defined", variable);
             }
-        }
+            Results::One(value) => {
+                self.func.data.swap_remove_ebb_param(param_value);
+                self.func.data.value_to_alias(param_value, value);
+
+                value
+            }
+            Results::More => {
+                for predecessor in predecessors {
+                    let pred_value = self.values.get(predecessor.block, variable).unwrap();
+                    self.func
+                        .data
+                        .inst_mut(predecessor.inst)
+                        .push_target_arg(pred_value);
+                }
+
+                param_value
+            }
+        };
+
+        self.results.push(result)
     }
 
     pub fn nop(&mut self) {
         let data = InstData::Nop();
-        self.push_inst(data, None);
+        self.push_inst(data);
     }
 
     pub fn element(&mut self) -> Value {
         let data = InstData::Element();
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        self.create_inst_result(inst, Type::VARYING_INT)
     }
 
     pub fn count(&mut self) -> Value {
         let data = InstData::Count();
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        self.create_inst_result(inst, Type::UNIFORM_INT)
     }
 
     pub fn iconst(&mut self, imm: i32) -> Value {
         let data = InstData::Iconst(imm);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        self.create_inst_result(inst, Type::UNIFORM_INT)
     }
 
     pub fn fconst(&mut self, imm: f32) -> Value {
         let data = InstData::Fconst(imm);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        self.create_inst_result(inst, Type::UNIFORM_FLOAT)
     }
 
     pub fn bconst(&mut self, imm: bool) -> Value {
         let data = InstData::Bconst(imm);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        self.create_inst_result(inst, Type::UNIFORM_BOOL)
     }
 
     pub fn ftoi(&mut self, arg: Value) -> Value {
         let data = InstData::Ftoi(arg);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_with_kind(arg, TypeKind::Int);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn itof(&mut self, arg: Value) -> Value {
         let data = InstData::Itof(arg);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_with_kind(arg, TypeKind::Float);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn not(&mut self, arg: Value) -> Value {
         let data = InstData::Not(arg);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.func.data.value_type(arg);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn clz(&mut self, arg: Value) -> Value {
         let data = InstData::Clz(arg);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_with_kind(arg, TypeKind::Int);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn add(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Add([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn sub(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Sub([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn shl(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Shl([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn shr(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Shr([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn asr(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Asr([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn ror(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Ror([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn min(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Min([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn max(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Max([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn and(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::And([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn or(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Or([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn xor(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Xor([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn fadd(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Fadd([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn fsub(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Fsub([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn fmul(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Fmul([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn fmin(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Fmin([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn fmax(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Fmax([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn fminabs(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Fminabs([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn fmaxabs(&mut self, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Fmaxabs([arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg0, arg1);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn select(&mut self, arg0: Value, arg1: Value, arg2: Value) -> Value {
         let data = InstData::Select([arg0, arg1, arg2]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary(arg1, arg2);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn icmp(&mut self, cond: Cond, arg0: Value, arg1: Value) -> Value {
         let data = InstData::Icmp(cond, [arg0, arg1]);
-        let inst = self.push_inst(data, None);
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary_with_kind(arg0, arg1, TypeKind::Bool);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn fcmp(&mut self, cond: Cond, arg0: Value, arg1: Value) -> Value {
-        let inst = self.push_inst(InstData::Fcmp(cond, [arg0, arg1]), None);
-        self.func.result(inst)
+        let data = InstData::Fcmp(cond, [arg0, arg1]);
+        let inst = self.push_inst(data);
+
+        let ty = self.result_type_binary_with_kind(arg0, arg1, TypeKind::Bool);
+        self.create_inst_result(inst, ty)
     }
 
     pub fn alloc(&mut self, len: u8) -> Value {
-        let inst = self.push_inst(InstData::Alloc(len), None);
-        self.func.result(inst)
+        let data = InstData::Alloc(len);
+        let inst = self.push_inst(data);
+
+        self.create_inst_result(inst, Type::UNIFORM_INT)
     }
 
     pub fn fetch(&mut self, ty: Type, arg: Value) -> Value {
-        let inst = self.push_inst(InstData::Fetch(arg), Some(ty.kind));
-        self.func.result(inst)
+        let data = InstData::Fetch(arg);
+        let inst = self.push_inst(data);
+
+        self.create_inst_result(inst, ty)
     }
 
     pub fn read(&mut self, ty: Type, arg: Value) -> Value {
         let data = InstData::Read(arg);
-        let inst = self.push_inst(data, Some(ty.kind));
-        self.func.result(inst)
+        let inst = self.push_inst(data);
+
+        self.create_inst_result(inst, ty)
     }
 
     pub fn write(&mut self, arg0: Value, arg1: Value) {
         let data = InstData::Write([arg0, arg1]);
-        self.push_inst(data, None);
+        self.push_inst(data);
     }
 
-    pub fn load(&mut self, ty: Type, arg0: Value, arg1: Value) {
+    pub fn load(&mut self, arg0: Value, arg1: Value) {
         let data = InstData::Load([arg0, arg1]);
-        self.push_inst(data, Some(ty.kind));
+        self.push_inst(data);
     }
 
     pub fn store(&mut self, arg0: Value, arg1: Value) {
         let data = InstData::Store([arg0, arg1]);
-        self.push_inst(data, None);
+        self.push_inst(data);
     }
 
     pub fn jump(&mut self, ebb: Ebb) {
-        let args = self.create_args(ebb, vec![]);
-        let data = InstData::Jump(ebb, args);
-        self.push_inst(data, None);
+        let data = InstData::Jump(ebb, vec![]);
+        self.push_inst(data);
     }
 
     pub fn brallz(&mut self, arg: Value, ebb: Ebb) {
-        let args = self.create_args(ebb, vec![arg]);
-        let data = InstData::Brallz(ebb, args);
-        self.push_inst(data, None);
+        let data = InstData::Brallz(ebb, vec![arg]);
+        self.push_inst(data);
     }
 
     pub fn brallnz(&mut self, arg: Value, ebb: Ebb) {
-        let args = self.create_args(ebb, vec![arg]);
-        let data = InstData::Brallnz(ebb, args);
-        self.push_inst(data, None);
+        let data = InstData::Brallnz(ebb, vec![arg]);
+        self.push_inst(data);
     }
 
     pub fn branyz(&mut self, arg: Value, ebb: Ebb) {
-        let args = self.create_args(ebb, vec![arg]);
-        let data = InstData::Branyz(ebb, args);
-        self.push_inst(data, None);
+        let data = InstData::Branyz(ebb, vec![arg]);
+        self.push_inst(data);
     }
 
     pub fn branynz(&mut self, arg: Value, ebb: Ebb) {
-        let args = self.create_args(ebb, vec![arg]);
-        let data = InstData::Branynz(ebb, args);
-        self.push_inst(data, None);
+        let data = InstData::Branynz(ebb, vec![arg]);
+        self.push_inst(data);
     }
 
     pub fn ret(&mut self) {
         let data = InstData::Return();
-        self.push_inst(data, None);
+        self.push_inst(data);
     }
 
-    fn push_inst(&mut self, data: InstData, kind: Option<TypeKind>) -> Inst {
-        let ebb = self.position.unwrap().ebb;
-        let inst = self.func.create_inst(data.clone());
-        self.func.push_inst(ebb, inst);
+    fn push_inst(&mut self, data: InstData) -> Inst {
+        let ebb = self.position.ebb.unwrap();
+        if !self.func.layout.is_ebb_inserted(ebb) {
+            self.func.layout.push_ebb(ebb);
+        }
 
-        self.func.create_result(inst, kind);
+        debug_assert!(
+            !self.blocks.header_block(ebb).filled,
+            "Instruction added to block which is already filled"
+        );
 
-        if let Some((ebb, _)) = data.target() {
-            let block = self.position.unwrap().block;
-            let predecessor = Predecessor::new(block, inst);
-            self.push_predecessor(ebb, predecessor);
+        let is_terminator = data.is_terminator();
+        let target_ebb = data.target();
 
-            self.position.as_mut().unwrap().block =
-                self.blocks.create(BlockData::Body(BodyBlock::new(block)))
+        let inst = self.func.data.create_inst(data);
+        self.func.layout.push_inst(ebb, inst);
+
+        if let Some(ebb) = target_ebb {
+            self.declare_successor(inst, ebb);
+        }
+
+        if is_terminator {
+            self.fill_ebb();
+        } else if target_ebb.is_some() {
+            self.switch_to_next_block();
         }
 
         inst
     }
 
-    fn create_value(&mut self, ty: Type) -> Value {
-        self.func.create_value(ValueData::new(ty))
+    fn result_type_with_kind(&self, arg: Value, kind: TypeKind) -> Type {
+        let ty = self.func.data.value_type(arg);
+
+        Type::new(ty.variability, kind)
     }
 
-    fn create_args(&mut self, ebb: Ebb, mut args: Vec<Value>) -> Vec<Value> {
-        let block = self.header_blocks[&ebb];
+    fn result_type_binary(&self, arg0: Value, arg1: Value) -> Type {
+        let ty0 = self.func.data.value_type(arg0);
+        let ty1 = self.func.data.value_type(arg1);
 
-        for i in 0..self.func.ebb_params(ebb).len() {
-            let param = self.func.ebb_params(ebb)[i];
-            let variable = self.values.get_param(block, param).unwrap();
-            let value = self.use_var(variable);
-            args.push(value);
-        }
+        debug_assert!(
+            ty0.kind == ty1.kind,
+            "Invalid argument types '{}' and '{}'",
+            ty0,
+            ty1
+        );
 
-        args
+        Type::new(ty0.variability | ty1.variability, ty0.kind)
     }
 
-    fn push_target_arg(&mut self, inst: Inst, value: Value) {
-        self.func.inst_mut(inst).push_target_arg(value);
+    fn result_type_binary_with_kind(&self, arg0: Value, arg1: Value, kind: TypeKind) -> Type {
+        let ty0 = self.func.data.value_type(arg0);
+        let ty1 = self.func.data.value_type(arg1);
+
+        debug_assert!(
+            ty0.kind == ty1.kind,
+            "Invalid argument types '{}' and '{}'",
+            ty0,
+            ty1
+        );
+
+        Type::new(ty0.variability | ty1.variability, kind)
     }
 
-    fn push_predecessor(&mut self, ebb: Ebb, predecessor: Predecessor) {
-        let block = self.header_blocks[&ebb];
-        match self.blocks[block] {
-            BlockData::Header(ref mut data) => data.predecessors.push(predecessor),
-            _ => panic!(),
-        }
+    fn create_inst_result(&mut self, inst: Inst, ty: Type) -> Value {
+        self.func.data.create_inst_result(inst, ty)
+    }
+
+    fn declare_successor(&mut self, inst: Inst, ebb: Ebb) {
+        let block = self.position.block.unwrap();
+        let predecessor = Predecessor { block, inst };
+        self.blocks
+            .header_block_mut(ebb)
+            .predecessors
+            .push(predecessor);
+    }
+
+    fn fill_ebb(&mut self) {
+        let ebb = self.position.ebb.unwrap();
+        self.blocks.header_block_mut(ebb).filled = true;
+    }
+
+    fn switch_to_next_block(&mut self) {
+        let predecessor = self.position.block.unwrap();
+        let block = self.blocks.create_body(predecessor);
+        self.position.set_block(block);
     }
 }

@@ -1,9 +1,9 @@
-fn if_uniform(uniform &int output, uniform bool bar) {
+fn if_uniform(uniform &int output, uniform int bar) {
     uniform int foo = 0;
 
-    if (bar) {
-        foo = 1;
+    if (bar < 1) {
+        foo = 2;
     }
 
-    *output = foo;
+    *output = foo + bar;
 }
