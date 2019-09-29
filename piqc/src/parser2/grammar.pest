@@ -1,0 +1,93 @@
+WHITESPACE = _{
+    "\t"
+    | "\n"
+    | "\r"
+    | " "
+}
+
+int = @{
+    ASCII_DIGIT+
+}
+
+float = @{
+    ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT*
+}
+
+bool = @{
+    "true"
+    | "false"
+}
+
+symbol = @{
+    ASCII_ALPHA ~ ASCII_ALPHANUMERIC*
+}
+
+deref = @{
+    "*"
+}
+
+negate = @{
+    "-"
+}
+
+not = @{
+    "!"
+}
+
+add = @{
+    "+"
+}
+
+sub = @{
+    "-"
+}
+
+mul = @{
+    "*"
+}
+
+primary_term = _{
+    int
+    | float
+    | bool
+    | "(" ~ expr ~ ")"
+}
+
+unary_term = {
+    primary_term
+}
+
+unary_op = _{
+    deref
+    | negate
+    | not
+}
+
+unary_expr = {
+    unary_op ~ unary_expr
+    | primary_term
+}
+
+binary_term = {
+    primary_term
+    | unary_expr
+}
+
+binary_op = _{
+    add
+    | sub
+    | mul
+}
+
+binary_expr = {
+    binary_term ~ binary_op ~ binary_term
+    | binary_term
+}
+
+expr = {
+    binary_expr
+}
+
+exprs = {
+    SOI ~ (int ~ ";")* ~ EOI
+}

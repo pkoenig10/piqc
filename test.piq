@@ -1,0 +1,3 @@
+fn expr(uniform &int int value) {
+    int a = 8;
+}

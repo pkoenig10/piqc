@@ -191,6 +191,10 @@ LogicalOrExpr = BinaryExpr<LogicalOrOp, LogicalAndExpr>;
 
 Expr: Expr = {
     LogicalOrExpr,
+    ! => {
+        context.push_parse_error(<>);
+        Expr::new(Span::new(0, 0), ExprKind::Invalid)
+    }
 };
 
 BaseStmt<T>: Stmt = {
@@ -253,6 +257,10 @@ Stmt: Stmt = {
     IfStmt,
     WhileStmt,
     ReturnStmt,
+    ! => {
+        context.push_parse_error(<>);
+        Stmt::new(Span::new(0, 0), StmtKind::Invalid)
+    }
 };
 
 Param: Param = {
@@ -271,6 +279,10 @@ FuncBlock: Stmt = {
     BlockStmt,
 };
 
-pub Func: Func = {
-    <l: @L> "fn" <identifier: Identifier> "(" <params: Params?> ")" <stmt: FuncBlock> <r: @R> => Func::new(Span::new(l, r), identifier, params.unwrap_or_default(), stmt),
+pub Func: Result<Func, ()> = {
+    <l: @L> "fn" <identifier: Identifier> "(" <params: Params?> ")" <stmt: FuncBlock> <r: @R> => Ok(Func::new(Span::new(l, r), identifier, params.unwrap_or_default(), stmt)),
+    ! => {
+        context.push_parse_error(<>);
+        Err(())
+    }
 };

@@ -5,6 +5,7 @@ pub mod ast;
 pub mod ir;
 
 mod parser;
+mod parser2;
 
 pub fn compile(s: &str) -> String {
     let func = parser::parse(s);
@@ -16,4 +17,8 @@ pub fn compile(s: &str) -> String {
     func.resolve_aliases();
 
     format!("{}", func)
+}
+
+pub fn compile2(s: &str) {
+    parser2::parse(s);
 }

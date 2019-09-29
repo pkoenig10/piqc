@@ -92,6 +92,7 @@ pub enum StmtKind {
     If(IfStmt),
     While(WhileStmt),
     Return(ReturnStmt),
+    Invalid,
 }
 
 impl From<BlockStmt> for StmtKind {
