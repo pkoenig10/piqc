@@ -30,17 +30,17 @@ mod gen;
 mod stmt;
 mod types;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
-    left: u32,
-    right: u32,
+    start: u32,
+    end: u32,
 }
 
 impl Span {
-    pub fn new(left: usize, right: usize) -> Span {
+    pub fn new(start: usize, end: usize) -> Span {
         Span {
-            left: left as u32,
-            right: right as u32,
+            start: start as u32,
+            end: end as u32,
         }
     }
 }

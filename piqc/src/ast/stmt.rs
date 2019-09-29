@@ -1,5 +1,3 @@
-use enum_dispatch::enum_dispatch;
-
 use crate::ast::*;
 
 #[derive(Debug)]
@@ -86,7 +84,6 @@ impl WhileStmt {
     }
 }
 
-#[enum_dispatch]
 #[derive(Debug)]
 pub enum StmtKind {
     Block(BlockStmt),
@@ -97,8 +94,41 @@ pub enum StmtKind {
     Return(ReturnStmt),
 }
 
-#[enum_dispatch(StmtKind)]
-trait StmtTrait {}
+impl From<BlockStmt> for StmtKind {
+    fn from(stmt: BlockStmt) -> StmtKind {
+        StmtKind::Block(stmt)
+    }
+}
+
+impl From<DeclStmt> for StmtKind {
+    fn from(stmt: DeclStmt) -> StmtKind {
+        StmtKind::Decl(stmt)
+    }
+}
+
+impl From<AssignStmt> for StmtKind {
+    fn from(stmt: AssignStmt) -> StmtKind {
+        StmtKind::Assign(stmt)
+    }
+}
+
+impl From<IfStmt> for StmtKind {
+    fn from(stmt: IfStmt) -> StmtKind {
+        StmtKind::If(stmt)
+    }
+}
+
+impl From<WhileStmt> for StmtKind {
+    fn from(stmt: WhileStmt) -> StmtKind {
+        StmtKind::While(stmt)
+    }
+}
+
+impl From<ReturnStmt> for StmtKind {
+    fn from(stmt: ReturnStmt) -> StmtKind {
+        StmtKind::Return(stmt)
+    }
+}
 
 #[derive(Debug)]
 pub struct Stmt {

@@ -15,13 +15,8 @@ mod types;
 mod verifier;
 
 id!(pub Ebb, "ebb");
-
-id!(Block, "b");
-
 id!(pub Inst, "i");
-
 id!(pub Value, "%");
-
 id!(pub Variable, "v");
 
 struct DisplaySlice<'a, T>(&'a [T]);

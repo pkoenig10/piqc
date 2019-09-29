@@ -4,6 +4,8 @@ use std::mem;
 use crate::collections::PrimaryMap;
 use crate::ir::*;
 
+id!(Block, "b");
+
 #[derive(Debug)]
 struct Predecessor {
     block: Block,
@@ -129,8 +131,8 @@ impl Values {
 
 #[derive(Debug, Default)]
 struct Position {
-    pub ebb: Option<Ebb>,
-    pub block: Option<Block>,
+    ebb: Option<Ebb>,
+    block: Option<Block>,
 }
 
 impl Position {
@@ -193,6 +195,27 @@ impl FuncBuilder {
         self.func
     }
 
+    pub fn create_ebb(&mut self) -> Ebb {
+        let ebb = self.func.data.create_ebb();
+        self.blocks.create_header(ebb);
+        ebb
+    }
+
+    pub fn seal_ebb(&mut self, ebb: Ebb) {
+        let data = self.blocks.header_block_mut(ebb);
+        if data.sealed {
+            return;
+        }
+
+        let params = mem::replace(&mut data.params, Vec::new());
+        for param in params {
+            self.start_multiple_predecessors(ebb, param.value);
+            self.run_use_var(param.variable);
+        }
+
+        self.blocks.header_block_mut(ebb).sealed = true;
+    }
+
     pub fn switch_to_ebb(&mut self, ebb: Ebb) {
         if let Some(current_ebb) = self.position.ebb {
             debug_assert!(
@@ -232,27 +255,6 @@ impl FuncBuilder {
 
         self.func.data.push_param(ty);
         self.func.data.push_ebb_param(ebb, ty)
-    }
-
-    pub fn create_ebb(&mut self) -> Ebb {
-        let ebb = self.func.data.create_ebb();
-        self.blocks.create_header(ebb);
-        ebb
-    }
-
-    pub fn seal_ebb(&mut self, ebb: Ebb) {
-        let data = self.blocks.header_block_mut(ebb);
-        if data.sealed {
-            return;
-        }
-
-        let params = mem::replace(&mut data.params, Vec::new());
-        for param in params {
-            self.start_multiple_predecessors(ebb, param.value);
-            self.run_use_var(param.variable);
-        }
-
-        self.blocks.header_block_mut(ebb).sealed = true;
     }
 
     pub fn declare_var(&mut self, variable: Variable, ty: Type) {

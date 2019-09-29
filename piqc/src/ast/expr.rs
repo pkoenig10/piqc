@@ -1,4 +1,3 @@
-use enum_dispatch::enum_dispatch;
 use std::fmt;
 
 use crate::ast::*;
@@ -205,7 +204,6 @@ impl ParenExpr {
     }
 }
 
-#[enum_dispatch]
 #[derive(Debug)]
 pub enum ExprKind {
     Int(IntExpr),
@@ -220,8 +218,65 @@ pub enum ExprKind {
     Paren(ParenExpr),
 }
 
-#[enum_dispatch(ExprKind)]
-trait ExprTrait {}
+impl From<IntExpr> for ExprKind {
+    fn from(stmt: IntExpr) -> ExprKind {
+        ExprKind::Int(stmt)
+    }
+}
+
+impl From<FloatExpr> for ExprKind {
+    fn from(stmt: FloatExpr) -> ExprKind {
+        ExprKind::Float(stmt)
+    }
+}
+
+impl From<BoolExpr> for ExprKind {
+    fn from(stmt: BoolExpr) -> ExprKind {
+        ExprKind::Bool(stmt)
+    }
+}
+
+impl From<ElementExpr> for ExprKind {
+    fn from(stmt: ElementExpr) -> ExprKind {
+        ExprKind::Element(stmt)
+    }
+}
+
+impl From<CountExpr> for ExprKind {
+    fn from(stmt: CountExpr) -> ExprKind {
+        ExprKind::Count(stmt)
+    }
+}
+
+impl From<IdentifierExpr> for ExprKind {
+    fn from(stmt: IdentifierExpr) -> ExprKind {
+        ExprKind::Identifier(stmt)
+    }
+}
+
+impl From<UnaryExpr> for ExprKind {
+    fn from(stmt: UnaryExpr) -> ExprKind {
+        ExprKind::Unary(stmt)
+    }
+}
+
+impl From<BinaryExpr> for ExprKind {
+    fn from(stmt: BinaryExpr) -> ExprKind {
+        ExprKind::Binary(stmt)
+    }
+}
+
+impl From<IndexExpr> for ExprKind {
+    fn from(stmt: IndexExpr) -> ExprKind {
+        ExprKind::Index(stmt)
+    }
+}
+
+impl From<ParenExpr> for ExprKind {
+    fn from(stmt: ParenExpr) -> ExprKind {
+        ExprKind::Paren(stmt)
+    }
+}
 
 #[derive(Debug)]
 pub struct Expr {
