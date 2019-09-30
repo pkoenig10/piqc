@@ -100,6 +100,15 @@ BaseExpr<T>: Expr = {
     <l: @L> <kind: T> <r: @R> => Expr::new(Span::new(l, r), kind),
 };
 
+ErrExprKind: ExprKind = {
+    ! => {
+        context.push_error(<>);
+        ExprKind::Err
+    }
+}
+
+ErrExpr = BaseExpr<ErrExprKind>;
+
 IntExpr: IntExpr = {
     Int => IntExpr::new(<>),
 };
@@ -138,18 +147,22 @@ PrimaryExprKind: ExprKind = {
     ParenExpr => <>.into(),
 };
 
-PrimaryExpr = BaseExpr<PrimaryExprKind>;
+PrimaryExpr = {
+    BaseExpr<PrimaryExprKind>,
+}
 
 IndexExpr: IndexExpr = {
     <PostfixExpr> "[" <Expr> "]" => IndexExpr::new(<>).into(),
 }
 
 PostfixExprKind: ExprKind = {
-    PrimaryExprKind,
     IndexExpr => <>.into(),
 };
 
-PostfixExpr: Expr = BaseExpr<PostfixExprKind>;
+PostfixExpr: Expr = {
+    PrimaryExpr,
+    BaseExpr<PostfixExprKind>,
+}
 
 UnaryExprKind: ExprKind = {
     UnaryOp UnaryExpr => UnaryExpr::new(<>).into(),
@@ -197,6 +210,15 @@ BaseStmt<T>: Stmt = {
     <l: @L> <kind: T> <r: @R> => Stmt::new(Span::new(l, r), kind),
 };
 
+ErrStmtKind: StmtKind = {
+    ! => {
+        context.push_error(<>);
+        StmtKind::Err
+    }
+}
+
+ErrStmt = BaseStmt<ErrStmtKind>;
+
 BlockStmtKind: StmtKind = {
     "{" <Stmt*> "}" => BlockStmt::new(<>).into(),
 };
@@ -217,11 +239,13 @@ AssignStmt = BaseStmt<AssignStmtKind>;
 
 IfBlock: Stmt = {
     BlockStmt,
+    ErrStmt,
 };
 
 ElseBlock: Stmt = {
     BlockStmt,
     IfStmt,
+    ErrStmt,
 };
 
 IfStmtKind: StmtKind = {
@@ -232,6 +256,7 @@ IfStmt = BaseStmt<IfStmtKind>;
 
 WhileBlock: Stmt = {
     BlockStmt,
+    ErrStmt,
 };
 
 WhileStmtKind: StmtKind = {
@@ -253,6 +278,7 @@ Stmt: Stmt = {
     IfStmt,
     WhileStmt,
     ReturnStmt,
+    ErrStmt,
 };
 
 Param: Param = {
@@ -269,6 +295,7 @@ Params: Vec<Param> = {
 
 FuncBlock: Stmt = {
     BlockStmt,
+    ErrStmt,
 };
 
 pub Func: Func = {

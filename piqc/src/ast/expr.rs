@@ -216,6 +216,7 @@ pub enum ExprKind {
     Binary(BinaryExpr),
     Index(IndexExpr),
     Paren(ParenExpr),
+    Err,
 }
 
 impl From<IntExpr> for ExprKind {

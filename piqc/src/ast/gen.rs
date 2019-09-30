@@ -142,6 +142,7 @@ impl IrGenerator {
             StmtKind::If(ref stmt) => self.if_stmt(stmt),
             StmtKind::While(ref stmt) => self.while_stmt(stmt),
             StmtKind::Return(ref stmt) => self.return_stmt(stmt),
+            StmtKind::Err => panic!("Invalid statement"),
         };
     }
 
@@ -400,6 +401,7 @@ impl IrGenerator {
             ExprKind::Binary(ref expr) => self.binary_expr(expr),
             ExprKind::Index(ref expr) => self.index_expr(expr),
             ExprKind::Paren(ref expr) => self.paren_expr(expr),
+            ExprKind::Err => panic!("Invalid expression"),
         }
     }
 
