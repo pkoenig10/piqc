@@ -1,8 +1,9 @@
 use crate::ast::*;
+use crate::Span;
 
 #[derive(Debug)]
 pub struct Param {
-    span: Span,
+    pub span: Span,
     pub ty: Type,
     pub identifier: Identifier,
 }

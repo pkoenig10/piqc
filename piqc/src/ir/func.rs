@@ -82,8 +82,8 @@ impl FuncData {
     }
 
     pub fn push_ebb_param(&mut self, ebb: Ebb, ty: Type) -> Value {
-        let index = self.ebbs[ebb].params.len();
-        let value = self.values.create(ValueData::Param(ty, ebb, index));
+        let idx = self.ebbs[ebb].params.len();
+        let value = self.values.create(ValueData::Param(ty, ebb, idx));
         self.ebbs[ebb].params.push(value);
         value
     }

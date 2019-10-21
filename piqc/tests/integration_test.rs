@@ -6,7 +6,7 @@ macro_rules! test_compile {
     ($piq_file:expr, $ir_file:expr) => {
         assert_diff!(
             include_str!($ir_file),
-            &piqc::compile(include_str!($piq_file)),
+            &format!("{}", piqc::compile(include_str!($piq_file)).unwrap()),
             "\n",
             0
         );

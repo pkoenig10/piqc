@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::parser::Context;
+use crate::Span;
 
 grammar(context: &mut Context<'input>);
 

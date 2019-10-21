@@ -1,15 +1,27 @@
-extern crate piqc;
-
+use piqc::SourceMap;
 use std::env;
-use std::fs::File;
-use std::io::prelude::*;
+use std::fs;
+use std::path::Path;
+use std::process;
 
 fn main() {
-    let filename = env::args().nth(1).expect("filename not given");
-    let mut file = File::open(filename).expect("file not found");
-    let mut input = String::new();
-    file.read_to_string(&mut input)
-        .expect("unable to read file");
+    let file_path = env::args().nth(1).unwrap();
+    let file_path = Path::new(&file_path);
 
-    println!("{}", piqc::compile(&input));
+    let input = fs::read_to_string(file_path).unwrap();
+
+    match piqc::compile(&input) {
+        Ok(func) => {
+            print!("{}", func);
+            process::exit(0);
+        }
+        Err(errors) => {
+            let name = file_path.to_string_lossy();
+            let source_map = SourceMap::new(name, &input);
+            for error in errors {
+                eprintln!("{}", error.display(&source_map));
+            }
+            process::exit(1);
+        }
+    };
 }
