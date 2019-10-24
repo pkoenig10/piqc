@@ -1,4 +1,5 @@
 mod builder;
+mod cfg;
 mod func;
 mod inst;
 mod types;
