@@ -173,12 +173,18 @@ impl FuncData {
     }
 }
 
+type SequenceNumber = u32;
+
+const MAJOR_STRIDE: SequenceNumber = 10;
+const MINOR_STRIDE: SequenceNumber = 2;
+
 #[derive(Debug, Default)]
 struct EbbNode {
     prev_ebb: Option<Ebb>,
     next_ebb: Option<Ebb>,
     first_inst: Option<Inst>,
     last_inst: Option<Inst>,
+    seq: SequenceNumber,
 }
 
 #[derive(Debug, Default)]
@@ -186,6 +192,7 @@ struct InstNode {
     ebb: Option<Ebb>,
     prev_inst: Option<Inst>,
     next_inst: Option<Inst>,
+    seq: SequenceNumber,
 }
 
 #[derive(Debug)]
@@ -205,7 +212,9 @@ impl FuncLayout {
             last_ebb: None,
         }
     }
+}
 
+impl FuncLayout {
     pub fn ebbs(&self) -> EbbIter<'_> {
         EbbIter {
             ebbs: &self.ebbs,
@@ -239,6 +248,8 @@ impl FuncLayout {
             }
         }
         self.last_ebb = Some(ebb);
+
+        self.assign_seq(ProgramPoint::Ebb(ebb));
     }
 
     pub fn remove_ebb(&mut self, ebb: Ebb) {
@@ -266,7 +277,9 @@ impl FuncLayout {
             }
         }
     }
+}
 
+impl FuncLayout {
     pub fn insts(&self, ebb: Ebb) -> InstIter<'_> {
         InstIter {
             insts: &self.insts,
@@ -310,6 +323,8 @@ impl FuncLayout {
             }
         }
         ebb_node.last_inst = Some(inst);
+
+        self.assign_seq(ProgramPoint::Inst(inst));
     }
 
     pub fn remove_inst(&mut self, inst: Inst) {
@@ -340,6 +355,101 @@ impl FuncLayout {
                     self.ebbs[ebb].last_inst = prev_inst;
                 }
             }
+        }
+    }
+}
+
+impl FuncLayout {
+    fn prev_pp(&self, pp: ProgramPoint) -> Option<ProgramPoint> {
+        match pp {
+            ProgramPoint::Ebb(ebb) => match self.ebbs[ebb].prev_ebb {
+                Some(prev_ebb) => match self.ebbs[prev_ebb].last_inst {
+                    Some(last_inst) => Some(last_inst.into()),
+                    None => Some(prev_ebb.into()),
+                },
+                None => None,
+            },
+            ProgramPoint::Inst(inst) => match self.insts[inst].prev_inst {
+                Some(prev_inst) => Some(prev_inst.into()),
+                None => Some(self.inst_ebb(inst).unwrap().into()),
+            },
+        }
+    }
+
+    fn next_pp(&self, pp: ProgramPoint) -> Option<ProgramPoint> {
+        match pp {
+            ProgramPoint::Ebb(ebb) => {
+                if let Some(first_inst) = self.ebbs[ebb].first_inst {
+                    Some(first_inst.into())
+                } else if let Some(next_ebb) = self.ebbs[ebb].next_ebb {
+                    Some(next_ebb.into())
+                } else {
+                    None
+                }
+            }
+            ProgramPoint::Inst(inst) => {
+                if let Some(next_inst) = self.insts[inst].next_inst {
+                    Some(next_inst.into())
+                } else if let Some(next_ebb) = self.ebbs[self.inst_ebb(inst).unwrap()].next_ebb {
+                    Some(next_ebb.into())
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn seq(&self, pp: ProgramPoint) -> SequenceNumber {
+        match pp {
+            ProgramPoint::Ebb(ebb) => self.ebbs[ebb].seq,
+            ProgramPoint::Inst(inst) => self.insts[inst].seq,
+        }
+    }
+
+    fn set_seq(&mut self, pp: ProgramPoint, seq: SequenceNumber) {
+        match pp {
+            ProgramPoint::Ebb(ebb) => self.ebbs[ebb].seq = seq,
+            ProgramPoint::Inst(inst) => self.insts[inst].seq = seq,
+        }
+    }
+
+    fn assign_seq<PP>(&mut self, pp: PP)
+    where
+        PP: Into<ProgramPoint>,
+    {
+        let pp = pp.into();
+
+        let prev_seq = self.prev_pp(pp).map(|pp| self.seq(pp)).unwrap_or(0);
+        let next_seq = self.next_pp(pp).map(|pp| self.seq(pp));
+
+        let seq = match next_seq {
+            Some(next_seq) => midpoint(prev_seq, next_seq),
+            None => Some(prev_seq + MAJOR_STRIDE),
+        };
+
+        match seq {
+            Some(seq) => self.set_seq(pp, seq),
+            None => self.renumber(pp, prev_seq + MINOR_STRIDE),
+        }
+    }
+
+    fn renumber(&mut self, pp: ProgramPoint, seq: SequenceNumber) {
+        let mut pp = pp;
+        let mut seq = seq;
+
+        loop {
+            self.set_seq(pp, seq);
+
+            let next_pp = match self.next_pp(pp) {
+                Some(next_pp) => next_pp,
+                None => break,
+            };
+            if self.seq(next_pp) > seq {
+                break;
+            }
+
+            pp = next_pp;
+            seq = seq + MINOR_STRIDE;
         }
     }
 }
@@ -379,6 +489,16 @@ impl Iterator for InstIter<'_> {
             }
             None => None,
         }
+    }
+}
+
+fn midpoint(a: SequenceNumber, b: SequenceNumber) -> Option<SequenceNumber> {
+    debug_assert!(a < b);
+    let m = a + (b - a) / 2;
+    if m > a {
+        Some(m)
+    } else {
+        None
     }
 }
 

@@ -2,12 +2,14 @@ mod builder;
 mod cfg;
 mod func;
 mod inst;
+mod program_point;
 mod types;
 mod verifier;
 
 pub use self::builder::*;
 pub use self::func::*;
 pub use self::inst::*;
+pub use self::program_point::*;
 pub use self::types::*;
 pub use self::verifier::verify_ir;
 
