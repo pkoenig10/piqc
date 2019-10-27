@@ -1,6 +1,5 @@
-use std::fmt;
-
 use crate::Span;
+use std::fmt;
 
 id!(pub Symbol, "s");
 

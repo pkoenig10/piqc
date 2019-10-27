@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-use std::mem;
-
 use crate::collections::PrimaryMap;
 use crate::ir::*;
+use std::collections::HashMap;
+use std::mem;
 
 id!(Block, "b");
 

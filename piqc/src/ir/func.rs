@@ -1,7 +1,6 @@
-use std::fmt;
-
 use crate::collections::{PrimaryMap, SecondaryMap};
 use crate::ir::*;
+use std::fmt;
 
 #[derive(Debug)]
 struct EbbData {

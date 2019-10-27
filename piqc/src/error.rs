@@ -1,8 +1,7 @@
+use crate::{SourceMap, Span};
 use std::cmp;
 use std::error;
 use std::fmt;
-
-use crate::{SourceMap, Span};
 
 #[derive(Debug)]
 pub struct Error {

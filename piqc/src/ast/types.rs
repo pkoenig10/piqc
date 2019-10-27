@@ -1,7 +1,6 @@
+use crate::ir;
 use std::fmt;
 use std::ops::BitOr;
-
-use crate::ir;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Variability {

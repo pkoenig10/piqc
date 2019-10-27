@@ -1,18 +1,17 @@
-pub use self::builder::FuncBuilder;
-pub use self::func::Func;
-pub use self::inst::Cond;
-pub use self::types::{Type, TypeKind, Variability};
-pub use self::verifier::verify_ir;
-
-use std::fmt;
-
-use self::inst::InstData;
-
 mod builder;
 mod func;
 mod inst;
 mod types;
 mod verifier;
+
+pub use self::builder::*;
+pub use self::func::*;
+pub use self::inst::*;
+pub use self::types::*;
+pub use self::verifier::verify_ir;
+
+use self::inst::InstData;
+use std::fmt;
 
 id!(pub Ebb, "ebb");
 id!(pub Inst, "i");

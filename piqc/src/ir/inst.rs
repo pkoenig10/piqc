@@ -1,7 +1,6 @@
+use crate::ir::*;
 use std::fmt;
 use std::slice::{from_mut, from_ref};
-
-use crate::ir::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Cond {

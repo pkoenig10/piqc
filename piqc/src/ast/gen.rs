@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
 use crate::ast::*;
 use crate::collections::Generator;
 use crate::error::{Error, Errors};
 use crate::ir;
 use crate::Span;
+use std::collections::HashMap;
 
 pub fn generate_ir(func: &Func) -> Result<ir::Func, Errors> {
     IrGenerator::new().func(func)
