@@ -1,6 +1,6 @@
 func(uniform int):
 
-ebb0(%0):
+b0(%0):
     %1 = fetch %0
     %2 = iconst 0
     %3 = sub %2, %1

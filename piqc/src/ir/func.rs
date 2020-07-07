@@ -3,14 +3,14 @@ use crate::ir::*;
 use std::fmt;
 
 #[derive(Debug)]
-struct EbbData {
+struct BlockData {
     params: Vec<Value>,
 }
 
 #[derive(Debug)]
 enum ValueData {
     Inst(Type, Inst),
-    Param(Type, Ebb, usize),
+    Param(Type, Block, usize),
     Alias(Type, Value),
 }
 
@@ -31,7 +31,7 @@ impl PrimaryMap<Value, ValueData> {
 #[derive(Debug)]
 pub struct FuncData {
     params: Vec<Type>,
-    ebbs: PrimaryMap<Ebb, EbbData>,
+    blocks: PrimaryMap<Block, BlockData>,
     insts: PrimaryMap<Inst, InstData>,
     values: PrimaryMap<Value, ValueData>,
     results: SecondaryMap<Inst, Option<Value>>,
@@ -41,16 +41,16 @@ impl FuncData {
     fn new() -> FuncData {
         FuncData {
             params: Vec::new(),
-            ebbs: PrimaryMap::new(),
+            blocks: PrimaryMap::new(),
             insts: PrimaryMap::new(),
             values: PrimaryMap::new(),
             results: SecondaryMap::new(),
         }
     }
 
-    pub fn create_ebb(&mut self) -> Ebb {
-        let data = EbbData { params: Vec::new() };
-        self.ebbs.create(data)
+    pub fn create_block(&mut self) -> Block {
+        let data = BlockData { params: Vec::new() };
+        self.blocks.create(data)
     }
 
     pub fn create_inst(&mut self, data: InstData) -> Inst {
@@ -76,24 +76,24 @@ impl FuncData {
         self.params.push(ty);
     }
 
-    pub fn ebb_params(&self, ebb: Ebb) -> &[Value] {
-        &self.ebbs[ebb].params
+    pub fn block_params(&self, block: Block) -> &[Value] {
+        &self.blocks[block].params
     }
 
-    pub fn push_ebb_param(&mut self, ebb: Ebb, ty: Type) -> Value {
-        let idx = self.ebbs[ebb].params.len();
-        let value = self.values.create(ValueData::Param(ty, ebb, idx));
-        self.ebbs[ebb].params.push(value);
+    pub fn push_block_param(&mut self, block: Block, ty: Type) -> Value {
+        let idx = self.blocks[block].params.len();
+        let value = self.values.create(ValueData::Param(ty, block, idx));
+        self.blocks[block].params.push(value);
         value
     }
 
-    pub fn swap_remove_ebb_param(&mut self, value: Value) {
-        let (ebb, idx) = match self.values[value] {
-            ValueData::Param(_, ebb, idx) => (ebb, idx),
+    pub fn swap_remove_block_param(&mut self, value: Value) {
+        let (block, idx) = match self.values[value] {
+            ValueData::Param(_, block, idx) => (block, idx),
             _ => panic!("Value {} is not a block parameter", value),
         };
 
-        let params = &mut self.ebbs[ebb].params;
+        let params = &mut self.blocks[block].params;
 
         params.swap_remove(idx);
 
@@ -167,123 +167,123 @@ impl FuncData {
     fn is_value_attached(&self, value: Value) -> bool {
         match self.values[value] {
             ValueData::Inst(_, inst) => self.inst_result(inst) == Some(value),
-            ValueData::Param(_, ebb, idx) => self.ebb_params(ebb).get(idx) == Some(&value),
+            ValueData::Param(_, block, idx) => self.block_params(block).get(idx) == Some(&value),
             ValueData::Alias(..) => false,
         }
     }
 }
 
 #[derive(Debug, Default)]
-struct EbbNode {
-    prev_ebb: Option<Ebb>,
-    next_ebb: Option<Ebb>,
+struct BlockNode {
+    prev_block: Option<Block>,
+    next_block: Option<Block>,
     first_inst: Option<Inst>,
     last_inst: Option<Inst>,
 }
 
 #[derive(Debug, Default)]
 struct InstNode {
-    ebb: Option<Ebb>,
+    block: Option<Block>,
     prev_inst: Option<Inst>,
     next_inst: Option<Inst>,
 }
 
 #[derive(Debug)]
 pub struct FuncLayout {
-    ebbs: SecondaryMap<Ebb, EbbNode>,
+    blocks: SecondaryMap<Block, BlockNode>,
     insts: SecondaryMap<Inst, InstNode>,
-    first_ebb: Option<Ebb>,
-    last_ebb: Option<Ebb>,
+    first_block: Option<Block>,
+    last_block: Option<Block>,
 }
 
 impl FuncLayout {
     pub fn new() -> FuncLayout {
         FuncLayout {
-            ebbs: SecondaryMap::new(),
+            blocks: SecondaryMap::new(),
             insts: SecondaryMap::new(),
-            first_ebb: None,
-            last_ebb: None,
+            first_block: None,
+            last_block: None,
         }
     }
 
-    pub fn ebbs(&self) -> EbbIter<'_> {
-        EbbIter {
-            ebbs: &self.ebbs,
-            next: self.first_ebb,
+    pub fn blocks(&self) -> BlockIter<'_> {
+        BlockIter {
+            blocks: &self.blocks,
+            next: self.first_block,
         }
     }
 
-    pub fn first_ebb(&self) -> Option<Ebb> {
-        self.first_ebb
+    pub fn first_block(&self) -> Option<Block> {
+        self.first_block
     }
 
-    pub fn last_ebb(&self) -> Option<Ebb> {
-        self.last_ebb
+    pub fn last_block(&self) -> Option<Block> {
+        self.last_block
     }
 
-    pub fn is_ebb_inserted(&self, ebb: Ebb) -> bool {
-        self.first_ebb == Some(ebb) || self.ebbs[ebb].prev_ebb.is_some()
+    pub fn is_block_inserted(&self, block: Block) -> bool {
+        self.first_block == Some(block) || self.blocks[block].prev_block.is_some()
     }
 
-    pub fn push_ebb(&mut self, ebb: Ebb) {
-        let ebb_node = &mut self.ebbs[ebb];
+    pub fn push_block(&mut self, block: Block) {
+        let block_node = &mut self.blocks[block];
 
-        ebb_node.prev_ebb = self.last_ebb;
+        block_node.prev_block = self.last_block;
 
-        match self.last_ebb {
-            Some(prev_ebb) => {
-                self.ebbs[prev_ebb].next_ebb = Some(ebb);
+        match self.last_block {
+            Some(prev_block) => {
+                self.blocks[prev_block].next_block = Some(block);
             }
             None => {
-                self.first_ebb = Some(ebb);
+                self.first_block = Some(block);
             }
         }
-        self.last_ebb = Some(ebb);
+        self.last_block = Some(block);
     }
 
-    pub fn remove_ebb(&mut self, ebb: Ebb) {
-        let ebb_node = &mut self.ebbs[ebb];
+    pub fn remove_block(&mut self, block: Block) {
+        let block_node = &mut self.blocks[block];
 
-        let prev_ebb = ebb_node.prev_ebb;
-        let next_ebb = ebb_node.next_ebb;
-        ebb_node.prev_ebb = None;
-        ebb_node.next_ebb = None;
+        let prev_block = block_node.prev_block;
+        let next_block = block_node.next_block;
+        block_node.prev_block = None;
+        block_node.next_block = None;
 
-        match prev_ebb {
-            Some(prev_ebb) => {
-                self.ebbs[prev_ebb].next_ebb = next_ebb;
+        match prev_block {
+            Some(prev_block) => {
+                self.blocks[prev_block].next_block = next_block;
             }
             None => {
-                self.first_ebb = next_ebb;
+                self.first_block = next_block;
             }
         }
-        match next_ebb {
-            Some(next_ebb) => {
-                self.ebbs[next_ebb].prev_ebb = prev_ebb;
+        match next_block {
+            Some(next_block) => {
+                self.blocks[next_block].prev_block = prev_block;
             }
             None => {
-                self.last_ebb = prev_ebb;
+                self.last_block = prev_block;
             }
         }
     }
 
-    pub fn insts(&self, ebb: Ebb) -> InstIter<'_> {
+    pub fn insts(&self, block: Block) -> InstIter<'_> {
         InstIter {
             insts: &self.insts,
-            next: self.ebbs[ebb].first_inst,
+            next: self.blocks[block].first_inst,
         }
     }
 
-    pub fn first_inst(&self, ebb: Ebb) -> Option<Inst> {
-        self.ebbs[ebb].first_inst
+    pub fn first_inst(&self, block: Block) -> Option<Inst> {
+        self.blocks[block].first_inst
     }
 
-    pub fn last_inst(&self, ebb: Ebb) -> Option<Inst> {
-        self.ebbs[ebb].last_inst
+    pub fn last_inst(&self, block: Block) -> Option<Inst> {
+        self.blocks[block].last_inst
     }
 
-    pub fn inst_ebb(&self, inst: Inst) -> Option<Ebb> {
-        self.insts[inst].ebb
+    pub fn inst_block(&self, inst: Inst) -> Option<Block> {
+        self.insts[inst].block
     }
 
     pub fn prev_inst(&self, inst: Inst) -> Option<Inst> {
@@ -294,41 +294,41 @@ impl FuncLayout {
         self.insts[inst].next_inst
     }
 
-    pub fn push_inst(&mut self, ebb: Ebb, inst: Inst) {
-        let ebb_node = &mut self.ebbs[ebb];
+    pub fn push_inst(&mut self, block: Block, inst: Inst) {
+        let block_node = &mut self.blocks[block];
         let inst_node = &mut self.insts[inst];
 
-        inst_node.ebb = Some(ebb);
-        inst_node.prev_inst = ebb_node.last_inst;
+        inst_node.block = Some(block);
+        inst_node.prev_inst = block_node.last_inst;
 
-        match ebb_node.last_inst {
+        match block_node.last_inst {
             Some(prev_inst) => {
                 self.insts[prev_inst].next_inst = Some(inst);
             }
             None => {
-                ebb_node.first_inst = Some(inst);
+                block_node.first_inst = Some(inst);
             }
         }
-        ebb_node.last_inst = Some(inst);
+        block_node.last_inst = Some(inst);
     }
 
     pub fn remove_inst(&mut self, inst: Inst) {
         let inst_node = &mut self.insts[inst];
 
-        let ebb = inst_node.ebb;
+        let block = inst_node.block;
         let prev_inst = inst_node.prev_inst;
         let next_inst = inst_node.next_inst;
-        inst_node.ebb = None;
+        inst_node.block = None;
         inst_node.prev_inst = None;
         inst_node.next_inst = None;
 
-        if let Some(ebb) = ebb {
+        if let Some(block) = block {
             match prev_inst {
                 Some(prev_inst) => {
                     self.insts[prev_inst].next_inst = next_inst;
                 }
                 None => {
-                    self.ebbs[ebb].first_inst = next_inst;
+                    self.blocks[block].first_inst = next_inst;
                 }
             }
 
@@ -337,26 +337,26 @@ impl FuncLayout {
                     self.insts[next_inst].prev_inst = prev_inst;
                 }
                 None => {
-                    self.ebbs[ebb].last_inst = prev_inst;
+                    self.blocks[block].last_inst = prev_inst;
                 }
             }
         }
     }
 }
 
-pub struct EbbIter<'a> {
-    ebbs: &'a SecondaryMap<Ebb, EbbNode>,
-    next: Option<Ebb>,
+pub struct BlockIter<'a> {
+    blocks: &'a SecondaryMap<Block, BlockNode>,
+    next: Option<Block>,
 }
 
-impl Iterator for EbbIter<'_> {
-    type Item = Ebb;
+impl Iterator for BlockIter<'_> {
+    type Item = Block;
 
-    fn next(&mut self) -> Option<Ebb> {
+    fn next(&mut self) -> Option<Block> {
         match self.next {
-            Some(ebb) => {
-                self.next = self.ebbs[ebb].next_ebb;
-                Some(ebb)
+            Some(block) => {
+                self.next = self.blocks[block].next_block;
+                Some(block)
             }
             None => None,
         }
@@ -397,8 +397,8 @@ impl Func {
     }
 
     pub fn resolve_aliases(&mut self) {
-        for ebb in self.layout.ebbs() {
-            for inst in self.layout.insts(ebb) {
+        for block in self.layout.blocks() {
+            for inst in self.layout.insts(block) {
                 self.data.resolve_aliases_in_inst(inst);
             }
         }
@@ -408,10 +408,15 @@ impl Func {
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "func({}):", DisplaySlice(&self.data.params()))?;
-        for ebb in self.layout.ebbs() {
+        for block in self.layout.blocks() {
             writeln!(f)?;
-            writeln!(f, "{}({}):", ebb, DisplaySlice(self.data.ebb_params(ebb)))?;
-            for inst in self.layout.insts(ebb) {
+            writeln!(
+                f,
+                "{}({}):",
+                block,
+                DisplaySlice(self.data.block_params(block))
+            )?;
+            for inst in self.layout.insts(block) {
                 write!(f, "    ")?;
                 if let Some(result) = self.data.inst_result(inst) {
                     write!(f, "{} = ", result)?;

@@ -1,6 +1,6 @@
 func(uniform int):
 
-ebb0(%0):
+b0(%0):
     %1 = iconst 0
     %2 = element
     %3 = iconst 8

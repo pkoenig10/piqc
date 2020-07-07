@@ -1,17 +1,20 @@
 func(uniform int, uniform int):
 
-ebb0(%0, %1):
+b0(%0, %1):
     %2 = iconst 0
-    jmp ebb1(%2)
+    jmp b1(%2)
 
-ebb1(%3):
+b1(%3):
     %4 = iconst 42
     %5 = icmp lt %3, %4
-    brallz %5 ebb2()
-    %7 = add %3, %1
-    jmp ebb1(%7)
+    brallz %5 b3()
+    jmp b2()
 
-ebb2():
+b2():
+    %7 = add %3, %1
+    jmp b1(%7)
+
+b3():
     %9 = alloc 1
     write %3, %9
     store %9, %0

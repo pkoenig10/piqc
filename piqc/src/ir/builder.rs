@@ -1,15 +1,7 @@
-use crate::collections::PrimaryMap;
+use crate::collections::SecondaryMap;
 use crate::ir::*;
 use std::collections::HashMap;
 use std::mem;
-
-id!(Block, "b");
-
-#[derive(Debug)]
-struct Predecessor {
-    block: Block,
-    inst: Inst,
-}
 
 #[derive(Debug)]
 struct Param {
@@ -17,94 +9,12 @@ struct Param {
     value: Value,
 }
 
-#[derive(Debug)]
-struct HeaderBlockData {
-    ebb: Ebb,
+#[derive(Debug, Default)]
+struct BlockData {
     sealed: bool,
     filled: bool,
-    predecessors: Vec<Predecessor>,
+    predecessors: Vec<Inst>,
     params: Vec<Param>,
-}
-
-#[derive(Debug)]
-struct BodyBlockData {
-    predecessor: Block,
-}
-
-#[derive(Debug)]
-enum BlockData {
-    Header(HeaderBlockData),
-    Body(BodyBlockData),
-}
-
-impl From<HeaderBlockData> for BlockData {
-    fn from(data: HeaderBlockData) -> BlockData {
-        BlockData::Header(data)
-    }
-}
-
-impl From<BodyBlockData> for BlockData {
-    fn from(data: BodyBlockData) -> BlockData {
-        BlockData::Body(data)
-    }
-}
-
-#[derive(Debug)]
-struct Blocks {
-    blocks: PrimaryMap<Block, BlockData>,
-    headers: HashMap<Ebb, Block>,
-}
-
-impl Blocks {
-    fn new() -> Blocks {
-        Blocks {
-            blocks: PrimaryMap::new(),
-            headers: HashMap::new(),
-        }
-    }
-
-    fn create_header(&mut self, ebb: Ebb) -> Block {
-        let data = HeaderBlockData {
-            ebb,
-            sealed: false,
-            filled: false,
-            predecessors: Vec::new(),
-            params: Vec::new(),
-        };
-        let block = self.blocks.create(data.into());
-        self.headers.insert(ebb, block);
-        block
-    }
-
-    fn create_body(&mut self, predecessor: Block) -> Block {
-        self.blocks.create(BlockData::Body(BodyBlockData {
-            predecessor: predecessor,
-        }))
-    }
-
-    fn header(&self, ebb: Ebb) -> Block {
-        self.headers[&ebb]
-    }
-
-    fn block(&self, block: Block) -> &BlockData {
-        &self.blocks[block]
-    }
-
-    fn header_block(&self, ebb: Ebb) -> &HeaderBlockData {
-        let block = self.header(ebb);
-        match &self.blocks[block] {
-            BlockData::Header(data) => data,
-            _ => panic!("Header block for {} is not a header block"),
-        }
-    }
-
-    fn header_block_mut(&mut self, ebb: Ebb) -> &mut HeaderBlockData {
-        let block = self.header(ebb);
-        match &mut self.blocks[block] {
-            BlockData::Header(data) => data,
-            _ => panic!("Header block for {} is not a header block"),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -128,36 +38,19 @@ impl Values {
     }
 }
 
-#[derive(Debug, Default)]
-struct Position {
-    ebb: Option<Ebb>,
-    block: Option<Block>,
-}
-
-impl Position {
-    fn set(&mut self, ebb: Ebb, block: Block) {
-        self.ebb = Some(ebb);
-        self.block = Some(block);
-    }
-
-    fn set_block(&mut self, block: Block) {
-        self.block = Some(block);
-    }
-}
-
 #[derive(Debug)]
 enum Call {
     UseVar(Block),
     FinishOnePredecessor(Block),
-    FinishMultiplePredecessors(Ebb, Value),
+    FinishMultiplePredecessors(Block, Value),
 }
 
 pub struct FuncBuilder {
     func: Func,
-    blocks: Blocks,
+    blocks: SecondaryMap<Block, BlockData>,
     values: Values,
     types: HashMap<Variable, Type>,
-    position: Position,
+    position: Option<Block>,
     calls: Vec<Call>,
     results: Vec<Value>,
 }
@@ -166,10 +59,10 @@ impl FuncBuilder {
     pub fn new() -> FuncBuilder {
         FuncBuilder {
             func: Func::new(),
-            blocks: Blocks::new(),
+            blocks: SecondaryMap::new(),
             values: Values::new(),
             types: HashMap::new(),
-            position: Position::default(),
+            position: None,
             calls: Vec::new(),
             results: Vec::new(),
         }
@@ -177,83 +70,80 @@ impl FuncBuilder {
 
     pub fn finalize(self) -> Func {
         debug_assert!(
-            self.blocks
-                .headers
-                .keys()
-                .all(|ebb| self.blocks.header_block(*ebb).sealed),
+            self.func
+                .layout
+                .blocks()
+                .all(|block| self.blocks[block].sealed),
             "All blocks must be sealed before finalize"
         );
         debug_assert!(
-            self.blocks
-                .headers
-                .keys()
-                .all(|ebb| self.blocks.header_block(*ebb).filled),
+            self.func
+                .layout
+                .blocks()
+                .all(|block| self.blocks[block].filled),
             "All blocks must be filled before finalize"
         );
 
         self.func
     }
 
-    pub fn create_ebb(&mut self) -> Ebb {
-        let ebb = self.func.data.create_ebb();
-        self.blocks.create_header(ebb);
-        ebb
+    pub fn create_block(&mut self) -> Block {
+        self.func.data.create_block()
     }
 
-    pub fn seal_ebb(&mut self, ebb: Ebb) {
-        let data = self.blocks.header_block_mut(ebb);
+    pub fn seal_block(&mut self, block: Block) {
+        let data = &mut self.blocks[block];
         if data.sealed {
             return;
         }
 
         let params = mem::replace(&mut data.params, Vec::new());
         for param in params {
-            self.start_multiple_predecessors(ebb, param.value);
+            self.start_multiple_predecessors(block, param.value);
             self.run_use_var(param.variable);
         }
 
-        self.blocks.header_block_mut(ebb).sealed = true;
+        self.blocks[block].sealed = true;
     }
 
-    pub fn switch_to_ebb(&mut self, ebb: Ebb) {
-        if let Some(current_ebb) = self.position.ebb {
+    pub fn switch_to_block(&mut self, block: Block) {
+        if let Some(current_block) = self.position {
             debug_assert!(
                 self.is_filled(),
                 "Switched to block {} before current block {} is filled",
-                ebb,
-                current_ebb
+                block,
+                current_block
             );
         }
 
         debug_assert!(
-            !self.blocks.header_block(ebb).filled,
+            !self.blocks[block].filled,
             "Switched to block {} which is already filled",
-            ebb
+            block
         );
 
-        let block = self.blocks.header(ebb);
-        self.position.set(ebb, block);
+        self.position = Some(block);
     }
 
     pub fn is_filled(&self) -> bool {
-        let ebb = self.position.ebb.unwrap();
-        self.blocks.header_block(ebb).filled
+        let block = self.position.unwrap();
+        self.blocks[block].filled
     }
 
-    pub fn push_param(&mut self, ebb: Ebb, ty: Type) -> Value {
+    pub fn push_param(&mut self, block: Block, ty: Type) -> Value {
         debug_assert!(
-            self.blocks.header_block(ebb).sealed,
+            self.blocks[block].sealed,
             "Parameter added to block {} which is not sealed",
-            ebb
+            block
         );
         debug_assert!(
-            self.func.layout.first_inst(ebb).is_none(),
+            self.func.layout.first_inst(block).is_none(),
             "Parameter added to block {} which already has instructions",
-            ebb
+            block
         );
 
         self.func.data.push_param(ty);
-        self.func.data.push_ebb_param(ebb, ty)
+        self.func.data.push_block_param(block, ty)
     }
 
     pub fn declare_var(&mut self, variable: Variable, ty: Type) {
@@ -261,7 +151,7 @@ impl FuncBuilder {
     }
 
     pub fn def_var(&mut self, variable: Variable, value: Value) {
-        let block = self.position.block.unwrap();
+        let block = self.position.unwrap();
         self.def_var_in_block(variable, value, block)
     }
 
@@ -285,7 +175,7 @@ impl FuncBuilder {
     }
 
     pub fn use_var(&mut self, variable: Variable) -> Value {
-        let block = self.position.block.unwrap();
+        let block = self.position.unwrap();
         if let Some(value) = self.values.get(block, variable) {
             return value;
         }
@@ -308,8 +198,8 @@ impl FuncBuilder {
                 Call::FinishOnePredecessor(block) => {
                     self.finish_one_predecessor(variable, block);
                 }
-                Call::FinishMultiplePredecessors(ebb, value) => {
-                    self.finish_multiple_predecessors(variable, ebb, value);
+                Call::FinishMultiplePredecessors(block, value) => {
+                    self.finish_multiple_predecessors(variable, block, value);
                 }
             }
         }
@@ -323,38 +213,29 @@ impl FuncBuilder {
             return;
         }
 
-        enum State {
-            Unsealed(Ebb),
-            SealedOnePredecessor(Block),
-            SealedMultiplePredecessors(Ebb),
-        };
+        let data = &self.blocks[block];
 
-        let state = match &self.blocks.block(block) {
-            BlockData::Header(data) => match (data.sealed, data.predecessors.len()) {
-                (false, _) => State::Unsealed(data.ebb),
-                (true, 1) => State::SealedOnePredecessor(data.predecessors[0].block),
-                (true, _) => State::SealedMultiplePredecessors(data.ebb),
-            },
-            BlockData::Body(data) => State::SealedOnePredecessor(data.predecessor),
-        };
-        match state {
-            State::Unsealed(ebb) => {
-                let value = self.func.data.push_ebb_param(ebb, ty);
+        match (data.sealed, data.predecessors.len()) {
+            (false, _) => {
+                let value = self.func.data.push_block_param(block, ty);
                 self.def_var_in_block(variable, value, block);
 
                 let param = Param { variable, value };
-                self.blocks.header_block_mut(ebb).params.push(param);
+                self.blocks[block].params.push(param);
 
                 self.results.push(value);
             }
-            State::SealedOnePredecessor(predecessor) => {
-                self.start_one_predecessor(block, predecessor);
+            (true, 1) => {
+                let predecessor = data.predecessors[0];
+                let pred_block = self.func.layout.inst_block(predecessor).unwrap();
+
+                self.start_one_predecessor(block, pred_block);
             }
-            State::SealedMultiplePredecessors(ebb) => {
-                let value = self.func.data.push_ebb_param(ebb, ty);
+            (true, _) => {
+                let value = self.func.data.push_block_param(block, ty);
                 self.def_var_in_block(variable, value, block);
 
-                self.start_multiple_predecessors(ebb, value);
+                self.start_multiple_predecessors(block, value);
             }
         };
     }
@@ -369,17 +250,23 @@ impl FuncBuilder {
         self.def_var_in_block(variable, value, block)
     }
 
-    fn start_multiple_predecessors(&mut self, ebb: Ebb, param_value: Value) {
+    fn start_multiple_predecessors(&mut self, block: Block, param_value: Value) {
         self.calls
-            .push(Call::FinishMultiplePredecessors(ebb, param_value));
+            .push(Call::FinishMultiplePredecessors(block, param_value));
 
-        for predecessor in &self.blocks.header_block(ebb).predecessors {
-            self.calls.push(Call::UseVar(predecessor.block))
+        for &predecessor in &self.blocks[block].predecessors {
+            let pred_block = self.func.layout.inst_block(predecessor).unwrap();
+            self.calls.push(Call::UseVar(pred_block))
         }
     }
 
-    fn finish_multiple_predecessors(&mut self, variable: Variable, ebb: Ebb, param_value: Value) {
-        let predecessors = &self.blocks.header_block(ebb).predecessors;
+    fn finish_multiple_predecessors(
+        &mut self,
+        variable: Variable,
+        block: Block,
+        param_value: Value,
+    ) {
+        let predecessors = &self.blocks[block].predecessors;
 
         enum Results<T> {
             Zero,
@@ -414,17 +301,18 @@ impl FuncBuilder {
                 panic!("Variable {} used but not defined", variable);
             }
             Results::One(value) => {
-                self.func.data.swap_remove_ebb_param(param_value);
+                self.func.data.swap_remove_block_param(param_value);
                 self.func.data.value_to_alias(param_value, value);
 
                 value
             }
             Results::More => {
-                for predecessor in predecessors {
-                    let pred_value = self.values.get(predecessor.block, variable).unwrap();
+                for &predecessor in predecessors {
+                    let pred_block = self.func.layout.inst_block(predecessor).unwrap();
+                    let pred_value = self.values.get(pred_block, variable).unwrap();
                     self.func
                         .data
-                        .inst_mut(predecessor.inst)
+                        .inst_mut(predecessor)
                         .push_target_arg(pred_value);
                 }
 
@@ -711,28 +599,28 @@ impl FuncBuilder {
         self.push_inst(data);
     }
 
-    pub fn jump(&mut self, ebb: Ebb) {
-        let data = InstData::Jump(ebb, vec![]);
+    pub fn jump(&mut self, block: Block) {
+        let data = InstData::Jump(block, vec![]);
         self.push_inst(data);
     }
 
-    pub fn brallz(&mut self, arg: Value, ebb: Ebb) {
-        let data = InstData::Brallz(ebb, vec![arg]);
+    pub fn brallz(&mut self, arg: Value, block: Block) {
+        let data = InstData::Brallz(block, vec![arg]);
         self.push_inst(data);
     }
 
-    pub fn brallnz(&mut self, arg: Value, ebb: Ebb) {
-        let data = InstData::Brallnz(ebb, vec![arg]);
+    pub fn brallnz(&mut self, arg: Value, block: Block) {
+        let data = InstData::Brallnz(block, vec![arg]);
         self.push_inst(data);
     }
 
-    pub fn branyz(&mut self, arg: Value, ebb: Ebb) {
-        let data = InstData::Branyz(ebb, vec![arg]);
+    pub fn branyz(&mut self, arg: Value, block: Block) {
+        let data = InstData::Branyz(block, vec![arg]);
         self.push_inst(data);
     }
 
-    pub fn branynz(&mut self, arg: Value, ebb: Ebb) {
-        let data = InstData::Branynz(ebb, vec![arg]);
+    pub fn branynz(&mut self, arg: Value, block: Block) {
+        let data = InstData::Branynz(block, vec![arg]);
         self.push_inst(data);
     }
 
@@ -742,30 +630,29 @@ impl FuncBuilder {
     }
 
     fn push_inst(&mut self, data: InstData) -> Inst {
-        let ebb = self.position.ebb.unwrap();
-        if !self.func.layout.is_ebb_inserted(ebb) {
-            self.func.layout.push_ebb(ebb);
+        let block = self.position.unwrap();
+        if !self.func.layout.is_block_inserted(block) {
+            self.func.layout.push_block(block);
         }
 
         debug_assert!(
-            !self.blocks.header_block(ebb).filled,
+            !self.blocks[block].filled,
             "Instruction added to block which is already filled"
         );
 
+        let target = data.target();
         let is_terminator = data.is_terminator();
-        let target_ebb = data.target();
 
         let inst = self.func.data.create_inst(data);
-        self.func.layout.push_inst(ebb, inst);
+        self.func.layout.push_inst(block, inst);
 
-        if let Some(ebb) = target_ebb {
-            self.declare_successor(inst, ebb);
+        if let Some(target) = target {
+            self.blocks[target].predecessors.push(inst);
         }
 
         if is_terminator {
-            self.fill_ebb();
-        } else if target_ebb.is_some() {
-            self.switch_to_next_block();
+            let block = self.position.unwrap();
+            self.blocks[block].filled = true;
         }
 
         inst
@@ -807,25 +694,5 @@ impl FuncBuilder {
 
     fn create_inst_result(&mut self, inst: Inst, ty: Type) -> Value {
         self.func.data.create_inst_result(inst, ty)
-    }
-
-    fn declare_successor(&mut self, inst: Inst, ebb: Ebb) {
-        let block = self.position.block.unwrap();
-        let predecessor = Predecessor { block, inst };
-        self.blocks
-            .header_block_mut(ebb)
-            .predecessors
-            .push(predecessor);
-    }
-
-    fn fill_ebb(&mut self) {
-        let ebb = self.position.ebb.unwrap();
-        self.blocks.header_block_mut(ebb).filled = true;
-    }
-
-    fn switch_to_next_block(&mut self) {
-        let predecessor = self.position.block.unwrap();
-        let block = self.blocks.create_body(predecessor);
-        self.position.set_block(block);
     }
 }

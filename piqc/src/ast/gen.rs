@@ -92,12 +92,12 @@ impl IrGenerator {
     fn func(mut self, func: &Func) -> Result<ir::Func, Errors> {
         self.symbols.push_scope();
 
-        let entry_ebb = self.builder.create_ebb();
-        self.builder.switch_to_ebb(entry_ebb);
-        self.builder.seal_ebb(entry_ebb);
+        let entry_block = self.builder.create_block();
+        self.builder.switch_to_block(entry_block);
+        self.builder.seal_block(entry_block);
 
         for param in &func.params {
-            self.param(entry_ebb, param);
+            self.param(entry_block, param);
         }
 
         self.stmt(&func.stmt);
@@ -113,12 +113,12 @@ impl IrGenerator {
         }
     }
 
-    fn param(&mut self, ebb: ir::Ebb, param: &Param) {
+    fn param(&mut self, block: ir::Block, param: &Param) {
         match param.ty {
             Type::Prim(Variability::Uniform, _)
             | Type::PrimRef(Variability::Uniform, _)
             | Type::ArrayRef(Variability::Uniform, _) => {
-                let value = self.builder.push_param(ebb, param.ty.into());
+                let value = self.builder.push_param(block, param.ty.into());
 
                 let variable = self.symbols.insert_ok(param.identifier.symbol, param.ty);
                 self.builder.declare_var(variable, param.ty.into());
@@ -249,34 +249,37 @@ impl IrGenerator {
 
         match cond_type {
             Type::UNIFORM_BOOL => {
-                let else_ebb = self.builder.create_ebb();
-                let merge_ebb = match stmt.else_stmt {
-                    Some(_) => self.builder.create_ebb(),
-                    None => else_ebb,
+                let if_block = self.builder.create_block();
+                let else_block = self.builder.create_block();
+                let after_block = match stmt.else_stmt {
+                    Some(_) => self.builder.create_block(),
+                    None => else_block,
                 };
 
-                self.builder.brallz(cond_value, else_ebb);
-                self.builder.seal_ebb(else_ebb);
+                self.builder.brallz(cond_value, else_block);
+                self.builder.jump(if_block);
+                self.builder.seal_block(if_block);
+                self.builder.seal_block(else_block);
 
+                self.builder.switch_to_block(if_block);
                 self.stmt(&stmt.if_stmt);
 
                 if !self.builder.is_filled() {
-                    self.builder.jump(merge_ebb);
+                    self.builder.jump(after_block);
                 }
 
                 if let Some(ref else_stmt) = stmt.else_stmt {
-                    self.builder.switch_to_ebb(else_ebb);
-
+                    self.builder.switch_to_block(else_block);
                     self.stmt(else_stmt);
 
                     if !self.builder.is_filled() {
-                        self.builder.jump(merge_ebb);
+                        self.builder.jump(after_block);
                     }
                 }
 
-                self.builder.seal_ebb(merge_ebb);
+                self.builder.seal_block(after_block);
 
-                self.builder.switch_to_ebb(merge_ebb);
+                self.builder.switch_to_block(after_block);
             }
             Type::VARYING_BOOL => {
                 let prev_predicate = self.set_predicate_and(cond_value);
@@ -303,27 +306,31 @@ impl IrGenerator {
     }
 
     fn while_stmt(&mut self, stmt: &WhileStmt) -> StmtResult {
-        let header_ebb = self.builder.create_ebb();
-        let after_ebb = self.builder.create_ebb();
+        let header_block = self.builder.create_block();
+        let while_block = self.builder.create_block();
+        let after_block = self.builder.create_block();
 
-        self.builder.jump(header_ebb);
-        self.builder.switch_to_ebb(header_ebb);
+        self.builder.jump(header_block);
+        self.builder.switch_to_block(header_block);
 
         let (cond_type, cond_value) = self.expr_value(&stmt.cond)?;
 
         match cond_type {
             Type::UNIFORM_BOOL => {
-                self.builder.brallz(cond_value, after_ebb);
-                self.builder.seal_ebb(after_ebb);
+                self.builder.brallz(cond_value, after_block);
+                self.builder.jump(while_block);
+                self.builder.seal_block(while_block);
+                self.builder.seal_block(after_block);
 
+                self.builder.switch_to_block(while_block);
                 self.stmt(&stmt.stmt);
 
                 if !self.builder.is_filled() {
-                    self.builder.jump(header_ebb);
+                    self.builder.jump(header_block);
                 }
-                self.builder.seal_ebb(header_ebb);
+                self.builder.seal_block(header_block);
 
-                self.builder.switch_to_ebb(after_ebb);
+                self.builder.switch_to_block(after_block);
             }
             Type::VARYING_BOOL => {
                 let prev_predicate = self.set_predicate_and(cond_value);
@@ -331,17 +338,20 @@ impl IrGenerator {
                 let predicate = self
                     .predicate
                     .expect("Predicate is none after while condition");
-                self.builder.brallz(predicate, after_ebb);
-                self.builder.seal_ebb(after_ebb);
+                self.builder.brallz(predicate, after_block);
+                self.builder.jump(while_block);
+                self.builder.seal_block(while_block);
+                self.builder.seal_block(after_block);
 
+                self.builder.switch_to_block(while_block);
                 self.stmt(&stmt.stmt);
 
                 if !self.builder.is_filled() {
-                    self.builder.jump(header_ebb);
+                    self.builder.jump(header_block);
                 }
-                self.builder.seal_ebb(header_ebb);
+                self.builder.seal_block(header_block);
 
-                self.builder.switch_to_ebb(after_ebb);
+                self.builder.switch_to_block(after_block);
 
                 self.reset_predicate(prev_predicate);
             }

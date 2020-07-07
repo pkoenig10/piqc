@@ -65,11 +65,11 @@ pub enum InstData {
     Write([Value; 2]),
     Load([Value; 2]),
     Store([Value; 2]),
-    Jump(Ebb, Vec<Value>),
-    Brallz(Ebb, Vec<Value>),
-    Brallnz(Ebb, Vec<Value>),
-    Branyz(Ebb, Vec<Value>),
-    Branynz(Ebb, Vec<Value>),
+    Jump(Block, Vec<Value>),
+    Brallz(Block, Vec<Value>),
+    Brallnz(Block, Vec<Value>),
+    Branyz(Block, Vec<Value>),
+    Branynz(Block, Vec<Value>),
     Return(),
 }
 
@@ -170,6 +170,23 @@ impl InstData {
         }
     }
 
+    pub fn is_branch(&self) -> bool {
+        match self {
+            InstData::Brallz(..)
+            | InstData::Brallnz(..)
+            | InstData::Branyz(..)
+            | InstData::Branynz(..) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_jump(&self) -> bool {
+        match self {
+            InstData::Jump(..) | InstData::Return(..) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_terminator(&self) -> bool {
         match self {
             InstData::Jump(..) | InstData::Return(..) => true,
@@ -177,13 +194,13 @@ impl InstData {
         }
     }
 
-    pub fn target(&self) -> Option<Ebb> {
+    pub fn target(&self) -> Option<Block> {
         match *self {
-            InstData::Jump(ebb, _)
-            | InstData::Brallz(ebb, _)
-            | InstData::Brallnz(ebb, _)
-            | InstData::Branyz(ebb, _)
-            | InstData::Branynz(ebb, _) => Some(ebb),
+            InstData::Jump(block, ..)
+            | InstData::Brallz(block, ..)
+            | InstData::Brallnz(block, ..)
+            | InstData::Branyz(block, ..)
+            | InstData::Branynz(block, ..) => Some(block),
             _ => None,
         }
     }
@@ -242,33 +259,33 @@ impl fmt::Display for InstData {
             InstData::Load(args) => write!(f, "load {}, {}", args[0], args[1]),
             InstData::Store(args) => write!(f, "store {}, {}", args[0], args[1]),
             InstData::Select(args) => write!(f, "select {}, {}, {}", args[0], args[1], args[2]),
-            InstData::Jump(ebb, args) => write!(f, "jmp {}({})", ebb, DisplaySlice(args)),
-            InstData::Brallz(ebb, args) => write!(
+            InstData::Jump(block, args) => write!(f, "jmp {}({})", block, DisplaySlice(args)),
+            InstData::Brallz(block, args) => write!(
                 f,
                 "brallz {} {}({})",
                 args[0],
-                ebb,
+                block,
                 DisplaySlice(&args[1..])
             ),
-            InstData::Brallnz(ebb, args) => write!(
+            InstData::Brallnz(block, args) => write!(
                 f,
                 "brallnz {} {}({})",
                 args[0],
-                ebb,
+                block,
                 DisplaySlice(&args[1..])
             ),
-            InstData::Branyz(ebb, args) => write!(
+            InstData::Branyz(block, args) => write!(
                 f,
                 "branyz {} {}({})",
                 args[0],
-                ebb,
+                block,
                 DisplaySlice(&args[1..])
             ),
-            InstData::Branynz(ebb, args) => write!(
+            InstData::Branynz(block, args) => write!(
                 f,
                 "branynz {} {}({})",
                 args[0],
-                ebb,
+                block,
                 DisplaySlice(&args[1..])
             ),
             InstData::Return() => write!(f, "ret"),

@@ -13,7 +13,7 @@ pub use self::verifier::verify_ir;
 use self::inst::InstData;
 use std::fmt;
 
-id!(pub Ebb, "ebb");
+id!(pub Block, "b");
 id!(pub Inst, "i");
 id!(pub Value, "%");
 id!(pub Variable, "v");

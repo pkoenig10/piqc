@@ -1,18 +1,21 @@
 func(uniform int, uniform int):
 
-ebb0(%0, %1):
+b0(%0, %1):
     %2 = iconst 0
-    jmp ebb1(%2)
+    jmp b1(%2)
 
-ebb1(%3):
+b1(%3):
     %4 = element
     %5 = icmp lt %3, %4
-    brallz %5 ebb2()
+    brallz %5 b3()
+    jmp b2()
+
+b2():
     %7 = add %3, %1
     %8 = select %5, %7, %3
-    jmp ebb1(%8)
+    jmp b1(%8)
 
-ebb2():
+b3():
     %10 = element
     %11 = iconst 2
     %12 = shl %10, %11
