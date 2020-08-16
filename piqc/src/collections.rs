@@ -11,7 +11,7 @@ pub trait Id: Copy + Eq + Hash {
 
 macro_rules! id {
     ($vis:vis $id:ident, $prefix:expr) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
         $vis struct $id(u32);
 
         impl $crate::collections::Id for $id {
@@ -27,6 +27,12 @@ macro_rules! id {
         impl std::fmt::Display for $id {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, concat!($prefix, "{}"), self.0)
+            }
+        }
+
+        impl std::fmt::Debug for $id {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                std::fmt::Display::fmt(self, f)
             }
         }
     };
@@ -57,6 +63,62 @@ where
 }
 
 #[derive(Debug)]
+pub struct Set<T>
+where
+    T: Id,
+{
+    values: Vec<u32>,
+    phantom: PhantomData<T>,
+}
+
+impl<T> Set<T>
+where
+    T: Id,
+{
+    pub fn new() -> Set<T> {
+        Set {
+            values: Vec::new(),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn contains(&mut self, value: T) -> bool {
+        let index = Set::index(value);
+        match self.values.get(index) {
+            Some(block) => {
+                let mask = Set::mask(value);
+                (block & mask) != 0
+            }
+            None => false,
+        }
+    }
+
+    pub fn insert(&mut self, value: T) -> bool {
+        if self.contains(value) {
+            return false;
+        }
+
+        let index = Set::index(value);
+        if index >= self.values.len() {
+            self.values.resize(index + 1, 0);
+        }
+
+        let mask = Set::mask(value);
+        self.values[index] |= mask;
+
+        true
+    }
+
+    fn index(value: T) -> usize {
+        value.index() / 32
+    }
+
+    fn mask(value: T) -> u32 {
+        1 << (value.index() % 32)
+    }
+}
+
+#[derive(Debug)]
 pub struct PrimaryMap<K, V> {
     values: Vec<V>,
     phantom: PhantomData<K>,
@@ -73,14 +135,14 @@ where
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
     pub fn create(&mut self, value: V) -> K {
         let key = K::new(self.values.len());
         self.values.push(value);
         key
-    }
-
-    pub fn len(&self) -> usize {
-        self.values.len()
     }
 }
 
@@ -122,6 +184,10 @@ where
             default: Default::default(),
             phantom: PhantomData,
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.values.clear()
     }
 
     pub fn insert(&mut self, key: K, value: V) {

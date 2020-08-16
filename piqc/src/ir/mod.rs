@@ -1,6 +1,8 @@
 mod builder;
+pub mod cfg;
 mod func;
 mod inst;
+pub mod liveness;
 mod types;
 mod verifier;
 

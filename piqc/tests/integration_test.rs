@@ -2,14 +2,27 @@
 extern crate difference;
 extern crate piqc;
 
+use piqc::ir::cfg::ControlFlowGraph;
+use piqc::ir::liveness::{Intervals, Order};
+
 macro_rules! test_compile {
     ($piq_file:expr, $ir_file:expr) => {
-        assert_diff!(
-            include_str!($ir_file),
-            &format!("{}", piqc::compile(include_str!($piq_file)).unwrap()),
-            "\n",
-            0
-        );
+        let func = piqc::compile(include_str!($piq_file)).unwrap();
+        // assert_diff!(include_str!($ir_file), &format!("{}", func), "\n", 0);
+
+        println!("{}", func);
+
+        let mut cfg = ControlFlowGraph::new();
+        cfg.compute(&func);
+        println!("{:#?}", cfg);
+
+        let mut order = Order::new();
+        order.compute(&func, &cfg);
+        println!("{:#?}", order);
+
+        let mut intervals = Intervals::new();
+        intervals.compute(&func, &cfg, &order);
+        println!("{:#?}", intervals);
     };
 }
 

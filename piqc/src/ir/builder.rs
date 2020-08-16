@@ -227,7 +227,7 @@ impl FuncBuilder {
             }
             (true, 1) => {
                 let predecessor = data.predecessors[0];
-                let pred_block = self.func.layout.inst_block(predecessor).unwrap();
+                let pred_block = self.func.layout.inst_block(predecessor);
 
                 self.start_one_predecessor(block, pred_block);
             }
@@ -255,7 +255,7 @@ impl FuncBuilder {
             .push(Call::FinishMultiplePredecessors(block, param_value));
 
         for &predecessor in &self.blocks[block].predecessors {
-            let pred_block = self.func.layout.inst_block(predecessor).unwrap();
+            let pred_block = self.func.layout.inst_block(predecessor);
             self.calls.push(Call::UseVar(pred_block))
         }
     }
@@ -308,7 +308,7 @@ impl FuncBuilder {
             }
             Results::More => {
                 for &predecessor in predecessors {
-                    let pred_block = self.func.layout.inst_block(predecessor).unwrap();
+                    let pred_block = self.func.layout.inst_block(predecessor);
                     let pred_value = self.values.get(pred_block, variable).unwrap();
                     self.func
                         .data

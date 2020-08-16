@@ -206,10 +206,11 @@ impl FuncLayout {
         }
     }
 
-    pub fn blocks(&self) -> BlockIter<'_> {
-        BlockIter {
+    pub fn blocks(&self) -> Blocks {
+        Blocks {
             blocks: &self.blocks,
-            next: self.first_block,
+            head: self.first_block,
+            tail: self.last_block,
         }
     }
 
@@ -267,10 +268,11 @@ impl FuncLayout {
         }
     }
 
-    pub fn insts(&self, block: Block) -> InstIter<'_> {
-        InstIter {
+    pub fn insts(&self, block: Block) -> Insts {
+        Insts {
             insts: &self.insts,
-            next: self.blocks[block].first_inst,
+            head: self.blocks[block].first_inst,
+            tail: self.blocks[block].last_inst,
         }
     }
 
@@ -282,8 +284,10 @@ impl FuncLayout {
         self.blocks[block].last_inst
     }
 
-    pub fn inst_block(&self, inst: Inst) -> Option<Block> {
-        self.insts[inst].block
+    pub fn inst_block(&self, inst: Inst) -> Block {
+        self.insts[inst]
+            .block
+            .expect("Instruction does not have block")
     }
 
     pub fn prev_inst(&self, inst: Inst) -> Option<Inst> {
@@ -344,41 +348,79 @@ impl FuncLayout {
     }
 }
 
-pub struct BlockIter<'a> {
+pub struct Blocks<'a> {
     blocks: &'a SecondaryMap<Block, BlockNode>,
-    next: Option<Block>,
+    head: Option<Block>,
+    tail: Option<Block>,
 }
 
-impl Iterator for BlockIter<'_> {
+impl Iterator for Blocks<'_> {
     type Item = Block;
 
     fn next(&mut self) -> Option<Block> {
-        match self.next {
-            Some(block) => {
-                self.next = self.blocks[block].next_block;
-                Some(block)
+        let next = self.head;
+        if let Some(block) = next {
+            if self.head == self.tail {
+                self.head = None;
+                self.tail = None;
+            } else {
+                self.head = self.blocks[block].next_block;
             }
-            None => None,
         }
+        next
     }
 }
 
-pub struct InstIter<'a> {
-    insts: &'a SecondaryMap<Inst, InstNode>,
-    next: Option<Inst>,
+impl DoubleEndedIterator for Blocks<'_> {
+    fn next_back(&mut self) -> Option<Block> {
+        let next = self.tail;
+        if let Some(block) = next {
+            if self.head == self.tail {
+                self.head = None;
+                self.tail = None;
+            } else {
+                self.head = self.blocks[block].prev_block;
+            }
+        }
+        next
+    }
 }
 
-impl Iterator for InstIter<'_> {
+pub struct Insts<'a> {
+    insts: &'a SecondaryMap<Inst, InstNode>,
+    head: Option<Inst>,
+    tail: Option<Inst>,
+}
+
+impl Iterator for Insts<'_> {
     type Item = Inst;
 
     fn next(&mut self) -> Option<Inst> {
-        match self.next {
-            Some(inst) => {
-                self.next = self.insts[inst].next_inst;
-                Some(inst)
+        let next = self.head;
+        if let Some(inst) = next {
+            if self.head == self.tail {
+                self.head = None;
+                self.tail = None;
+            } else {
+                self.head = self.insts[inst].next_inst;
             }
-            None => None,
         }
+        next
+    }
+}
+
+impl DoubleEndedIterator for Insts<'_> {
+    fn next_back(&mut self) -> Option<Inst> {
+        let next = self.tail;
+        if let Some(inst) = next {
+            if self.head == self.tail {
+                self.head = None;
+                self.tail = None;
+            } else {
+                self.tail = self.insts[inst].prev_inst;
+            }
+        }
+        next
     }
 }
 
@@ -422,7 +464,7 @@ impl fmt::Display for Func {
                     write!(f, "{} = ", result)?;
                 }
                 let data = self.data.inst(inst);
-                writeln!(f, "{}", data)?;
+                writeln!(f, "{} ({})", data, inst)?;
             }
         }
         Ok(())
