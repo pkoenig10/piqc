@@ -19,8 +19,8 @@ enum Register {
 #[derive(Debug, PartialEq, Eq)]
 struct Interval {
     value: Value,
-    begin: ProgramIndex,
-    end: Option<ProgramIndex>,
+    begin: ProgramPoint,
+    end: ProgramPoint,
 }
 
 // TODO: Implementing this trait for Interval is weird
@@ -39,40 +39,54 @@ impl Ord for Interval {
 #[derive(Debug)]
 pub struct Intervals {
     intervals: Vec<Interval>,
-    liveins: SecondaryMap<Block, Vec<Value>>,
 }
 
 impl Intervals {
     pub fn new() -> Intervals {
         Intervals {
             intervals: Vec::new(),
-            liveins: SecondaryMap::new(),
         }
     }
 
     pub fn compute(&mut self, func: &Func, cfg: &ControlFlowGraph, order: &Order) {
-        let mut active: HashMap<Value, Option<ProgramIndex>> = HashMap::new();
+        let mut active = HashMap::new();
+        let mut liveins = SecondaryMap::<Block, Vec<Value>>::new();
 
         for block in cfg.blocks().rev() {
             debug_assert!(active.is_empty());
 
+            let first_point = ProgramPoint::new_use(
+                func.layout
+                    .first_inst(block)
+                    .expect("Block does not have first inst")
+                    .index(order),
+            );
+            let last_point = ProgramPoint::new_def(
+                func.layout
+                    .last_inst(block)
+                    .expect("Block does not have last inst")
+                    .index(order),
+            );
+
             for succ in cfg.succs(block) {
-                for &value in &self.liveins[succ] {
-                    active.entry(value).or_insert(None);
+                for &value in &liveins[succ] {
+                    active.entry(value).or_insert(last_point);
                 }
             }
 
             for inst in func.layout.insts(block).rev() {
                 for &value in func.data.inst(inst).args() {
                     // In the future we could add uses here
-                    active.entry(value).or_insert(Some(inst.index(order)));
+                    active
+                        .entry(value)
+                        .or_insert(ProgramPoint::new_use(inst.index(order)));
                 }
 
                 if let Some(value) = func.data.inst_result(inst) {
                     if let Some(end) = active.remove(&value) {
                         self.intervals.push(Interval {
                             value,
-                            begin: inst.index(order),
+                            begin: ProgramPoint::new_def(inst.index(order)),
                             end,
                         })
                     }
@@ -83,7 +97,7 @@ impl Intervals {
                 if let Some(end) = active.remove(&value) {
                     self.intervals.push(Interval {
                         value,
-                        begin: block.index(order),
+                        begin: first_point,
                         end,
                     })
                 }
@@ -92,10 +106,10 @@ impl Intervals {
             for (value, end) in active.drain() {
                 self.intervals.push(Interval {
                     value,
-                    begin: block.index(order),
+                    begin: first_point,
                     end,
                 });
-                self.liveins[block].push(value);
+                liveins[block].push(value);
             }
         }
 
@@ -105,19 +119,41 @@ impl Intervals {
     }
 }
 
-// TODO: this default can cause weird behavior, maybe make explicit invalid value?
-type ProgramIndex = u32;
+type InstIdx = u32;
+
+enum InstPoint {
+    Use = 0,
+    Def = 1,
+}
+
+// We changed from ProgramIndex = u32 because we want to perform linear scan without the func or cfg. In order to do this we need a non-optional program point to represent the end of a live-out interval so we know when to remove those intervals from the active set
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct ProgramPoint(u32);
+
+// TODO: this is probably a premature optimization, consider just using a struct
+impl ProgramPoint {
+    pub fn new_use(idx: InstIdx) -> ProgramPoint {
+        ProgramPoint::new(idx, InstPoint::Use)
+    }
+
+    pub fn new_def(idx: InstIdx) -> ProgramPoint {
+        ProgramPoint::new(idx, InstPoint::Def)
+    }
+
+    fn new(idx: u32, point: InstPoint) -> ProgramPoint {
+        debug_assert!(idx <= 0x4000_0000);
+        ProgramPoint(idx << 1 | (point as u32))
+    }
+}
 
 #[derive(Debug)]
 pub struct Order {
-    blocks: SecondaryMap<Block, ProgramIndex>,
-    insts: SecondaryMap<Inst, ProgramIndex>,
+    insts: SecondaryMap<Inst, InstIdx>,
 }
 
 impl Order {
     pub fn new() -> Order {
         Order {
-            blocks: SecondaryMap::new(),
             insts: SecondaryMap::new(),
         }
     }
@@ -126,9 +162,6 @@ impl Order {
         let mut index = 0;
 
         for block in cfg.blocks() {
-            self.blocks[block] = index;
-            index += 1;
-
             for inst in func.layout.insts(block) {
                 self.insts[inst] = index;
                 index += 1;
@@ -145,17 +178,17 @@ impl Order {
 }
 
 trait OrderIndex {
-    fn index(self, ordering: &Order) -> ProgramIndex;
+    fn index(self, ordering: &Order) -> InstIdx;
 }
 
-impl OrderIndex for Block {
-    fn index(self, ordering: &Order) -> ProgramIndex {
-        ordering.blocks[self]
-    }
-}
+// impl OrderIndex for Block {
+//     fn index(self, ordering: &Order) -> InstIdx {
+//         ordering.blocks[self]
+//     }
+// }
 
 impl OrderIndex for Inst {
-    fn index(self, ordering: &Order) -> ProgramIndex {
+    fn index(self, ordering: &Order) -> InstIdx {
         ordering.insts[self]
     }
 }
