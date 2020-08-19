@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::iter::Enumerate;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
+use std::slice;
 
 pub trait Id: Copy + Eq + Hash {
     fn new(id: usize) -> Self;
@@ -139,7 +141,7 @@ where
         self.values.len()
     }
 
-    pub fn create(&mut self, value: V) -> K {
+    pub fn insert(&mut self, value: V) -> K {
         let key = K::new(self.values.len());
         self.values.push(value);
         key
@@ -163,6 +165,19 @@ where
 {
     fn index_mut(&mut self, key: K) -> &mut V {
         &mut self.values[key.index()]
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a PrimaryMap<K, V>
+where
+    K: Id,
+{
+    type Item = (K, &'a V);
+    type IntoIter = MapIter<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> MapIter<'a, K, V> {
+        MapIter::new(&self.values)
     }
 }
 
@@ -248,5 +263,36 @@ where
     pub fn intern(&mut self, value: V) -> K {
         let key = K::new(self.values.len());
         *self.values.entry(value).or_insert(key)
+    }
+}
+
+pub struct MapIter<'a, K, V>
+where
+    K: Id,
+{
+    values: Enumerate<slice::Iter<'a, V>>,
+    phantom: PhantomData<K>,
+}
+
+impl<'a, K, V> MapIter<'a, K, V>
+where
+    K: Id,
+{
+    pub fn new(values: &'a [V]) -> MapIter<'a, K, V> {
+        MapIter {
+            values: values.iter().enumerate(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, K, V> Iterator for MapIter<'a, K, V>
+where
+    K: Id,
+{
+    type Item = (K, &'a V);
+
+    fn next(&mut self) -> Option<(K, &'a V)> {
+        self.values.next().map(|(i, v)| (K::new(i), v))
     }
 }

@@ -3,7 +3,7 @@ extern crate difference;
 extern crate piqc;
 
 use piqc::ir::cfg::ControlFlowGraph;
-use piqc::ir::liveness::{Intervals, Order};
+use piqc::ir::liveness::{Intervals, Order, RegisterAllocator};
 
 macro_rules! test_compile {
     ($piq_file:expr, $ir_file:expr) => {
@@ -23,6 +23,9 @@ macro_rules! test_compile {
         let mut intervals = Intervals::new();
         intervals.compute(&func, &cfg, &order);
         println!("{:#?}", intervals);
+
+        let mut allocator = RegisterAllocator::new();
+        allocator.run(&intervals);
     };
 }
 

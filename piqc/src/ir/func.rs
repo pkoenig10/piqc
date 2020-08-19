@@ -50,11 +50,11 @@ impl FuncData {
 
     pub fn create_block(&mut self) -> Block {
         let data = BlockData { params: Vec::new() };
-        self.blocks.create(data)
+        self.blocks.insert(data)
     }
 
     pub fn create_inst(&mut self, data: InstData) -> Inst {
-        self.insts.create(data)
+        self.insts.insert(data)
     }
 
     pub fn create_inst_result(&mut self, inst: Inst, ty: Type) -> Value {
@@ -63,7 +63,7 @@ impl FuncData {
             "Instruction {} already has result",
         );
 
-        let value = self.values.create(ValueData::Inst(ty, inst));
+        let value = self.values.insert(ValueData::Inst(ty, inst));
         self.results.insert(inst, Some(value));
         value
     }
@@ -82,7 +82,7 @@ impl FuncData {
 
     pub fn push_block_param(&mut self, block: Block, ty: Type) -> Value {
         let idx = self.blocks[block].params.len();
-        let value = self.values.create(ValueData::Param(ty, block, idx));
+        let value = self.values.insert(ValueData::Param(ty, block, idx));
         self.blocks[block].params.push(value);
         value
     }
