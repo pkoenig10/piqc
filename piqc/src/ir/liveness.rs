@@ -1,4 +1,4 @@
-use crate::collections::{PrimaryMap, SecondaryMap};
+use crate::collections::{PrimaryMap, SecondaryMap, Set};
 use crate::ir::cfg::ControlFlowGraph;
 use crate::ir::*;
 use std::cmp::Ordering;
@@ -122,7 +122,7 @@ impl Intervals {
 
     pub fn compute(&mut self, func: &Func, cfg: &ControlFlowGraph, order: &Order) {
         let mut active = HashMap::new();
-        let mut liveins = SecondaryMap::<Block, Vec<Value>>::new();
+        let mut liveins = SecondaryMap::new();
 
         for block in cfg.blocks().rev() {
             debug_assert!(active.is_empty());
@@ -135,8 +135,13 @@ impl Intervals {
 
             // TODO: this doesn't quite work for loops because we process the successor before the predecessor
             for succ in cfg.succs(block) {
-                for &value in &liveins[succ] {
-                    active.entry(value).or_insert(last_point);
+                match liveins[succ] {
+                    Some(ref liveins) => {
+                        for &value in liveins {
+                            active.entry(value).or_insert(last_point);
+                        }
+                    }
+                    None => panic!("Back edge detected"),
                 }
             }
 
@@ -173,7 +178,7 @@ impl Intervals {
                     begin: block.use_point(order),
                     end,
                 });
-                liveins[block].push(value);
+                liveins[block].get_or_insert_with(Vec::new).push(value);
             }
         }
     }
