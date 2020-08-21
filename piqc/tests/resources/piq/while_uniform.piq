@@ -1,8 +1,9 @@
 fn while_uniform(uniform &int output, uniform int bar) {
     uniform int foo = 0;
+    uniform int foo2 = 0;
 
     while (foo < 42) {
-        foo = foo + bar;
+        foo2 = foo2 + bar;
     }
 
     *output = foo;

@@ -3,7 +3,7 @@ use crate::ir::cfg::ControlFlowGraph;
 use crate::ir::*;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
-use std::fmt;
+use std::ops::{Add, AddAssign};
 
 enum RegisterClass {
     Accumulator,
@@ -17,74 +17,81 @@ enum Register {
     B(u8),
 }
 
-type InstIdx = u32;
-
-enum InstPoint {
-    Use = 0,
-    Def = 1,
-}
-
-// We changed from ProgramIndex = u32 because we want to perform linear scan without the func or cfg. In order to do this we need a non-optional program point to represent the end of a live-out interval so we know when to remove those intervals from the active set
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+// TODO: use a less error-prone default here
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 struct ProgramPoint(u32);
 
-// TODO: this is probably a premature optimization, consider just using a struct
 impl ProgramPoint {
-    pub fn new_use(idx: InstIdx) -> ProgramPoint {
-        ProgramPoint::new(idx, InstPoint::Use)
-    }
-
-    pub fn new_def(idx: InstIdx) -> ProgramPoint {
-        ProgramPoint::new(idx, InstPoint::Def)
-    }
-
-    fn new(idx: u32, point: InstPoint) -> ProgramPoint {
-        debug_assert!(idx <= 0x4000_0000);
-        ProgramPoint(2 * idx + (point as u32))
+    fn fetch_add(&mut self, val: u32) -> ProgramPoint {
+        let ret = *self;
+        *self += val;
+        ret
     }
 }
 
-// TODO: remove this
-impl fmt::Display for ProgramPoint {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.0 & 1 {
-            0 => write!(f, "{}-u", self.0 >> 1),
-            _ => write!(f, "{}-d", self.0 >> 1),
-        }
+impl Add<u32> for ProgramPoint {
+    type Output = ProgramPoint;
+
+    fn add(self, rhs: u32) -> ProgramPoint {
+        ProgramPoint(self.0 + rhs)
+    }
+}
+
+impl AddAssign<u32> for ProgramPoint {
+    fn add_assign(&mut self, rhs: u32) {
+        self.0 += rhs;
     }
 }
 
 #[derive(Debug)]
 pub struct Order {
-    insts: SecondaryMap<Inst, InstIdx>,
+    insts: SecondaryMap<Inst, ProgramPoint>,
+    blocks: SecondaryMap<Block, ProgramPoint>,
 }
 
 impl Order {
     pub fn new() -> Order {
         Order {
             insts: SecondaryMap::new(),
+            blocks: SecondaryMap::new(),
         }
     }
 
     pub fn compute(&mut self, func: &Func, cfg: &ControlFlowGraph) {
-        let mut index = 0;
+        let mut point = ProgramPoint(0);
 
         for block in cfg.blocks() {
+            self.blocks[block] = point.fetch_add(2);
             for inst in func.layout.insts(block) {
-                self.insts[inst] = index;
-                index += 1;
+                self.insts[inst] = point.fetch_add(2);
             }
         }
     }
 }
 
 trait OrderIndex {
-    fn index(self, ordering: &Order) -> InstIdx;
+    fn use_point(self, ordering: &Order) -> ProgramPoint;
+
+    fn def_point(self, ordering: &Order) -> ProgramPoint;
+}
+
+impl OrderIndex for Block {
+    fn use_point(self, ordering: &Order) -> ProgramPoint {
+        ordering.blocks[self]
+    }
+
+    fn def_point(self, ordering: &Order) -> ProgramPoint {
+        ordering.blocks[self] + 1
+    }
 }
 
 impl OrderIndex for Inst {
-    fn index(self, ordering: &Order) -> InstIdx {
+    fn use_point(self, ordering: &Order) -> ProgramPoint {
         ordering.insts[self]
+    }
+
+    fn def_point(self, ordering: &Order) -> ProgramPoint {
+        ordering.insts[self] + 1
     }
 }
 
@@ -120,19 +127,13 @@ impl Intervals {
         for block in cfg.blocks().rev() {
             debug_assert!(active.is_empty());
 
-            let first_point = ProgramPoint::new_use(
-                func.layout
-                    .first_inst(block)
-                    .expect("Block does not have first inst")
-                    .index(order),
-            );
-            let last_point = ProgramPoint::new_def(
-                func.layout
-                    .last_inst(block)
-                    .expect("Block does not have last inst")
-                    .index(order),
-            );
+            let last_point = func
+                .layout
+                .last_inst(block)
+                .expect("Block does not have last inst")
+                .def_point(order);
 
+            // TODO: this doesn't quite work for loops because we process the successor before the predecessor
             for succ in cfg.succs(block) {
                 for &value in &liveins[succ] {
                     active.entry(value).or_insert(last_point);
@@ -142,16 +143,14 @@ impl Intervals {
             for inst in func.layout.insts(block).rev() {
                 for &value in func.data.inst(inst).args() {
                     // In the future we could add uses here
-                    active
-                        .entry(value)
-                        .or_insert(ProgramPoint::new_use(inst.index(order)));
+                    active.entry(value).or_insert(inst.use_point(order));
                 }
 
                 if let Some(value) = func.data.inst_result(inst) {
                     if let Some(end) = active.remove(&value) {
                         self.intervals.insert(Interval {
                             value,
-                            begin: ProgramPoint::new_def(inst.index(order)),
+                            begin: inst.def_point(order),
                             end,
                         });
                     }
@@ -162,7 +161,7 @@ impl Intervals {
                 if let Some(end) = active.remove(&value) {
                     self.intervals.insert(Interval {
                         value,
-                        begin: first_point,
+                        begin: block.def_point(order),
                         end,
                     });
                 }
@@ -171,7 +170,7 @@ impl Intervals {
             for (value, end) in active.drain() {
                 self.intervals.insert(Interval {
                     value,
-                    begin: first_point,
+                    begin: block.use_point(order),
                     end,
                 });
                 liveins[block].push(value);
@@ -251,7 +250,7 @@ impl RegisterAllocator {
                 .map(|&id| intervals.get(id).value)
                 .collect();
 
-            println!("{}: {}", interval.begin, DisplaySlice(&values));
+            println!("{}: {}", interval.begin.0, DisplaySlice(&values));
         }
     }
 }

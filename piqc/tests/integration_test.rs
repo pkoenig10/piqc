@@ -10,19 +10,20 @@ macro_rules! test_compile {
         let func = piqc::compile(include_str!($piq_file)).unwrap();
         // assert_diff!(include_str!($ir_file), &format!("{}", func), "\n", 0);
 
-        println!("{}", func);
-
         let mut cfg = ControlFlowGraph::new();
         cfg.compute(&func);
-        println!("{:#?}", cfg);
 
         let mut order = Order::new();
         order.compute(&func, &cfg);
-        println!("{:#?}", order);
 
         let mut intervals = Intervals::new();
         intervals.compute(&func, &cfg, &order);
-        println!("{:#?}", intervals);
+
+        println!("{:#?}", cfg);
+        // println!("{:#?}", order);
+        // println!("{:#?}", intervals);
+
+        println!("{}", func);
 
         let mut allocator = RegisterAllocator::new();
         allocator.run(&intervals);
