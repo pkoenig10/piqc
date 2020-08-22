@@ -3,7 +3,7 @@ extern crate difference;
 extern crate piqc;
 
 use piqc::ir::cfg::ControlFlowGraph;
-use piqc::ir::liveness::{Intervals, Order, RegisterAllocator};
+use piqc::ir::liveness::{Intervals, Order, OrderIndex, RegisterAllocator};
 
 macro_rules! test_compile {
     ($piq_file:expr, $ir_file:expr) => {
@@ -21,9 +21,32 @@ macro_rules! test_compile {
 
         println!("{:#?}", cfg);
         // println!("{:#?}", order);
-        // println!("{:#?}", intervals);
+        println!("{:#?}", intervals);
 
-        println!("{}", func);
+        // println!("{}", func);
+        for block in func.layout.blocks() {
+            println!();
+            print!("{:2}: {}(", block.use_point(&order).0, block);
+            let mut first = true;
+            for param in func.data.block_params(block) {
+                if first {
+                    print!("{}", param);
+                    first = false;
+                } else {
+                    print!(", {}", param);
+                }
+            }
+            println!(")");
+            for inst in func.layout.insts(block) {
+                print!("{:2}:     ", inst.use_point(&order).0);
+                if let Some(result) = func.data.inst_result(inst) {
+                    print!("{} = ", result);
+                }
+                let data = func.data.inst(inst);
+                println!("{}", data);
+            }
+        }
+        println!("");
 
         let mut allocator = RegisterAllocator::new();
         allocator.run(&intervals);

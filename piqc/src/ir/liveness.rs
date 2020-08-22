@@ -19,7 +19,7 @@ enum Register {
 
 // TODO: use a less error-prone default here
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-struct ProgramPoint(u32);
+pub struct ProgramPoint(pub u32);
 
 impl ProgramPoint {
     fn fetch_add(&mut self, val: u32) -> ProgramPoint {
@@ -69,7 +69,7 @@ impl Order {
     }
 }
 
-trait OrderIndex {
+pub trait OrderIndex {
     fn use_point(self, ordering: &Order) -> ProgramPoint;
 
     fn def_point(self, ordering: &Order) -> ProgramPoint;
@@ -123,6 +123,7 @@ impl Intervals {
     pub fn compute(&mut self, func: &Func, cfg: &ControlFlowGraph, order: &Order) {
         let mut active = HashMap::new();
         let mut liveins = SecondaryMap::new();
+        let mut back_edges = HashMap::new();
 
         for block in cfg.blocks().rev() {
             debug_assert!(active.is_empty());
@@ -133,7 +134,6 @@ impl Intervals {
                 .expect("Block does not have last inst")
                 .def_point(order);
 
-            // TODO: this doesn't quite work for loops because we process the successor before the predecessor
             for succ in cfg.succs(block) {
                 match liveins[succ] {
                     Some(ref liveins) => {
@@ -141,7 +141,9 @@ impl Intervals {
                             active.entry(value).or_insert(last_point);
                         }
                     }
-                    None => panic!("Back edge detected"),
+                    None => {
+                        back_edges.insert(succ, block);
+                    }
                 }
             }
 
@@ -172,13 +174,42 @@ impl Intervals {
                 }
             }
 
+            let mut block_liveins = Vec::new();
             for (value, end) in active.drain() {
                 self.intervals.insert(Interval {
                     value,
                     begin: block.use_point(order),
                     end,
                 });
-                liveins[block].get_or_insert_with(Vec::new).push(value);
+                block_liveins.push(value);
+            }
+            liveins[block] = Some(block_liveins);
+        }
+
+        // Handle back edges
+        let mut live: Vec<(Value, Block)> = Vec::new();
+
+        for block in cfg.blocks() {
+            let last_point = func
+                .layout
+                .last_inst(block)
+                .expect("Block does not have last inst")
+                .def_point(order);
+
+            for &(value, _) in &live {
+                self.intervals.insert(Interval {
+                    value,
+                    begin: block.use_point(order),
+                    end: last_point,
+                });
+            }
+
+            live.retain(|&(_, end_block)| end_block != block);
+
+            if let Some(end_block) = back_edges.remove(&block) {
+                for &value in liveins[block].as_ref().unwrap() {
+                    live.push((value, end_block))
+                }
             }
         }
     }
