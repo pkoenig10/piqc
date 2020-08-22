@@ -1,7 +1,8 @@
-use crate::collections::{PrimaryMap, SecondaryMap, Set};
+use crate::collections::SecondaryMap;
 use crate::ir::cfg::ControlFlowGraph;
 use crate::ir::*;
 use std::cmp::Ordering;
+use std::cmp::{max, min};
 use std::collections::{BinaryHeap, HashMap};
 use std::ops::{Add, AddAssign};
 
@@ -95,29 +96,86 @@ impl OrderIndex for Inst {
     }
 }
 
-id!(IntervalId, "interval");
-
-#[derive(Debug, PartialEq, Eq)]
-struct Interval {
-    value: Value,
+// TODO: Remove Clone
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LiveInterval {
     begin: ProgramPoint,
     end: ProgramPoint,
 }
 
+impl LiveInterval {
+    fn extend_begin(&mut self, begin: ProgramPoint) {
+        self.begin = min(self.begin, begin);
+    }
+
+    fn extend_end(&mut self, end: ProgramPoint) {
+        self.end = max(self.end, end);
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct LiveRange {
+    intervals: Vec<LiveInterval>,
+}
+
+impl LiveRange {
+    fn insert(&mut self, interval: LiveInterval) {
+        // TODO: this reverse is not intuitive, it exists because we compute live intervals in post-order so larger block IDs are more likely to come first, leading to fewer copies when inserting.
+        let index = self.search(interval.begin);
+
+        let (after, before) = self.intervals.split_at_mut(index);
+        let mut previous = before.first_mut();
+        let mut next = after.last_mut();
+
+        let mut coalesced = false;
+        if let Some(ref mut previous) = previous {
+            if previous.end + 1 >= interval.begin {
+                previous.extend_end(interval.end);
+                coalesced = true;
+            }
+        }
+        if let Some(ref mut next) = next {
+            if interval.end + 1 >= next.begin {
+                next.extend_begin(interval.begin);
+                coalesced = true;
+            }
+        }
+
+        if let (Some(previous), Some(next)) = (previous, next) {
+            if previous.end + 1 >= next.begin {
+                next.extend_begin(previous.begin);
+                coalesced = true;
+
+                self.intervals.remove(index);
+            }
+        }
+
+        if !coalesced {
+            self.intervals.insert(index, interval);
+        }
+    }
+
+    fn search(&mut self, point: ProgramPoint) -> usize {
+        match self
+            .intervals
+            .binary_search_by(|interval| interval.begin.cmp(&point).reverse())
+        {
+            Ok(i) => i,
+            Err(i) => i,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Intervals {
-    intervals: PrimaryMap<IntervalId, Interval>,
+    ranges: SecondaryMap<Value, LiveRange>,
 }
 
 impl Intervals {
     pub fn new() -> Intervals {
         Intervals {
-            intervals: PrimaryMap::new(),
+            ranges: SecondaryMap::new(),
         }
-    }
-
-    fn get(&self, id: IntervalId) -> &Interval {
-        &self.intervals[id]
     }
 
     pub fn compute(&mut self, func: &Func, cfg: &ControlFlowGraph, order: &Order) {
@@ -149,38 +207,26 @@ impl Intervals {
 
             for inst in func.layout.insts(block).rev() {
                 for &value in func.data.inst(inst).args() {
-                    // In the future we could add uses here
+                    // TODO: In the future we could add uses here
                     active.entry(value).or_insert(inst.use_point(order));
                 }
 
                 if let Some(value) = func.data.inst_result(inst) {
                     if let Some(end) = active.remove(&value) {
-                        self.intervals.insert(Interval {
-                            value,
-                            begin: inst.def_point(order),
-                            end,
-                        });
+                        self.insert(value, inst.def_point(order), end);
                     }
                 }
             }
 
             for &value in func.data.block_params(block) {
                 if let Some(end) = active.remove(&value) {
-                    self.intervals.insert(Interval {
-                        value,
-                        begin: block.def_point(order),
-                        end,
-                    });
+                    self.insert(value, block.def_point(order), end);
                 }
             }
 
             let mut block_liveins = Vec::new();
             for (value, end) in active.drain() {
-                self.intervals.insert(Interval {
-                    value,
-                    begin: block.use_point(order),
-                    end,
-                });
+                self.insert(value, block.use_point(order), end);
                 block_liveins.push(value);
             }
             liveins[block] = Some(block_liveins);
@@ -197,11 +243,7 @@ impl Intervals {
                 .def_point(order);
 
             for &(value, _) in &live {
-                self.intervals.insert(Interval {
-                    value,
-                    begin: block.use_point(order),
-                    end: last_point,
-                });
+                self.insert(value, block.use_point(order), last_point);
             }
 
             live.retain(|&(_, end_block)| end_block != block);
@@ -213,12 +255,18 @@ impl Intervals {
             }
         }
     }
+
+    fn insert(&mut self, value: Value, begin: ProgramPoint, end: ProgramPoint) {
+        self.ranges[value].insert(LiveInterval { begin, end });
+    }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+// TODO: Remove Clone
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct UnhandledInterval {
-    id: IntervalId,
+    value: Value,
     begin: ProgramPoint,
+    end: ProgramPoint,
 }
 
 impl PartialOrd for UnhandledInterval {
@@ -244,17 +292,17 @@ impl UnhandledIntervals {
         }
     }
 
-    pub fn push(&mut self, id: IntervalId, begin: ProgramPoint) {
-        self.intervals.push(UnhandledInterval { id, begin });
+    pub fn push(&mut self, value: Value, interval: LiveInterval) {
+        self.intervals.push(UnhandledInterval {
+            value,
+            begin: interval.begin,
+            end: interval.end,
+        });
     }
 
-    pub fn pop(&mut self) -> Option<IntervalId> {
-        self.intervals.pop().map(|interval| interval.id)
+    pub fn pop(&mut self) -> Option<UnhandledInterval> {
+        self.intervals.pop()
     }
-}
-
-struct ActiveInterval {
-    id: IntervalId,
 }
 
 #[derive(Debug)]
@@ -267,26 +315,30 @@ impl RegisterAllocator {
 
     pub fn run(&mut self, intervals: &Intervals) {
         let mut unhandled_intervals = UnhandledIntervals::new();
-        for (id, interval) in &intervals.intervals {
-            unhandled_intervals.push(id, interval.begin);
+        for (value, range) in &intervals.ranges {
+            for interval in &range.intervals {
+                unhandled_intervals.push(value, interval.clone());
+            }
         }
 
-        let mut active_intervals: Vec<IntervalId> = Vec::new();
+        let mut active_intervals: Vec<UnhandledInterval> = Vec::new();
 
-        while let Some(id) = unhandled_intervals.pop() {
-            let interval = &intervals.get(id);
+        while let Some(interval) = unhandled_intervals.pop() {
+            active_intervals.retain(|active_interval| interval.begin <= active_interval.end);
 
-            active_intervals
-                .retain(|&active_interval| interval.begin <= intervals.get(active_interval).end);
+            active_intervals.push(interval.clone());
 
-            active_intervals.push(id);
-
-            let values: Vec<Value> = active_intervals
-                .iter()
-                .map(|&id| intervals.get(id).value)
-                .collect();
-
-            println!("{}: {}", interval.begin.0, DisplaySlice(&values));
+            print!("{}:", interval.begin.0);
+            let mut first = true;
+            for interval in &active_intervals {
+                if first {
+                    print!(" {}", interval.value);
+                    first = false;
+                } else {
+                    print!(", {}", interval.value)
+                }
+            }
+            println!("");
         }
     }
 }

@@ -19,9 +19,9 @@ macro_rules! test_compile {
         let mut intervals = Intervals::new();
         intervals.compute(&func, &cfg, &order);
 
-        println!("{:#?}", cfg);
+        // println!("{:#?}", cfg);
         // println!("{:#?}", order);
-        println!("{:#?}", intervals);
+        // println!("{:#?}", intervals);
 
         // println!("{}", func);
         for block in func.layout.blocks() {

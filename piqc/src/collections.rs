@@ -241,6 +241,19 @@ where
     }
 }
 
+impl<'a, K, V> IntoIterator for &'a SecondaryMap<K, V>
+where
+    K: Id,
+{
+    type Item = (K, &'a V);
+    type IntoIter = MapIter<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> MapIter<'a, K, V> {
+        MapIter::new(&self.values)
+    }
+}
+
 #[derive(Debug)]
 pub struct InternMap<K, V>
 where

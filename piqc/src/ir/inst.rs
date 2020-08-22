@@ -205,6 +205,17 @@ impl InstData {
         }
     }
 
+    pub fn target_args(&self) -> &[Value] {
+        match self {
+            InstData::Jump(_, args) => &args,
+            InstData::Brallz(_, args)
+            | InstData::Brallnz(_, args)
+            | InstData::Branyz(_, args)
+            | InstData::Branynz(_, args) => &args[1..],
+            _ => &[],
+        }
+    }
+
     pub fn push_target_arg(&mut self, arg: Value) {
         match self {
             InstData::Jump(_, args)
