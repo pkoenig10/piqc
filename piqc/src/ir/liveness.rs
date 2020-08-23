@@ -2,7 +2,6 @@ use crate::collections::SecondaryMap;
 use crate::ir::cfg::ControlFlowGraph;
 use crate::ir::*;
 use std::cmp::Ordering;
-use std::cmp::{max, min};
 use std::collections::{BinaryHeap, HashMap};
 use std::ops::{Add, AddAssign};
 
@@ -96,21 +95,10 @@ impl OrderIndex for Inst {
     }
 }
 
-// TODO: Remove Clone
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct LiveInterval {
     begin: ProgramPoint,
     end: ProgramPoint,
-}
-
-impl LiveInterval {
-    fn extend_begin(&mut self, begin: ProgramPoint) {
-        self.begin = min(self.begin, begin);
-    }
-
-    fn extend_end(&mut self, end: ProgramPoint) {
-        self.end = max(self.end, end);
-    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -119,50 +107,29 @@ struct LiveRange {
 }
 
 impl LiveRange {
-    fn insert(&mut self, interval: LiveInterval) {
-        // TODO: this reverse is not intuitive, it exists because we compute live intervals in post-order so larger block IDs are more likely to come first, leading to fewer copies when inserting.
-        let index = self.search(interval.begin);
-
-        let (after, before) = self.intervals.split_at_mut(index);
-        let mut previous = before.first_mut();
-        let mut next = after.last_mut();
-
-        let mut coalesced = false;
-        if let Some(ref mut previous) = previous {
-            if previous.end + 1 >= interval.begin {
-                previous.extend_end(interval.end);
-                coalesced = true;
-            }
-        }
-        if let Some(ref mut next) = next {
-            if interval.end + 1 >= next.begin {
-                next.extend_begin(interval.begin);
-                coalesced = true;
-            }
-        }
-
-        if let (Some(previous), Some(next)) = (previous, next) {
-            if previous.end + 1 >= next.begin {
-                next.extend_begin(previous.begin);
-                coalesced = true;
-
-                self.intervals.remove(index);
-            }
-        }
-
-        if !coalesced {
-            self.intervals.insert(index, interval);
-        }
+    fn push(&mut self, interval: LiveInterval) {
+        self.intervals.push(interval);
     }
 
-    fn search(&mut self, point: ProgramPoint) -> usize {
-        match self
-            .intervals
-            .binary_search_by(|interval| interval.begin.cmp(&point).reverse())
-        {
-            Ok(i) => i,
-            Err(i) => i,
+    fn coalesce(&mut self) {
+        self.intervals.sort_unstable();
+
+        let mut len = 1;
+        for i in 1..self.intervals.len() {
+            let interval = self.intervals[i];
+
+            let previous = &mut self.intervals[len - 1];
+            if interval.begin <= previous.end + 1 {
+                previous.end = interval.end;
+                continue;
+            }
+
+            self.intervals[len] = interval;
+            len += 1;
         }
+
+        self.intervals.truncate(len);
+        self.intervals.shrink_to_fit();
     }
 }
 
@@ -213,26 +180,45 @@ impl Intervals {
 
                 if let Some(value) = func.data.inst_result(inst) {
                     if let Some(end) = active.remove(&value) {
-                        self.insert(value, inst.def_point(order), end);
+                        self.push(
+                            value,
+                            LiveInterval {
+                                begin: inst.def_point(order),
+                                end,
+                            },
+                        );
                     }
                 }
             }
 
             for &value in func.data.block_params(block) {
                 if let Some(end) = active.remove(&value) {
-                    self.insert(value, block.def_point(order), end);
+                    self.push(
+                        value,
+                        LiveInterval {
+                            begin: block.def_point(order),
+                            end,
+                        },
+                    );
                 }
             }
 
             let mut block_liveins = Vec::new();
             for (value, end) in active.drain() {
-                self.insert(value, block.use_point(order), end);
+                self.push(
+                    value,
+                    LiveInterval {
+                        begin: block.use_point(order),
+                        end,
+                    },
+                );
                 block_liveins.push(value);
             }
             liveins[block] = Some(block_liveins);
         }
 
         // Handle back edges
+        // TODO: Can we clean this up?
         let mut live: Vec<(Value, Block)> = Vec::new();
 
         for block in cfg.blocks() {
@@ -243,7 +229,13 @@ impl Intervals {
                 .def_point(order);
 
             for &(value, _) in &live {
-                self.insert(value, block.use_point(order), last_point);
+                self.push(
+                    value,
+                    LiveInterval {
+                        begin: block.use_point(order),
+                        end: last_point,
+                    },
+                );
             }
 
             live.retain(|&(_, end_block)| end_block != block);
@@ -254,15 +246,23 @@ impl Intervals {
                 }
             }
         }
+
+        self.coalesce();
     }
 
-    fn insert(&mut self, value: Value, begin: ProgramPoint, end: ProgramPoint) {
-        self.ranges[value].insert(LiveInterval { begin, end });
+    fn push(&mut self, value: Value, interval: LiveInterval) {
+        self.ranges[value].push(interval);
+    }
+
+    fn coalesce(&mut self) {
+        for (_, range) in &mut self.ranges {
+            range.coalesce();
+        }
     }
 }
 
-// TODO: Remove Clone
-#[derive(Debug, Clone, PartialEq, Eq)]
+// TODO: Remove Copy
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct UnhandledInterval {
     value: Value,
     begin: ProgramPoint,
@@ -316,8 +316,8 @@ impl RegisterAllocator {
     pub fn run(&mut self, intervals: &Intervals) {
         let mut unhandled_intervals = UnhandledIntervals::new();
         for (value, range) in &intervals.ranges {
-            for interval in &range.intervals {
-                unhandled_intervals.push(value, interval.clone());
+            for &interval in &range.intervals {
+                unhandled_intervals.push(value, interval);
             }
         }
 
@@ -326,7 +326,7 @@ impl RegisterAllocator {
         while let Some(interval) = unhandled_intervals.pop() {
             active_intervals.retain(|active_interval| interval.begin <= active_interval.end);
 
-            active_intervals.push(interval.clone());
+            active_intervals.push(interval);
 
             print!("{}:", interval.begin.0);
             let mut first = true;

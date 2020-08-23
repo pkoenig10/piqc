@@ -181,6 +181,19 @@ where
     }
 }
 
+impl<'a, K, V> IntoIterator for &'a mut PrimaryMap<K, V>
+where
+    K: Id,
+{
+    type Item = (K, &'a mut V);
+    type IntoIter = MapIterMut<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> MapIterMut<'a, K, V> {
+        MapIterMut::new(&mut self.values)
+    }
+}
+
 #[derive(Debug)]
 pub struct SecondaryMap<K, V> {
     values: Vec<V>,
@@ -254,6 +267,19 @@ where
     }
 }
 
+impl<'a, K, V> IntoIterator for &'a mut SecondaryMap<K, V>
+where
+    K: Id,
+{
+    type Item = (K, &'a mut V);
+    type IntoIter = MapIterMut<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> MapIterMut<'a, K, V> {
+        MapIterMut::new(&mut self.values)
+    }
+}
+
 #[derive(Debug)]
 pub struct InternMap<K, V>
 where
@@ -306,6 +332,37 @@ where
     type Item = (K, &'a V);
 
     fn next(&mut self) -> Option<(K, &'a V)> {
+        self.values.next().map(|(i, v)| (K::new(i), v))
+    }
+}
+
+pub struct MapIterMut<'a, K, V>
+where
+    K: Id,
+{
+    values: Enumerate<slice::IterMut<'a, V>>,
+    phantom: PhantomData<K>,
+}
+
+impl<'a, K, V> MapIterMut<'a, K, V>
+where
+    K: Id,
+{
+    pub fn new(values: &'a mut [V]) -> MapIterMut<'a, K, V> {
+        MapIterMut {
+            values: values.iter_mut().enumerate(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, K, V> Iterator for MapIterMut<'a, K, V>
+where
+    K: Id,
+{
+    type Item = (K, &'a mut V);
+
+    fn next(&mut self) -> Option<(K, &'a mut V)> {
         self.values.next().map(|(i, v)| (K::new(i), v))
     }
 }
