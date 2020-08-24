@@ -1,11 +1,13 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::iter::Enumerate;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 use std::slice;
 
-pub trait Id: Copy + Eq + Hash {
+pub trait Id: Copy + Display + Debug + Eq + Hash {
     fn new(id: usize) -> Self;
 
     fn index(self) -> usize;
@@ -305,6 +307,92 @@ where
     }
 }
 
+enum UnionFindEntry<T> {
+    Rank(u32),
+    Link(T),
+}
+
+impl<T> Default for UnionFindEntry<T> {
+    fn default() -> UnionFindEntry<T> {
+        UnionFindEntry::Rank(0)
+    }
+}
+
+pub struct UnionFind<T>
+where
+    T: Id,
+{
+    values: SecondaryMap<T, UnionFindEntry<T>>,
+}
+
+impl<T> UnionFind<T>
+where
+    T: Id,
+{
+    pub fn new() -> UnionFind<T> {
+        UnionFind {
+            values: SecondaryMap::new(),
+        }
+    }
+
+    pub fn find2(&self, mut value: T) -> T {
+        loop {
+            match self.values[value] {
+                UnionFindEntry::Rank(_) => return value,
+                UnionFindEntry::Link(parent) => value = parent,
+            };
+        }
+    }
+
+    pub fn find(&mut self, mut value: T) -> (T, u32) {
+        let mut path = Vec::new();
+
+        let (leader, rank) = loop {
+            match self.values[value] {
+                UnionFindEntry::Rank(rank) => break (value, rank),
+                UnionFindEntry::Link(parent) => {
+                    path.push(value);
+                    value = parent;
+                }
+            }
+        };
+
+        for value in path {
+            self.values[value] = UnionFindEntry::Link(leader);
+        }
+
+        (leader, rank)
+    }
+
+    pub fn union(&mut self, value0: T, value1: T) {
+        let (leader0, rank0) = self.find(value0);
+        let (leader1, rank1) = self.find(value1);
+
+        if leader0 == leader1 {
+            return;
+        }
+
+        match rank0.cmp(&rank1) {
+            Ordering::Less => {
+                self.values[leader0] = UnionFindEntry::Link(leader1);
+            }
+            Ordering::Greater => {
+                self.values[leader1] = UnionFindEntry::Link(leader0);
+            }
+            Ordering::Equal => {
+                self.values[leader0] = UnionFindEntry::Rank(rank0 + 1);
+                self.values[leader1] = UnionFindEntry::Link(leader0);
+            }
+        }
+    }
+
+    pub fn print(&mut self) {
+        for (value, _) in &self.values {
+            println!("{}: {}", value, self.find2(value));
+        }
+    }
+}
+
 pub struct MapIter<'a, K, V>
 where
     K: Id,
@@ -317,7 +405,7 @@ impl<'a, K, V> MapIter<'a, K, V>
 where
     K: Id,
 {
-    pub fn new(values: &'a [V]) -> MapIter<'a, K, V> {
+    fn new(values: &'a [V]) -> MapIter<'a, K, V> {
         MapIter {
             values: values.iter().enumerate(),
             phantom: PhantomData,
@@ -348,7 +436,7 @@ impl<'a, K, V> MapIterMut<'a, K, V>
 where
     K: Id,
 {
-    pub fn new(values: &'a mut [V]) -> MapIterMut<'a, K, V> {
+    fn new(values: &'a mut [V]) -> MapIterMut<'a, K, V> {
         MapIterMut {
             values: values.iter_mut().enumerate(),
             phantom: PhantomData,

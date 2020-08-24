@@ -14,6 +14,11 @@ enum ValueData {
     Alias(Type, Value),
 }
 
+pub enum ValueDef {
+    Inst(Inst),
+    Param(Block),
+}
+
 impl PrimaryMap<Value, ValueData> {
     pub fn resolve_alias(&self, value: Value) -> Value {
         let mut current_value = value;
@@ -117,6 +122,15 @@ impl FuncData {
 
     pub fn inst_result(&self, inst: Inst) -> Option<Value> {
         self.results[inst]
+    }
+
+    pub fn value_def(&self, value: Value) -> ValueDef {
+        let value = self.resolve_alias(value);
+        match self.values[value] {
+            ValueData::Inst(_, inst) => ValueDef::Inst(inst),
+            ValueData::Param(_, block, _) => ValueDef::Param(block),
+            ValueData::Alias(..) => panic!("Failed to resolve alias"),
+        }
     }
 
     pub fn value_type(&self, value: Value) -> Type {
@@ -464,7 +478,7 @@ impl fmt::Display for Func {
                     write!(f, "{} = ", result)?;
                 }
                 let data = self.data.inst(inst);
-                writeln!(f, "{} ({})", data, inst)?;
+                writeln!(f, "{}", data)?;
             }
         }
         Ok(())

@@ -1,11 +1,11 @@
 use crate::collections::{SecondaryMap, Set};
-use crate::ir::{Block, Func};
+use crate::ir::{Block, Func, Inst};
 use std::iter;
 use std::slice;
 
 #[derive(Debug, Default)]
 struct Node {
-    predecessors: Vec<Block>,
+    predecessors: Vec<Inst>,
     successors: Vec<Block>,
 }
 
@@ -34,7 +34,7 @@ impl ControlFlowGraph {
             for inst in func.layout.insts(block).rev().take(2) {
                 if let Some(target_block) = func.data.inst(inst).target() {
                     self.nodes[block].successors.push(target_block);
-                    self.nodes[target_block].predecessors.push(block);
+                    self.nodes[target_block].predecessors.push(inst);
                 }
             }
         }
@@ -102,12 +102,12 @@ impl DoubleEndedIterator for Blocks<'_> {
     }
 }
 
-pub struct Preds<'a>(iter::Copied<slice::Iter<'a, Block>>);
+pub struct Preds<'a>(iter::Copied<slice::Iter<'a, Inst>>);
 
 impl Iterator for Preds<'_> {
-    type Item = Block;
+    type Item = Inst;
 
-    fn next(&mut self) -> Option<Block> {
+    fn next(&mut self) -> Option<Inst> {
         self.0.next()
     }
 }

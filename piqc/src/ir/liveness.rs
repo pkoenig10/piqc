@@ -1,4 +1,4 @@
-use crate::collections::SecondaryMap;
+use crate::collections::{SecondaryMap, UnionFind};
 use crate::ir::cfg::ControlFlowGraph;
 use crate::ir::*;
 use std::cmp::Ordering;
@@ -70,28 +70,44 @@ impl Order {
 }
 
 pub trait OrderIndex {
-    fn use_point(self, ordering: &Order) -> ProgramPoint;
+    fn use_point(self, order: &Order) -> ProgramPoint;
 
-    fn def_point(self, ordering: &Order) -> ProgramPoint;
+    fn def_point(self, order: &Order) -> ProgramPoint;
 }
 
 impl OrderIndex for Block {
-    fn use_point(self, ordering: &Order) -> ProgramPoint {
-        ordering.blocks[self]
+    fn use_point(self, order: &Order) -> ProgramPoint {
+        order.blocks[self]
     }
 
-    fn def_point(self, ordering: &Order) -> ProgramPoint {
-        ordering.blocks[self] + 1
+    fn def_point(self, order: &Order) -> ProgramPoint {
+        order.blocks[self] + 1
     }
 }
 
 impl OrderIndex for Inst {
-    fn use_point(self, ordering: &Order) -> ProgramPoint {
-        ordering.insts[self]
+    fn use_point(self, order: &Order) -> ProgramPoint {
+        order.insts[self]
     }
 
-    fn def_point(self, ordering: &Order) -> ProgramPoint {
-        ordering.insts[self] + 1
+    fn def_point(self, order: &Order) -> ProgramPoint {
+        order.insts[self] + 1
+    }
+}
+
+impl OrderIndex for ValueDef {
+    fn use_point(self, order: &Order) -> ProgramPoint {
+        match self {
+            ValueDef::Inst(inst) => inst.use_point(order),
+            ValueDef::Param(block) => block.use_point(order),
+        }
+    }
+
+    fn def_point(self, order: &Order) -> ProgramPoint {
+        match self {
+            ValueDef::Inst(inst) => inst.def_point(order),
+            ValueDef::Param(block) => block.def_point(order),
+        }
     }
 }
 
@@ -101,12 +117,110 @@ struct LiveInterval {
     end: ProgramPoint,
 }
 
+// trait IntervalOrd<Rhs> {
+//     fn ord(&self, other: Rhs) -> Ordering;
+// }
+
+// impl IntervalOrd<LiveInterval> for LiveInterval {
+//     fn ord(&self, interval: LiveInterval) -> Ordering {
+//         if interval.end < self.begin {
+//             Ordering::Greater
+//         } else if self.end < interval.begin {
+//             Ordering::Less
+//         } else {
+//             Ordering::Equal
+//         }
+//     }
+// }
+
+// impl IntervalOrd<ProgramPoint> for LiveInterval {
+//     fn ord(&self, point: ProgramPoint) -> Ordering {
+//         if point < self.begin {
+//             Ordering::Greater
+//         } else if self.end < point {
+//             Ordering::Less
+//         } else {
+//             Ordering::Equal
+//         }
+//     }
+// }
+
+impl LiveInterval {
+    fn cmp<T>(&self, value: &T) -> Ordering
+    where
+        T: LiveIntervalOrd,
+    {
+        value.ord(&self).reverse()
+    }
+}
+
+trait LiveIntervalOrd {
+    fn ord(&self, interval: &LiveInterval) -> Ordering;
+}
+
+impl LiveIntervalOrd for ProgramPoint {
+    fn ord(&self, interval: &LiveInterval) -> Ordering {
+        if *self < interval.begin {
+            Ordering::Less
+        } else if interval.end < *self {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
+    }
+}
+
+impl LiveIntervalOrd for LiveInterval {
+    fn ord(&self, interval: &LiveInterval) -> Ordering {
+        if self.end < interval.begin {
+            Ordering::Less
+        } else if interval.end < self.begin {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Eq)]
 struct LiveRange {
     intervals: Vec<LiveInterval>,
 }
 
 impl LiveRange {
+    fn len(&self) -> usize {
+        self.intervals.len()
+    }
+
+    fn contains<T>(&self, value: T) -> bool
+    where
+        T: LiveIntervalOrd,
+    {
+        self.intervals
+            .binary_search_by(|interval| interval.cmp(&value))
+            .is_ok()
+    }
+
+    // fn intersects(&self, range: &LiveRange) -> bool {
+    //     let iter0 = self.intervals.iter();
+    //     let iter1 = self.intervals.iter();
+    //     loop {
+
+    //     }
+    //     false
+    //     let (range0, range1) = if self.len() <= range.len() {
+    //         (&self, &range)
+    //     } else {
+    //         (&range, &self)
+    //     };
+    //     for interval in &range0.intervals {
+    //         if range1.contains(*interval) {
+    //             return true;
+    //         }
+    //     }
+    //     false
+    // }
+
     fn push(&mut self, interval: LiveInterval) {
         self.intervals.push(interval);
     }
@@ -134,13 +248,13 @@ impl LiveRange {
 }
 
 #[derive(Debug)]
-pub struct Intervals {
+pub struct Liveness {
     ranges: SecondaryMap<Value, LiveRange>,
 }
 
-impl Intervals {
-    pub fn new() -> Intervals {
-        Intervals {
+impl Liveness {
+    pub fn new() -> Liveness {
+        Liveness {
             ranges: SecondaryMap::new(),
         }
     }
@@ -250,6 +364,14 @@ impl Intervals {
         self.coalesce();
     }
 
+    fn live_at(&self, value: Value, point: ProgramPoint) -> bool {
+        self.ranges[value].contains(point)
+    }
+
+    // fn interfere(&self, value0: Value, value1: Value) -> bool {
+    //     LiveRange::intersects(&self.ranges[value0], &self.ranges[value1])
+    // }
+
     fn push(&mut self, value: Value, interval: LiveInterval) {
         self.ranges[value].push(interval);
     }
@@ -258,6 +380,87 @@ impl Intervals {
         for (_, range) in &mut self.ranges {
             range.coalesce();
         }
+    }
+}
+
+pub struct RegisterHints {
+    hints: UnionFind<Value>,
+}
+
+impl RegisterHints {
+    pub fn new() -> RegisterHints {
+        RegisterHints {
+            hints: UnionFind::new(),
+        }
+    }
+
+    pub fn compute(
+        &mut self,
+        func: &Func,
+        cfg: &ControlFlowGraph,
+        order: &Order,
+        liveness: &Liveness,
+    ) {
+        for block in cfg.blocks() {
+            let params = func.data.block_params(block);
+
+            for inst in cfg.preds(block) {
+                let args = func.data.inst(inst).target_args();
+
+                debug_assert!(params.len() == args.len());
+
+                for (&param, &arg) in params.iter().zip(args) {
+                    let param_def_point = func.data.value_def(param).def_point(order);
+                    let arg_def_point = func.data.value_def(arg).def_point(order);
+
+                    if liveness.live_at(param, arg_def_point)
+                        || liveness.live_at(arg, param_def_point)
+                    {
+                        continue;
+                    }
+
+                    self.hints.union(param, arg);
+                }
+            }
+        }
+
+        self.hints.print();
+    }
+}
+
+pub struct VirtualRegisters {}
+
+impl VirtualRegisters {
+    pub fn compute(func: &Func, cfg: &ControlFlowGraph, order: &Order, liveness: &Liveness) {
+        let mut isolated_params = Vec::new();
+        let mut isolated_args = Vec::new();
+
+        for block in cfg.blocks() {
+            let params = func.data.block_params(block);
+
+            for inst in cfg.preds(block) {
+                let args = func.data.inst(inst).target_args();
+
+                debug_assert!(params.len() == args.len());
+
+                for (i, (&param, &arg)) in params.iter().zip(args).enumerate() {
+                    let param_def_point = func.data.value_def(param).def_point(order);
+                    let arg_def_point = func.data.value_def(arg).def_point(order);
+
+                    if liveness.live_at(param, arg_def_point) {
+                        println!("Param {} live at arg {} ({})", param, arg, arg_def_point.0);
+                        isolated_params.push((inst, i));
+                    }
+
+                    if liveness.live_at(arg, param_def_point) {
+                        println!("Arg {} ({}) live at param {}", arg, arg_def_point.0, param);
+                        isolated_args.push((block, i));
+                    }
+                }
+            }
+        }
+
+        println!("");
     }
 }
 
@@ -313,9 +516,9 @@ impl RegisterAllocator {
         RegisterAllocator {}
     }
 
-    pub fn run(&mut self, intervals: &Intervals) {
+    pub fn run(&mut self, liveness: &Liveness) {
         let mut unhandled_intervals = UnhandledIntervals::new();
-        for (value, range) in &intervals.ranges {
+        for (value, range) in &liveness.ranges {
             for &interval in &range.intervals {
                 unhandled_intervals.push(value, interval);
             }

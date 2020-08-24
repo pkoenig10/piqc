@@ -1,0 +1,17 @@
+func():
+
+b0():
+    %0 = iconst 0
+    jmp b1(%0)
+
+b1(%2):
+    %1 = bconst true
+    brallz %1 b3()
+    jmp b2()
+
+b2():
+    %4 = add %2, %0
+    jmp b1(%4)
+
+b3():
+    ret

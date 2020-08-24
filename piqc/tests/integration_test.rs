@@ -3,12 +3,14 @@ extern crate difference;
 extern crate piqc;
 
 use piqc::ir::cfg::ControlFlowGraph;
-use piqc::ir::liveness::{Intervals, Order, OrderIndex, RegisterAllocator};
+use piqc::ir::liveness::{Liveness, Order, OrderIndex, RegisterHints, VirtualRegisters};
 
 macro_rules! test_compile {
     ($piq_file:expr, $ir_file:expr) => {
         let func = piqc::compile(include_str!($piq_file)).unwrap();
-        // assert_diff!(include_str!($ir_file), &format!("{}", func), "\n", 0);
+        assert_diff!(include_str!($ir_file), &format!("{}", func), "\n", 0);
+
+        println!("{}", func);
 
         let mut cfg = ControlFlowGraph::new();
         cfg.compute(&func);
@@ -16,12 +18,11 @@ macro_rules! test_compile {
         let mut order = Order::new();
         order.compute(&func, &cfg);
 
-        let mut intervals = Intervals::new();
-        intervals.compute(&func, &cfg, &order);
+        let mut liveness = Liveness::new();
+        liveness.compute(&func, &cfg, &order);
 
-        // println!("{:#?}", cfg);
-        // println!("{:#?}", order);
-        // println!("{:#?}", intervals);
+        let mut hints = RegisterHints::new();
+        hints.compute(&func, &cfg, &order, &liveness);
 
         // println!("{}", func);
         for block in func.layout.blocks() {
@@ -48,8 +49,14 @@ macro_rules! test_compile {
         }
         println!("");
 
-        let mut allocator = RegisterAllocator::new();
-        allocator.run(&intervals);
+        // println!("{:#?}", cfg);
+        // println!("{:#?}", order);
+        // println!("{:#?}", liveness);
+
+        VirtualRegisters::compute(&func, &cfg, &order, &liveness);
+
+        // let mut allocator = RegisterAllocator::new();
+        // allocator.run(&intervals);
     };
 }
 
@@ -114,4 +121,25 @@ fn while_varying() {
         "resources/piq/while_varying.piq",
         "resources/ir/while_varying.ir"
     );
+}
+
+#[test]
+fn arg_at_param() {
+    test_compile!(
+        "resources/piq/arg_at_param.piq",
+        "resources/ir/arg_at_param.ir"
+    );
+}
+
+#[test]
+fn param_at_arg() {
+    test_compile!(
+        "resources/piq/param_at_arg.piq",
+        "resources/ir/param_at_arg.ir"
+    );
+}
+
+#[test]
+fn transitive() {
+    test_compile!("resources/piq/transitive.piq", "resources/ir/transitive.ir");
 }

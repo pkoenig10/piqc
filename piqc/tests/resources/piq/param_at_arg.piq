@@ -1,0 +1,10 @@
+fn test() {
+    uniform int foo = 0;
+    uniform int baz = 0;
+
+    while (true) {
+        uniform int bar = foo;
+        foo = 42;
+        bar = bar + baz;
+    }
+}
