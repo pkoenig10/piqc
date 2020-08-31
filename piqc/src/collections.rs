@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::iter::Enumerate;
@@ -122,7 +123,6 @@ where
     }
 }
 
-#[derive(Debug)]
 pub struct PrimaryMap<K, V> {
     values: Vec<V>,
     phantom: PhantomData<K>,
@@ -196,7 +196,16 @@ where
     }
 }
 
-#[derive(Debug)]
+impl<K, V> fmt::Debug for PrimaryMap<K, V>
+where
+    K: Id,
+    V: Debug,
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_map().entries(self).finish()
+    }
+}
+
 pub struct SecondaryMap<K, V> {
     values: Vec<V>,
     default: V,
@@ -282,6 +291,16 @@ where
     }
 }
 
+impl<K, V> fmt::Debug for SecondaryMap<K, V>
+where
+    K: Id,
+    V: Debug,
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_map().entries(self).finish()
+    }
+}
+
 #[derive(Debug)]
 pub struct InternMap<K, V>
 where
@@ -335,7 +354,7 @@ where
         }
     }
 
-    pub fn find2(&self, mut value: T) -> T {
+    pub fn find(&self, mut value: T) -> T {
         loop {
             match self.values[value] {
                 UnionFindEntry::Rank(_) => return value,
@@ -344,7 +363,7 @@ where
         }
     }
 
-    pub fn find(&mut self, mut value: T) -> (T, u32) {
+    pub fn find_mut(&mut self, mut value: T) -> (T, u32) {
         let mut path = Vec::new();
 
         let (leader, rank) = loop {
@@ -365,8 +384,8 @@ where
     }
 
     pub fn union(&mut self, value0: T, value1: T) {
-        let (leader0, rank0) = self.find(value0);
-        let (leader1, rank1) = self.find(value1);
+        let (leader0, rank0) = self.find_mut(value0);
+        let (leader1, rank1) = self.find_mut(value1);
 
         if leader0 == leader1 {
             return;
@@ -388,7 +407,10 @@ where
 
     pub fn print(&mut self) {
         for (value, _) in &self.values {
-            println!("{}: {}", value, self.find2(value));
+            let leader = self.find(value);
+            if value != leader {
+                println!("{} -> {}", value, leader);
+            }
         }
     }
 }

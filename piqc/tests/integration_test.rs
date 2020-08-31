@@ -10,7 +10,7 @@ macro_rules! test_compile {
         let func = piqc::compile(include_str!($piq_file)).unwrap();
         assert_diff!(include_str!($ir_file), &format!("{}", func), "\n", 0);
 
-        println!("{}", func);
+        // println!("{}", func);
 
         let mut cfg = ControlFlowGraph::new();
         cfg.compute(&func);
@@ -25,7 +25,7 @@ macro_rules! test_compile {
         hints.compute(&func, &cfg, &order, &liveness);
 
         // println!("{}", func);
-        for block in func.layout.blocks() {
+        for block in cfg.blocks() {
             println!();
             print!("{:2}: {}(", block.use_point(&order).0, block);
             let mut first = true;
@@ -51,7 +51,8 @@ macro_rules! test_compile {
 
         // println!("{:#?}", cfg);
         // println!("{:#?}", order);
-        // println!("{:#?}", liveness);
+        // liveness.print();
+        println!("{:#?}", liveness);
 
         VirtualRegisters::compute(&func, &cfg, &order, &liveness);
 

@@ -18,7 +18,7 @@ enum Register {
 }
 
 // TODO: use a less error-prone default here
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProgramPoint(pub u32);
 
 impl ProgramPoint {
@@ -40,6 +40,12 @@ impl Add<u32> for ProgramPoint {
 impl AddAssign<u32> for ProgramPoint {
     fn add_assign(&mut self, rhs: u32) {
         self.0 += rhs;
+    }
+}
+
+impl fmt::Debug for ProgramPoint {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}", self.0)
     }
 }
 
@@ -111,41 +117,13 @@ impl OrderIndex for ValueDef {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct LiveInterval {
-    begin: ProgramPoint,
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct LiveRange {
+    start: ProgramPoint,
     end: ProgramPoint,
 }
 
-// trait IntervalOrd<Rhs> {
-//     fn ord(&self, other: Rhs) -> Ordering;
-// }
-
-// impl IntervalOrd<LiveInterval> for LiveInterval {
-//     fn ord(&self, interval: LiveInterval) -> Ordering {
-//         if interval.end < self.begin {
-//             Ordering::Greater
-//         } else if self.end < interval.begin {
-//             Ordering::Less
-//         } else {
-//             Ordering::Equal
-//         }
-//     }
-// }
-
-// impl IntervalOrd<ProgramPoint> for LiveInterval {
-//     fn ord(&self, point: ProgramPoint) -> Ordering {
-//         if point < self.begin {
-//             Ordering::Greater
-//         } else if self.end < point {
-//             Ordering::Less
-//         } else {
-//             Ordering::Equal
-//         }
-//     }
-// }
-
-impl LiveInterval {
+impl LiveRange {
     fn cmp<T>(&self, value: &T) -> Ordering
     where
         T: LiveIntervalOrd,
@@ -154,15 +132,21 @@ impl LiveInterval {
     }
 }
 
+impl fmt::Debug for LiveRange {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{:?}..{:?}", self.start, self.end)
+    }
+}
+
 trait LiveIntervalOrd {
-    fn ord(&self, interval: &LiveInterval) -> Ordering;
+    fn ord(&self, range: &LiveRange) -> Ordering;
 }
 
 impl LiveIntervalOrd for ProgramPoint {
-    fn ord(&self, interval: &LiveInterval) -> Ordering {
-        if *self < interval.begin {
+    fn ord(&self, range: &LiveRange) -> Ordering {
+        if *self < range.start {
             Ordering::Less
-        } else if interval.end < *self {
+        } else if range.end < *self {
             Ordering::Greater
         } else {
             Ordering::Equal
@@ -170,11 +154,11 @@ impl LiveIntervalOrd for ProgramPoint {
     }
 }
 
-impl LiveIntervalOrd for LiveInterval {
-    fn ord(&self, interval: &LiveInterval) -> Ordering {
-        if self.end < interval.begin {
+impl LiveIntervalOrd for LiveRange {
+    fn ord(&self, range: &LiveRange) -> Ordering {
+        if self.end < range.start {
             Ordering::Less
-        } else if interval.end < self.begin {
+        } else if range.end < self.start {
             Ordering::Greater
         } else {
             Ordering::Equal
@@ -183,79 +167,61 @@ impl LiveIntervalOrd for LiveInterval {
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-struct LiveRange {
-    intervals: Vec<LiveInterval>,
+struct LiveInterval {
+    ranges: Vec<LiveRange>,
 }
 
-impl LiveRange {
-    fn len(&self) -> usize {
-        self.intervals.len()
-    }
-
+impl LiveInterval {
     fn contains<T>(&self, value: T) -> bool
     where
         T: LiveIntervalOrd,
     {
-        self.intervals
-            .binary_search_by(|interval| interval.cmp(&value))
+        self.ranges
+            .binary_search_by(|range| range.cmp(&value))
             .is_ok()
     }
 
-    // fn intersects(&self, range: &LiveRange) -> bool {
-    //     let iter0 = self.intervals.iter();
-    //     let iter1 = self.intervals.iter();
-    //     loop {
-
-    //     }
-    //     false
-    //     let (range0, range1) = if self.len() <= range.len() {
-    //         (&self, &range)
-    //     } else {
-    //         (&range, &self)
-    //     };
-    //     for interval in &range0.intervals {
-    //         if range1.contains(*interval) {
-    //             return true;
-    //         }
-    //     }
-    //     false
-    // }
-
-    fn push(&mut self, interval: LiveInterval) {
-        self.intervals.push(interval);
+    fn push(&mut self, range: LiveRange) {
+        self.ranges.push(range);
     }
 
     fn coalesce(&mut self) {
-        self.intervals.sort_unstable();
+        self.ranges.sort_unstable();
 
         let mut len = 1;
-        for i in 1..self.intervals.len() {
-            let interval = self.intervals[i];
+        for i in 1..self.ranges.len() {
+            let range = self.ranges[i];
 
-            let previous = &mut self.intervals[len - 1];
-            if interval.begin <= previous.end + 1 {
-                previous.end = interval.end;
+            let previous = &mut self.ranges[len - 1];
+            if range.start <= previous.end + 1 {
+                previous.end = range.end;
                 continue;
             }
 
-            self.intervals[len] = interval;
+            self.ranges[len] = range;
             len += 1;
         }
 
-        self.intervals.truncate(len);
-        self.intervals.shrink_to_fit();
+        self.ranges.truncate(len);
+        self.ranges.shrink_to_fit();
     }
 }
 
+// impl fmt::Debug for LiveInterval {
+//     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+//         fmt.debug_list().entries(self.ranges.iter()).finish()
+//     }
+// }
+
 #[derive(Debug)]
 pub struct Liveness {
-    ranges: SecondaryMap<Value, LiveRange>,
+    intervals: SecondaryMap<Value, LiveInterval>,
 }
 
 impl Liveness {
     pub fn new() -> Liveness {
         Liveness {
-            ranges: SecondaryMap::new(),
+            intervals: SecondaryMap::new(),
         }
     }
 
@@ -296,8 +262,8 @@ impl Liveness {
                     if let Some(end) = active.remove(&value) {
                         self.push(
                             value,
-                            LiveInterval {
-                                begin: inst.def_point(order),
+                            LiveRange {
+                                start: inst.def_point(order),
                                 end,
                             },
                         );
@@ -309,8 +275,8 @@ impl Liveness {
                 if let Some(end) = active.remove(&value) {
                     self.push(
                         value,
-                        LiveInterval {
-                            begin: block.def_point(order),
+                        LiveRange {
+                            start: block.def_point(order),
                             end,
                         },
                     );
@@ -321,8 +287,8 @@ impl Liveness {
             for (value, end) in active.drain() {
                 self.push(
                     value,
-                    LiveInterval {
-                        begin: block.use_point(order),
+                    LiveRange {
+                        start: block.use_point(order),
                         end,
                     },
                 );
@@ -345,8 +311,8 @@ impl Liveness {
             for &(value, _) in &live {
                 self.push(
                     value,
-                    LiveInterval {
-                        begin: block.use_point(order),
+                    LiveRange {
+                        start: block.use_point(order),
                         end: last_point,
                     },
                 );
@@ -365,20 +331,29 @@ impl Liveness {
     }
 
     fn live_at(&self, value: Value, point: ProgramPoint) -> bool {
-        self.ranges[value].contains(point)
+        self.intervals[value].contains(point)
     }
 
-    // fn interfere(&self, value0: Value, value1: Value) -> bool {
-    //     LiveRange::intersects(&self.ranges[value0], &self.ranges[value1])
-    // }
-
-    fn push(&mut self, value: Value, interval: LiveInterval) {
-        self.ranges[value].push(interval);
+    fn push(&mut self, value: Value, interval: LiveRange) {
+        self.intervals[value].push(interval);
     }
 
     fn coalesce(&mut self) {
-        for (_, range) in &mut self.ranges {
-            range.coalesce();
+        for (_, interval) in &mut self.intervals {
+            interval.coalesce();
+        }
+    }
+
+    pub fn print(&self) {
+        for (value, interval) in &self.intervals {
+            if interval.ranges.is_empty() {
+                continue;
+            }
+
+            println!("{}:", value);
+            for range in &interval.ranges {
+                println!("  ({}, {})", range.start.0, range.end.0);
+            }
         }
     }
 }
@@ -392,6 +367,10 @@ impl RegisterHints {
         RegisterHints {
             hints: UnionFind::new(),
         }
+    }
+
+    pub fn get(&self, value: Value) -> Value {
+        self.hints.find(value)
     }
 
     pub fn compute(
@@ -468,7 +447,7 @@ impl VirtualRegisters {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct UnhandledInterval {
     value: Value,
-    begin: ProgramPoint,
+    start: ProgramPoint,
     end: ProgramPoint,
 }
 
@@ -480,7 +459,7 @@ impl PartialOrd for UnhandledInterval {
 
 impl Ord for UnhandledInterval {
     fn cmp(&self, other: &UnhandledInterval) -> Ordering {
-        self.begin.cmp(&other.begin).reverse()
+        self.start.cmp(&other.start).reverse()
     }
 }
 
@@ -495,10 +474,10 @@ impl UnhandledIntervals {
         }
     }
 
-    pub fn push(&mut self, value: Value, interval: LiveInterval) {
+    pub fn push(&mut self, value: Value, interval: LiveRange) {
         self.intervals.push(UnhandledInterval {
             value,
-            begin: interval.begin,
+            start: interval.start,
             end: interval.end,
         });
     }
@@ -518,8 +497,8 @@ impl RegisterAllocator {
 
     pub fn run(&mut self, liveness: &Liveness) {
         let mut unhandled_intervals = UnhandledIntervals::new();
-        for (value, range) in &liveness.ranges {
-            for &interval in &range.intervals {
+        for (value, range) in &liveness.intervals {
+            for &interval in &range.ranges {
                 unhandled_intervals.push(value, interval);
             }
         }
@@ -527,11 +506,11 @@ impl RegisterAllocator {
         let mut active_intervals: Vec<UnhandledInterval> = Vec::new();
 
         while let Some(interval) = unhandled_intervals.pop() {
-            active_intervals.retain(|active_interval| interval.begin <= active_interval.end);
+            active_intervals.retain(|active_interval| interval.start <= active_interval.end);
 
             active_intervals.push(interval);
 
-            print!("{}:", interval.begin.0);
+            print!("{}:", interval.start.0);
             let mut first = true;
             for interval in &active_intervals {
                 if first {

@@ -97,7 +97,7 @@ impl FuncBuilder {
             return;
         }
 
-        let params = mem::replace(&mut data.params, Vec::new());
+        let params = mem::take(&mut data.params);
         for param in params {
             self.start_multiple_predecessors(block, param.value);
             self.run_use_var(param.variable);
