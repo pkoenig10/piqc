@@ -2,7 +2,8 @@ use crate::collections::{SecondaryMap, UnionFind};
 use crate::ir::cfg::ControlFlowGraph;
 use crate::ir::*;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::mem;
 use std::ops::{Add, AddAssign};
 
 enum RegisterClass {
@@ -185,7 +186,7 @@ impl LiveInterval {
         self.ranges.push(range);
     }
 
-    fn coalesce(&mut self) {
+    fn merge(&mut self) {
         self.ranges.sort_unstable();
 
         let mut len = 1;
@@ -327,7 +328,26 @@ impl Liveness {
             }
         }
 
-        self.coalesce();
+        self.merge();
+    }
+
+    pub fn apply(&mut self, hints: &RegisterHints) {
+        let mut intervals = Vec::new();
+        let mut modified = HashSet::new();
+
+        for (value, interval) in &mut self.intervals {
+            let hint = hints.get(value);
+            if hint != value {
+                intervals.push((hint, mem::take(interval)));
+                modified.insert(hint);
+            }
+        }
+
+        for interval in intervals {}
+
+        for value in modified {
+            self.intervals[value].merge();
+        }
     }
 
     fn live_at(&self, value: Value, point: ProgramPoint) -> bool {
@@ -338,9 +358,9 @@ impl Liveness {
         self.intervals[value].push(interval);
     }
 
-    fn coalesce(&mut self) {
+    fn merge(&mut self) {
         for (_, interval) in &mut self.intervals {
-            interval.coalesce();
+            interval.merge();
         }
     }
 
@@ -358,6 +378,7 @@ impl Liveness {
     }
 }
 
+#[derive(Debug)]
 pub struct RegisterHints {
     hints: UnionFind<Value>,
 }
@@ -398,12 +419,21 @@ impl RegisterHints {
                         continue;
                     }
 
+                    // TODO: this is probably wrong because wwe don't consider the live range of the entire union-find group
                     self.hints.union(param, arg);
                 }
             }
         }
 
-        self.hints.print();
+        print!("{:#?}", self.hints);
+
+        for leader in self.hints.leaders() {
+            print!("{}: ", leader);
+            for value in self.hints.elements(leader) {
+                print!("{}, ", value);
+            }
+            println!("");
+        }
     }
 }
 

@@ -51,8 +51,8 @@ macro_rules! test_compile {
 
         // println!("{:#?}", cfg);
         // println!("{:#?}", order);
-        // liveness.print();
         println!("{:#?}", liveness);
+        // println!("{:#?}", hints);
 
         VirtualRegisters::compute(&func, &cfg, &order, &liveness);
 

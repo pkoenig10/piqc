@@ -326,17 +326,19 @@ where
     }
 }
 
+#[derive(Debug)]
 enum UnionFindEntry<T> {
-    Rank(u32),
-    Link(T),
+    Leader(u32, Option<T>),
+    Link(T, T),
 }
 
 impl<T> Default for UnionFindEntry<T> {
     fn default() -> UnionFindEntry<T> {
-        UnionFindEntry::Rank(0)
+        UnionFindEntry::Leader(0, None)
     }
 }
 
+#[derive(Debug)]
 pub struct UnionFind<T>
 where
     T: Id,
@@ -357,35 +359,15 @@ where
     pub fn find(&self, mut value: T) -> T {
         loop {
             match self.values[value] {
-                UnionFindEntry::Rank(_) => return value,
-                UnionFindEntry::Link(parent) => value = parent,
+                UnionFindEntry::Leader(..) => return value,
+                UnionFindEntry::Link(parent, _) => value = parent,
             };
         }
     }
 
-    pub fn find_mut(&mut self, mut value: T) -> (T, u32) {
-        let mut path = Vec::new();
-
-        let (leader, rank) = loop {
-            match self.values[value] {
-                UnionFindEntry::Rank(rank) => break (value, rank),
-                UnionFindEntry::Link(parent) => {
-                    path.push(value);
-                    value = parent;
-                }
-            }
-        };
-
-        for value in path {
-            self.values[value] = UnionFindEntry::Link(leader);
-        }
-
-        (leader, rank)
-    }
-
     pub fn union(&mut self, value0: T, value1: T) {
-        let (leader0, rank0) = self.find_mut(value0);
-        let (leader1, rank1) = self.find_mut(value1);
+        let (leader0, rank0, next0) = self.find_mut(value0);
+        let (leader1, rank1, next1) = self.find_mut(value1);
 
         if leader0 == leader1 {
             return;
@@ -393,24 +375,125 @@ where
 
         match rank0.cmp(&rank1) {
             Ordering::Less => {
-                self.values[leader0] = UnionFindEntry::Link(leader1);
+                self.values[leader0] = UnionFindEntry::Link(leader1, next1);
+                self.values[leader1] = UnionFindEntry::Leader(rank1, Some(next0));
             }
             Ordering::Greater => {
-                self.values[leader1] = UnionFindEntry::Link(leader0);
+                self.values[leader0] = UnionFindEntry::Leader(rank0, Some(next1));
+                self.values[leader1] = UnionFindEntry::Link(leader0, next0);
             }
             Ordering::Equal => {
-                self.values[leader0] = UnionFindEntry::Rank(rank0 + 1);
-                self.values[leader1] = UnionFindEntry::Link(leader0);
+                self.values[leader0] = UnionFindEntry::Leader(rank0 + 1, Some(next1));
+                self.values[leader1] = UnionFindEntry::Link(leader0, next0);
             }
         }
     }
 
-    pub fn print(&mut self) {
-        for (value, _) in &self.values {
-            let leader = self.find(value);
-            if value != leader {
-                println!("{} -> {}", value, leader);
+    pub fn leaders(&self) -> UnionFindIter<T> {
+        UnionFindIter::new(&self)
+    }
+
+    pub fn elements(&self, value: T) -> UnionFindSetIter<T> {
+        UnionFindSetIter::new(&self, value)
+    }
+
+    fn find_mut(&mut self, mut value: T) -> (T, u32, T) {
+        let mut child = value;
+        loop {
+            match self.values[value] {
+                UnionFindEntry::Leader(rank, next) => {
+                    return (value, rank, next.unwrap_or(value));
+                }
+                UnionFindEntry::Link(parent, next) => {
+                    if child != value {
+                        self.values[child] = UnionFindEntry::Link(parent, next);
+                    }
+                    child = value;
+                    value = parent;
+                }
+            };
+        }
+    }
+
+    fn next(&self, value: T) -> T {
+        match self.values[value] {
+            UnionFindEntry::Leader(_, next) => next.unwrap_or(value),
+            UnionFindEntry::Link(_, next) => next,
+        }
+    }
+}
+
+pub struct UnionFindIter<'a, T>
+where
+    T: Id,
+{
+    iter: MapIter<'a, T, UnionFindEntry<T>>,
+}
+
+impl<'a, T> UnionFindIter<'a, T>
+where
+    T: Id,
+{
+    fn new(union_find: &'a UnionFind<T>) -> UnionFindIter<'a, T> {
+        UnionFindIter {
+            iter: union_find.values.into_iter(),
+        }
+    }
+}
+
+impl<'a, T> Iterator for UnionFindIter<'a, T>
+where
+    T: Id,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        loop {
+            match self.iter.next() {
+                Some((value, UnionFindEntry::Leader(..))) => return Some(value),
+                Some((_, UnionFindEntry::Link(..))) => continue,
+                None => return None,
             }
+        }
+    }
+}
+
+pub struct UnionFindSetIter<'a, T>
+where
+    T: Id,
+{
+    union_find: &'a UnionFind<T>,
+    next: Option<T>,
+    end: T,
+}
+
+impl<'a, T> UnionFindSetIter<'a, T>
+where
+    T: Id,
+{
+    fn new(union_find: &'a UnionFind<T>, value: T) -> UnionFindSetIter<'a, T> {
+        UnionFindSetIter {
+            union_find,
+            next: Some(value),
+            end: value,
+        }
+    }
+}
+
+impl<'a, T> Iterator for UnionFindSetIter<'a, T>
+where
+    T: Id,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        match self.next {
+            Some(value) => {
+                let next = self.union_find.next(value);
+                self.next = if next != self.end { Some(next) } else { None };
+                Some(value)
+            }
+            None => None,
         }
     }
 }
@@ -419,7 +502,7 @@ pub struct MapIter<'a, K, V>
 where
     K: Id,
 {
-    values: Enumerate<slice::Iter<'a, V>>,
+    iter: Enumerate<slice::Iter<'a, V>>,
     phantom: PhantomData<K>,
 }
 
@@ -429,7 +512,7 @@ where
 {
     fn new(values: &'a [V]) -> MapIter<'a, K, V> {
         MapIter {
-            values: values.iter().enumerate(),
+            iter: values.iter().enumerate(),
             phantom: PhantomData,
         }
     }
@@ -442,7 +525,7 @@ where
     type Item = (K, &'a V);
 
     fn next(&mut self) -> Option<(K, &'a V)> {
-        self.values.next().map(|(i, v)| (K::new(i), v))
+        self.iter.next().map(|(i, v)| (K::new(i), v))
     }
 }
 
@@ -450,7 +533,7 @@ pub struct MapIterMut<'a, K, V>
 where
     K: Id,
 {
-    values: Enumerate<slice::IterMut<'a, V>>,
+    iter: Enumerate<slice::IterMut<'a, V>>,
     phantom: PhantomData<K>,
 }
 
@@ -460,7 +543,7 @@ where
 {
     fn new(values: &'a mut [V]) -> MapIterMut<'a, K, V> {
         MapIterMut {
-            values: values.iter_mut().enumerate(),
+            iter: values.iter_mut().enumerate(),
             phantom: PhantomData,
         }
     }
@@ -473,6 +556,6 @@ where
     type Item = (K, &'a mut V);
 
     fn next(&mut self) -> Option<(K, &'a mut V)> {
-        self.values.next().map(|(i, v)| (K::new(i), v))
+        self.iter.next().map(|(i, v)| (K::new(i), v))
     }
 }
