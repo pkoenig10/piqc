@@ -5,6 +5,7 @@ pub mod ast;
 pub mod error;
 pub mod ir;
 pub mod parser;
+pub mod parser2;
 
 use crate::error::Errors;
 
@@ -25,6 +26,10 @@ impl Span {
 
     pub fn end(&self) -> usize {
         self.end
+    }
+
+    pub fn to(&self, span: Span) -> Span {
+        Span::new(self.start, span.end)
     }
 }
 

@@ -287,4 +287,8 @@ impl Expr {
     pub fn new(span: Span, kind: ExprKind) -> Expr {
         Expr { span, kind }
     }
+
+    pub fn span(&self) -> Span {
+        self.span
+    }
 }
